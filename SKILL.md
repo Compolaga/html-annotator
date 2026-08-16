@@ -191,8 +191,21 @@ Per annotatie:
 - `attachment` staat er als Luc zelf een afbeelding plakte of bijvoegde; ook
   die met de Read-tool bekijken.
 
+**Eerst begrijpen, dan pas verwerken.** Dit is geen formaliteit: Luc dicteert
+zijn annotaties vaak, waardoor zinnen soms doodlopen en context die voor hem
+vanzelfsprekend is niet op papier staat. Loop ze één voor één na en leg voor wat
+je niet zeker weet, in plaats van het in te vullen. Vraag door als iets te vaag
+is om op te handelen, benoem het als je het er niet mee eens bent of een gevolg
+ziet dat hij niet noemt, en zeg het als een punt iets tegenspreekt dat hij eerder
+zei. Zitten er keuzes in, stel de vraag dan klikbaar met `AskUserQuestion`.
+Twijfel je of je moet vragen: vragen. Verkeerd raden kost hem meer tijd dan een
+vraag.
+
+`toon-annotaties.py` drukt deze werkregel zelf af zodra er open annotaties zijn,
+zodat hij ook meekomt in een sessie die deze skill niet gelezen heeft.
+
 Bij veel annotaties mag je subagents inzetten (één per annotatie of per groepje)
-of er stapsgewijs doorheen gaan. Verwerk punt voor punt en vraag bij twijfel.
+of er stapsgewijs doorheen gaan. Verwerk punt voor punt.
 
 Ga voor de context van een oudere ronde naar de bijbehorende `ronde-NN`-map; de
 `contentHash` en `capturedAt` vertellen bij welke versie van de pagina die

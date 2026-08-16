@@ -20,6 +20,31 @@ import sys
 
 ROOT = os.path.expanduser("~/Desktop/annotaties")
 
+# Komt mee zodra er open annotaties zijn. Staat hier en niet alleen in SKILL.md,
+# zodat het altijd in de context terechtkomt van wie deze feedback verwerkt.
+WERKREGEL = """
+╭─ Voor Claude: eerst begrijpen, dan pas verwerken ─────────────────
+│ Neem deze annotaties niet klakkeloos over. Luc dicteert ze vaak,
+│ dus zinnen lopen soms dood, en context die bij hem vanzelfsprekend
+│ is staat er niet altijd bij.
+│
+│ Loop ze één voor één na en vraag jezelf per annotatie af:
+│   · Snap ik wat hij bedoelt, of vul ik het zelf in? Vul je in, vraag.
+│   · Kan dit meer dan één kant op? Leg de lezingen voor, kies er niet
+│     zelf een.
+│   · Ben ik het er niet mee eens, of zie ik een gevolg dat hij niet
+│     noemt? Zeg dat, met je reden erbij.
+│   · Is het te vaag om op te handelen? Vraag door tot het scherp is.
+│   · Spreekt dit iets tegen dat hij eerder zei? Benoem het.
+│
+│ Zitten er keuzes in, stel je vragen dan klikbaar met AskUserQuestion.
+│ Twijfel je of je moet vragen: vragen. Verkeerd raden kost hem meer
+│ tijd dan een vraag.
+│
+│ Verwerk pas daarna, en vink af wat af is via POST /resolve.
+╰───────────────────────────────────────────────────────────────────
+"""
+
 
 def rondes(pagina):
     d = os.path.join(ROOT, pagina)
@@ -67,6 +92,8 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
     if not tonen:
         print("  (niets open)")
         return
+    if open_n:
+        print(WERKREGEL)
 
     map_ = os.path.dirname(f)
     for a in tonen:
