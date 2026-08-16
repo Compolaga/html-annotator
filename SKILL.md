@@ -1,0 +1,276 @@
+---
+name: html-annotator
+description: Standaard feedback-component voor ELKE HTML-pagina die voor Luc wordt gemaakt (prototypes, slides, vergelijkingspagina's, dashboards). Bouw het annotatie-snippet standaard in bij elke nieuwe of substantieel herziene HTML-oplevering, zonder dat Luc erom hoeft te vragen. Trigger ook wanneer Luc zegt "verwerk mijn feedback", "check mijn bewaarde feedback" of naar een annotations.json / annotatieronde verwijst; dan beschrijft deze skill hoe je de rondes en screenshot-crops uitleest en verwerkt.
+---
+
+# HTML-annotator: standaardcomponent + feedbackverwerking
+
+## Deel 1: inbouwen (bij elke HTML-oplevering)
+
+Plak de volledige inhoud van `annotator-snippet.html` (in deze skill-map) onderaan
+elke HTML die Luc te zien krijgt, vlak voor `</body>` of aan het einde van het
+bestand. Het blok loopt van `<!-- LUC-ANNOTATOR v2 -->` tot `<!-- /LUC-ANNOTATOR -->`.
+
+Detectie bij een bestaande pagina:
+- staat `LUC-ANNOTATOR v2` er al: niets doen;
+- staat er een ouder blok (`LUC-ANNOTATOR v1`, zonder eindmarker): vervang alles
+  vanaf `<!-- LUC-ANNOTATOR` tot en met het bijbehorende `</script>` door het
+  nieuwe blok;
+- staat er niets: onderaan toevoegen.
+
+Self-contained: geen libraries, geen CDN, geen externe fonts. Werkt op file://
+en localhost.
+
+**Start daarna altijd de bridge.** Eén commando, idempotent, dus blind aanroepen
+bij elke oplevering en elke update van een pagina met het snippet erin:
+
+```bash
+~/.claude/skills/html-annotator/ensure-bridge.sh
+```
+
+Draait hij al, dan doet het script niets. Draait hij niet, dan start het hem
+losgekoppeld van je shell (nohup), schrijft de pid naar `bridge.pid` en de
+output naar `bridge.log` in de skill-map, en wacht het tot hij antwoordt (max
+5 seconden). Sla dit nooit over: zonder bridge annoteert Luc in localStorage en
+staat er niets op schijf.
+
+**Vangnet.** Een PostToolUse-hook op `Edit|Write` (gedefinieerd in
+`~/.claude/settings.local.json`) draait na elke schrijf-actie
+`hook-ensure-bridge.sh` uit deze skill-map: is het geschreven bestand een
+`.html`/`.htm` met de marker `LUC-ANNOTATOR`, dan roept het `ensure-bridge.sh`
+aan (log: `bridge-hook.log`). Vergeten = automatisch gerepareerd, maar alleen
+voor pagina's die via Edit/Write op schijf komen.
+
+**Open de pagina altijd via de bridge, nooit via `file://` of de preview-pane.**
+De bridge serveert lokale bestanden zelf op `GET /p/<pad-vanaf-home>`:
+
+```
+/Users/lucmahieu/Desktop/todos-uit-mail.html
+→ http://127.0.0.1:8791/p/Desktop/todos-uit-mail.html
+```
+
+Bouwen doe je zo: neem het absolute pad, haal de home-map (`/Users/lucmahieu/`)
+eraf en plak de rest achter `http://127.0.0.1:8791/p/`. Paden buiten de home-map
+geeft de bridge 403.
+
+Dit lost een echt probleem op: de preview-pane van Claude Code serveert een
+lokaal bestand als `data:`-snapshot, en vanuit zo'n snapshot blokkeert Chrome elk
+verzoek naar localhost. De statuspil bleef dan op "bridge uit" staan terwijl de
+bridge wel draaide, en er werd niets weggeschreven. Via `/p/` is de pagina
+same-origin met de bridge en werkt opslaan altijd. Het snippet leidt het
+bestandspad uit zo'n `/p/`-URL af, dus rondedetectie en crops blijven werken.
+
+Wat Luc kan:
+- **Annotate selection** (regio): knop rechtsonder → rechthoek slepen (snipping-stijl) →
+  comment typen, afbeelding plakken of bijvoegen → Save. De gesleepte rechthoek
+  blijft zichtbaar zolang de commentbox open staat (rest van de pagina gedimd)
+  en verdwijnt pas bij Save of Cancel.
+- **Toetsen in de commentbox**: Cmd+Enter of Ctrl+Enter slaat op, Escape
+  annuleert.
+- **Tekstselectie**: gewoon tekst selecteren → er verschijnt een paars knopje
+  "Annoteer selectie" → comment typen → Save. De geselecteerde tekst komt in de
+  JSON, er wordt geen screenshot gemaakt.
+- **Remove all**: wist na een bevestiging alle annotaties van de lopende ronde.
+  Eerdere rondes op schijf blijven staan.
+- **Stuur direct**: bevestigt eerst wat er op schijf staat (`/session`) en opent
+  daarna via `POST /sessie` een verse Claude Code-sessie met het verwerk-promptje
+  (pad naar `annotations.json`, ronde, aantal, en de opdracht om achteraf te
+  resolven). Lukt het openen niet, dan komt datzelfde promptje op het klembord.
+  Draait de bridge niet, dan zegt de knop dat er niets op schijf staat; hij faalt
+  niet stil. Er is geen download-knop meer: de bridge is de enige opslagroute.
+- Badges: blauw = regio, paars = tekstselectie. Klik erop om te bekijken,
+  bewerken of verwijderen.
+- Statuspil links van de knoppen: `round N - X annotaties opgeslagen` (X = het
+  aantal **openstaande** annotaties op schijf), of "bridge uit - alleen
+  localStorage".
+- **Afvinken in de UI**: elk kaartje in de weeslijst heeft een ✓, en de popup van
+  elke badge ook. Dat zet `resolved` via de bridge; de annotatie verdwijnt van de
+  pagina en blijft in de JSON staan.
+
+Elke Save schrijft direct weg via de bridge. Zodra de bridge bereikbaar is, is
+hij ook leidend voor wat de pagina toont: bij het laden haalt het snippet de
+openstaande (niet-resolved) annotaties van de lopende ronde op en tekent alleen
+die. Zonder bridge blijft localStorage het vangnet.
+
+Kan een anker niet meer geplaatst worden na een pagina-wijziging, dan verschijnt
+er linksonder een klein kaartje **"N annotaties waarschijnlijk verwerkt"**. Dat
+is bewust geen foutmelding: een anker verdwijnt meestal juist doordat de tekst is
+aangepast, dus het is een opruimlijst. Het kaartje is standaard **ingeklapt**
+(alleen de kopregel met chevron), onthoudt zijn open/dicht-stand in localStorage
+en wijkt uit naar boven als het de knoppenbalk rechtsonder zou raken. Openklappen
+geeft per annotatie de comment (klik = popup) en een ✓ om hem af te vinken.
+
+Test/debug-API: `window.LucAnnotator.add({type:'region'|'text', rect, comment,
+selectedText})` (geeft een promise terug), `.anns()`, `.bridge()`, `.session()`,
+`.resolve(annotatie)`.
+
+## Deel 2: de bridge
+
+Een browserpagina kan zelf niet naar schijf schrijven. `annotator-bridge.py`
+(stdlib only) lost dat op: hij luistert op **127.0.0.1:8791** (niet 0.0.0.0,
+en niet 8080 want dat is van Docker), beheert de rondemappen, schrijft de JSON
+en snijdt de screenshot-crops uit.
+
+Starten gaat via `ensure-bridge.sh` (zie deel 1), niet handmatig. Dat script
+checkt eerst of hij al luistert, start hem anders met nohup, schrijft de pid
+naar `bridge.pid` en de output naar `bridge.log` in de skill-map. Rechtstreeks
+starten kan ook, voor debuggen in de voorgrond:
+
+```bash
+python3 ~/.claude/skills/html-annotator/annotator-bridge.py
+```
+
+Draait hij? `curl -s http://127.0.0.1:8791/ping` geeft
+`{"ok": true, "bridge": "luc-annotator", "version": 2, ...}`. In de pagina zelf
+is het te zien aan de groene statuspil ("round N - X annotaties opgeslagen"). Staat die pil
+oranje op "bridge uit - alleen localStorage", dan is er niets weggeschreven;
+de pagina valt dan terug op localStorage en zegt dat ook bij elke Save.
+
+Croppen doet de bridge met headless Chrome (`--headless=new --screenshot
+--window-size=<doc.w>,<doc.h>`) plus Pillow als dat geïnstalleerd is; zonder
+Pillow rendert Chrome het gebied zelf via een iframe-clip. Beide routes zijn
+getest. Volledige paginascreenshots worden gecached in
+`$TMPDIR/luc-annotator-shots`.
+
+Endpoints: `GET /ping`, `GET /p/<pad>`, `POST /session`, `/save`, `/delete`,
+`/remove-all`, `/resolve`, `/sessie`.
+
+`/session` geeft naast de tellingen ook de openstaande annotaties terug (nr, id,
+type, rect, comment, selectedText, `stale`), zodat de pagina weet wat hij moet
+tekenen.
+
+`POST /sessie` opent een nieuwe Claude Code-sessie met een voorgeladen prompt:
+geef `{"prompt": "..."}` of een kant-en-klare `{"url": "claude://code/new?q=..."}`
+mee. Alleen het claude-scheme wordt geaccepteerd, zodat dit geen algemene
+URL-opener wordt. Dit bestaat omdat een ingebedde browser custom schemes niet
+doorgeeft; zie de skill `nieuwe-sessie`.
+
+## Deel 3: rondes en mapstructuur
+
+```
+~/Desktop/annotaties/<pagina-slug>/
+  ronde-01/
+    annotations.json
+    screenshots/annotatie-01.png
+  ronde-02/
+    ...
+```
+
+De slug komt van de bestandsnaam van de pagina (file://) of anders van de
+paginatitel. Oude rondes worden nooit overschreven.
+
+Een nieuwe ronde begint **alleen na Remove all**: de lopende ronde wordt
+leeggemaakt en op `"closed": true` gezet, en de volgende annotatie opent ronde+1.
+De lopende ronde is dus altijd de hoogste bestaande ronde die niet gesloten is.
+
+Een gewijzigde pagina-inhoud opent **geen** nieuwe ronde meer. Pas jij de HTML
+aan naar aanleiding van feedback, dan blijft de ronde staan met de annotaties die
+nog niet verwerkt zijn. De `contentHash` (hash van het HTML-bestand zonder het
+annotator-blok; voor niet-schijf-pagina's een DOM-hash) wordt nog wel
+weggeschreven, per ronde en per annotatie, puur als context bij welke
+paginaversie die feedback hoorde, plus `lastContentHash` op rondeniveau.
+
+## Deel 4: feedback verwerken
+
+Luc plakt een berichtje in de trant van "Kijk, hier staan de annotaties:
+`<pad>/ronde-NN/annotations.json`. Het zijn er X." Lees dat bestand.
+
+Per annotatie:
+
+```json
+{ "nr": 1, "type": "region", "target": "kop van de kaart",
+  "comment": "...", "image": "screenshots/annotatie-01.png", "_rect": {...} }
+{ "nr": 2, "type": "text", "target": "...", "comment": "...",
+  "selectedText": "de exact geselecteerde tekst" }
+```
+
+- `type: "region"` → open `image` (pad is relatief aan de rondemap) met de
+  Read-tool en lees de crop naast de comment. Zelf croppen hoeft niet meer, dat
+  is al gebeurd op het moment van opslaan. `_rect` is intern, negeer het.
+- `type: "text"` → gebruik `selectedText`; er is geen screenshot.
+- `attachment` staat er als Luc zelf een afbeelding plakte of bijvoegde; ook
+  die met de Read-tool bekijken.
+
+Bij veel annotaties mag je subagents inzetten (één per annotatie of per groepje)
+of er stapsgewijs doorheen gaan. Verwerk punt voor punt en vraag bij twijfel.
+
+Ga voor de context van een oudere ronde naar de bijbehorende `ronde-NN`-map; de
+`contentHash` en `capturedAt` vertellen bij welke versie van de pagina die
+feedback hoorde.
+
+### VERPLICHT: verwerkte annotaties resolved markeren
+
+Dit is de stap die het vaakst vergeten wordt, en precies daar loopt het mis: een
+verwerkte annotatie waarvan je de vlag niet zet, verliest zijn anker (je hebt de
+tekst immers aangepast), belandt in de lijst "waarschijnlijk verwerkt" en komt
+elke ronde terug. Verwerken zonder afvinken is dus **niet af**.
+
+Heb je een annotatie verwerkt in de pagina, meld hem dan direct af bij de bridge.
+Hij blijft als historie in de JSON staan (met `"resolved": true` en
+`"resolvedAt"`), maar verdwijnt van de pagina, zodat Luc na een refresh alleen
+nog ziet wat nog open staat. Doe dit per verwerkte batch, niet pas aan het eind:
+
+```bash
+curl -s -X POST http://127.0.0.1:8791/resolve \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonPath":"~/Desktop/annotaties/todos-uit-mail/ronde-09/annotations.json","nrs":[1,3,4]}'
+```
+
+Antwoord: `{"ok":true,"round":9,"resolved":[1,3,4],"notFound":[],"open":2,"total":5}`.
+Check `notFound` en `open`: dat is je eigen controle dat je de goede nummers had
+en hoeveel er nog openstaan.
+
+- `nrs` zijn de annotatienummers uit die ronde; `ids` mag ook.
+- `jsonPath` is het pad dat Luc je stuurde (`~` mag). Laat je het weg, dan pakt
+  de bridge de lopende ronde van de pagina (`pageFile`/`page`/`slug`, net als de
+  andere routes).
+- Terugdraaien kan met `"resolved": false`.
+- Zeg er in je antwoord bij welke nummers je hebt afgevinkt en wat er nog
+  openstaat.
+
+Positionering na een pagina-wijziging: tekstannotaties zoekt het snippet
+opnieuw op via hun `selectedText`, dus die schuiven vanzelf mee. Regio-annotaties
+van een oudere paginaversie worden niet op mogelijk verkeerde coördinaten
+getekend, maar verschijnen in het kaartje "waarschijnlijk verwerkt" linksonder. Verwerk je
+zo'n annotatie, dan verdwijnt hij daaruit zodra je hem resolved zet; Luc kan hem
+daar ook zelf afvinken met het ✓.
+
+## Deel 5: de concept-berichtkaart
+
+Een conceptbericht (mail, Teams, WhatsApp) dat nog niet verstuurd is, hoort niet
+als platte tekst in de chat maar als kaart in de HTML. Dan kan Luc de tekst zien
+zoals de ontvanger hem krijgt, en er met de annotator per zin op reageren.
+
+De CSS zit in `annotator-snippet.html`, dus elke pagina met het snippet kan het
+component gebruiken zonder eigen opmaak. Klassen hebben de `la-`-prefix, net als
+de rest van de annotator, en zijn vlak (`la-draft-hdr` in plaats van
+`.la-draft .hdr`) zodat een pagina-eigen `.hdr`, `.txt` of `.na` er niet mee
+botst. `--ink` en `--muted` worden gebruikt als de pagina ze definieert, met een
+fallback als dat niet zo is.
+
+```html
+<h2>Mail-concepten <span class="count">1</span></h2>
+<p class="lead">Nog niet verstuurd. Annoteer gerust in de tekst zelf, dan pas ik aan.</p>
+
+<div class="la-draft">
+  <div class="la-draft-hdr"><b>Aan:</b> Anne Dijkstra &nbsp;·&nbsp; <b>Cc:</b> Marco Bonsink &nbsp;·&nbsp; <b>Onderwerp:</b> Even bijpraten over security</div>
+  <div class="la-draft-txt">Hi Anne,
+
+Eerste alinea van het bericht.
+
+Groet,
+Luc</div>
+  <div class="la-draft-na">Openstaand: welk issue heb je ingeschoten? Zodra je dat zegt maak ik de eerste zin concreet.</div>
+</div>
+```
+
+Regels bij het gebruik:
+
+- De berichttekst staat letterlijk in `la-draft-txt`, met echte regelafbrekingen.
+  `white-space: pre-wrap` doet de rest, dus geen `<br>` of `<p>` erin.
+- `la-draft-na` is jouw notitie, niet die van de ontvanger: wat nog open staat,
+  welke vraag beantwoord moet worden, of wat er gebeurt zodra het verstuurd is.
+- De concepten staan bovenaan de pagina, met een lead-regel die duidelijk maakt
+  dat er nog niets verstuurd is.
+- Een concept in de pagina zetten is geen goedkeuring. De verzendregel uit
+  CLAUDE.md en de skill `bericht-sturen` blijft onverkort gelden.

@@ -1,0 +1,703 @@
+<!-- LUC-ANNOTATOR v2 · standaard feedback-component; plak dit blok onderaan elke HTML (voor </body> of aan het einde). Self-contained, geen dependencies. Schrijft via de lokale bridge (annotator-bridge.py, 127.0.0.1:8791) naar ~/Desktop/annotaties/<slug>/ronde-NN/. -->
+<style>
+  #la-bar { position: fixed; right: 14px; bottom: 12px; z-index: 99999; display: flex; align-items: center; gap: 6px; font-family: -apple-system, "Segoe UI", Arial, sans-serif; }
+  #la-bar button { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid #c8ccd3; background: #fff; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  #la-bar button.la-aan { background: #16181d; color: #fff; border-color: #16181d; }
+  #la-bar button.la-gevaar { color: #a4262c; border-color: #e6b8ba; }
+  #la-status { font-size: 11px; padding: 5px 9px; border-radius: 999px; border: 1px solid #cfe2cf; background: #eef7ee; color: #256029; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  #la-status.la-uit { border-color: #e6c9a8; background: #fdf3e6; color: #8a4b08; cursor: help; }
+  #la-overlay { position: fixed; inset: 0; z-index: 99998; cursor: crosshair; background: rgba(20,25,35,.06); }
+  .la-ghost { position: absolute; border: 1.5px dashed #2f6bec; background: rgba(47,107,236,.12); z-index: 99998; pointer-events: none; }
+  .la-ghost-vast { border-style: solid; border-width: 2px; background: rgba(47,107,236,.16); box-shadow: 0 0 0 9999px rgba(15,20,30,.10); border-radius: 2px; }
+  .la-badge { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #2f6bec; color: #fff; font: 700 12px/22px -apple-system, Arial, sans-serif; text-align: center; cursor: pointer; z-index: 99997; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  .la-badge.la-tekst { background: #7a4bd6; }
+  .la-rect { position: absolute; border: 1.5px solid rgba(47,107,236,.55); background: rgba(47,107,236,.07); z-index: 99996; pointer-events: none; border-radius: 2px; }
+  .la-rect.la-tekst { border-color: rgba(122,75,214,.5); background: rgba(122,75,214,.10); }
+  /* Kaartje "waarschijnlijk verwerkt": standaard dicht, zodat het nooit het halve
+     scherm afdekt. De open/dicht-stand staat in localStorage. */
+  #la-wees { position: fixed; left: 14px; bottom: 12px; z-index: 99997; width: 300px; max-width: min(300px, calc(100vw - 380px)); background: #fff; border: 1px solid #e6c9a8; border-radius: 10px; padding: 6px 8px; box-shadow: 0 2px 10px rgba(0,0,0,.14); font: 12px/1.4 -apple-system, "Segoe UI", Arial, sans-serif; color: #8a4b08; }
+  #la-wees .la-wees-kop { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: none; border: 0; padding: 2px 0; font: 600 12px/1.35 -apple-system, "Segoe UI", Arial, sans-serif; color: #8a4b08; cursor: pointer; }
+  #la-wees .la-chev { transition: transform .12s ease; display: inline-block; }
+  #la-wees.la-open .la-chev { transform: rotate(90deg); }
+  #la-wees .la-wees-lijst { display: none; margin-top: 4px; max-height: 42vh; overflow: auto; }
+  #la-wees.la-open .la-wees-lijst { display: block; }
+  #la-wees .la-wees-rij { display: flex; align-items: flex-start; gap: 4px; border-top: 1px solid #f2e3cd; }
+  #la-wees .la-wees-tekst { flex: 1; text-align: left; font: 12px/1.35 -apple-system, Arial, sans-serif; background: none; border: 0; padding: 4px 0; color: #4a4f59; cursor: pointer; }
+  #la-wees .la-wees-ok { flex: none; background: none; border: 0; padding: 4px 2px; color: #256029; cursor: pointer; font-size: 13px; }
+  #la-wees .la-wees-ok:hover { color: #0f3d16; }
+  #la-wees .la-wees-uitleg { font-size: 11px; color: #a9793d; margin: 2px 0 0; }
+  #la-selknop { position: absolute; z-index: 100000; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid #7a4bd6; background: #7a4bd6; color: #fff; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); font-family: -apple-system, "Segoe UI", Arial, sans-serif; }
+  #la-popup { position: absolute; z-index: 100000; width: 340px; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.25); padding: 12px; font-family: -apple-system, "Segoe UI", Arial, sans-serif; }
+  #la-popup textarea { width: 100%; min-height: 70px; border: 1px solid #d9dce2; border-radius: 8px; padding: 8px; font: 13px/1.4 -apple-system, Arial, sans-serif; resize: vertical; box-sizing: border-box; }
+  #la-popup .la-quote { font-size: 12px; color: #4a4f59; background: #f4f2fb; border-left: 3px solid #7a4bd6; padding: 6px 8px; border-radius: 4px; margin-bottom: 8px; max-height: 70px; overflow: auto; }
+  #la-popup .la-img { max-width: 100%; max-height: 120px; display: block; margin-top: 6px; border-radius: 6px; border: 1px solid #e2e5ea; }
+  #la-popup .la-rij { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  #la-popup .la-rij .la-spacer { flex: 1; }
+  #la-popup button { font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid #c8ccd3; background: #fff; cursor: pointer; }
+  #la-popup button.la-save { background: #16181d; color: #fff; border-color: #16181d; }
+  #la-popup .la-hint { font-size: 11px; color: #8a8f99; margin-top: 6px; }
+  #la-popup .la-hint.la-waarschuwing { color: #8a4b08; }
+
+  /* Concept-berichtkaart: een nog niet verstuurd bericht, zo weergegeven dat Luc
+     er per zin op kan annoteren. Zie SKILL.md deel 5. Vlakke la-draft-*-namen,
+     geen nesting, zodat pagina-eigen .hdr/.txt/.na niet botsen. Kleuren vallen
+     terug op een default als de pagina --ink/--muted niet definieert. */
+  .la-draft { background: #fffdf7; border: 1px solid #e8dcc0; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .la-draft-hdr { font-size: 13px; color: var(--muted, #6b6b66); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #eee4cd; }
+  .la-draft-hdr b { color: var(--ink, #1c1c1a); }
+  .la-draft-txt { font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; white-space: pre-wrap; }
+  /* Knop die een verse Claude Code-sessie opent met de context van dit punt.
+     Zie de skill nieuwe-sessie. */
+  .la-sessie { display: inline-block; margin-top: 2px; font-size: 13px; text-decoration: none;
+    padding: 5px 11px; border-radius: 999px; border: 1px solid #c8ccd3; background: #fff;
+    color: #16181d; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .la-sessie:hover { background: #16181d; color: #fff; border-color: #16181d; }
+  .la-sessie::before { content: "\2197\00a0"; }
+  .la-sesmeld { position: fixed; left: 14px; bottom: 56px; z-index: 100001; max-width: 340px;
+    background: #16181d; color: #fff; border-radius: 10px; padding: 10px 12px;
+    font: 12px/1.45 -apple-system, "Segoe UI", Arial, sans-serif;
+    box-shadow: 0 3px 14px rgba(0,0,0,.28); }
+  .la-sesmeld.la-fout { background: #7a3b06; }
+  .la-draft-na { font-size: 13px; color: var(--muted, #6b6b66); margin-top: 12px; padding-top: 10px; border-top: 1px solid #eee4cd; }
+</style>
+<script>
+(function () {
+  "use strict";
+  var BRIDGE = "http://127.0.0.1:8791";
+  var KEY = "luc-annotaties:" + location.pathname;
+  var anns = [];
+  try { anns = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) {}
+  var teller = anns.reduce(function (m, a) { return Math.max(m, a.nr || 0); }, 0);
+  var brug = { ok: false, jsonPath: null, count: 0, round: null };
+
+  function bewaarLokaal() { try { localStorage.setItem(KEY, JSON.stringify(anns)); } catch (e) {} }
+  function el(tag, css, ouder) { var d = document.createElement(tag); if (css) d.style.cssText = css; (ouder || document.body).appendChild(d); return d; }
+  function slug() { return (document.title || location.pathname).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "pagina"; }
+  function paginaBestand() {
+    if (location.protocol === "file:") {
+      try { return decodeURIComponent(location.pathname); } catch (e) { return location.pathname; }
+    }
+    /* via de bridge geserveerd: http://127.0.0.1:8791/p/<pad-vanaf-home> */
+    var m = location.pathname.match(/^\/p\/(.+)$/);
+    if (m && (location.hostname === "127.0.0.1" || location.hostname === "localhost")) {
+      try { return "~/" + decodeURIComponent(m[1]); } catch (e) { return "~/" + m[1]; }
+    }
+    return null;
+  }
+  function domHash() {
+    var h = 5381, s = document.body ? document.body.innerText || "" : "";
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(16);
+  }
+  /* eenmalig, vóór de annotator zelf iets in de DOM zet: anders veranderen
+     badges en de statuspil de hash en denkt de bridge dat het een nieuwe ronde is */
+  var DOMHASH = domHash();
+  function basis() {
+    return {
+      page: location.href, pageFile: paginaBestand(), slug: slug(), title: document.title,
+      domHash: DOMHASH,
+      doc: { w: document.documentElement.scrollWidth, h: document.documentElement.scrollHeight }
+    };
+  }
+
+  /* ---- bridge-communicatie -------------------------------------- */
+  function post(pad, body) {
+    return fetch(BRIDGE + pad, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) throw new Error((j && j.error) || "bridge-fout");
+      return j;
+    });
+  }
+  function zetStatus(aan, tekst, titel) {
+    var s = document.getElementById("la-status");
+    if (!s) return;
+    s.classList.toggle("la-uit", !aan);
+    s.textContent = tekst;
+    s.title = titel || "";
+  }
+  /* De bridge is leidend zodra hij bereikbaar is: hij levert de open (niet-resolved)
+     annotaties van de lopende ronde, en die vervangen de lokale lijst. Zo verdwijnen
+     verwerkte annotaties na een refresh en blijven de rest gewoon staan. Zonder
+     bridge blijft localStorage het vangnet. */
+  function uitBridge(j) {
+    if (!j || !Array.isArray(j.annotations)) return;
+    anns = j.annotations.map(function (a) {
+      return {
+        id: a.id, nr: a.nr, type: a.type || "region",
+        rect: a.rect || null, comment: a.comment || "", target: a.target || "",
+        selectedText: a.selectedText || "", img: null,
+        createdAt: a.createdAt, stale: !!a.stale
+      };
+    });
+    teller = Math.max(j.maxNr || 0, anns.reduce(function (m, a) { return Math.max(m, a.nr || 0); }, 0));
+    bewaarLokaal(); render();
+  }
+
+  function verversSessie() {
+    return post("/session", basis()).then(function (j) {
+      /* Nieuwe ronde op schijf? Dan horen de badges van de vorige ronde hier niet
+         meer thuis: die staan al veilig in hun eigen rondemap. Lokaal opschonen,
+         anders blijven oude markeringen op verschoven posities hangen. */
+      var vorige = null;
+      try { vorige = JSON.parse(localStorage.getItem(KEY + ":ronde") || "null"); } catch (e) {}
+      if (vorige !== null && vorige !== j.round) {
+        anns = []; teller = 0;
+        try { localStorage.setItem(KEY, "[]"); } catch (e) {}
+        render();
+      }
+      try { localStorage.setItem(KEY + ":ronde", JSON.stringify(j.round)); } catch (e) {}
+      uitBridge(j);
+      brug.ok = true; brug.jsonPath = j.jsonPath; brug.count = j.count; brug.round = j.round;
+      zetStatus(true, "round " + j.round + " - " + j.count + " annotaties opgeslagen", j.jsonPath);
+      return j;
+    }).catch(function () {
+      brug.ok = false; brug.jsonPath = null;
+      zetStatus(false, "bridge uit - alleen localStorage",
+        "Start de bridge: python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
+      return null;
+    });
+  }
+
+  /* ---- knoppenbalk ---------------------------------------------- */
+  var bar = document.createElement("div"); bar.id = "la-bar";
+  bar.innerHTML = '<span id="la-status">bridge checken...</span>' +
+    '<button id="la-toggle">&#9998; Annotate selection</button>' +
+    '<button id="la-wisalles" class="la-gevaar">Remove all</button>' +
+    '<button id="la-send">Stuur direct</button>';
+  document.body.appendChild(bar);
+
+  /* ---- anker terugvinden na een pagina-wijziging ------------------ */
+  function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+  /* Zoekt de opgeslagen selectie terug in de huidige DOM en geeft de nieuwe
+     paginacoördinaten. Zo blijven tekstannotaties kloppen als er tekst boven is
+     bijgekomen of weggevallen. Niet gevonden? Dan is de annotatie een "wees". */
+  function zoekTekst(needle) {
+    var doel = (needle || "").replace(/\s+/g, " ").trim().slice(0, 300);
+    if (doel.length < 3) return null;
+
+    /* Alle zichtbare tekstnodes achter elkaar in één string, met een index terug
+       naar (node, offset). Dat is nodig om twee redenen:
+       - een selectie kan over meerdere nodes lopen zodra er opmaak in staat
+         (<b>, <a>, <code>), en per node zoeken vindt zo'n zin nooit;
+       - bij text-transform: uppercase levert de selectie HOOFDLETTERS op terwijl
+         de DOM de originele schrijfwijze bevat, dus matchen we hoofdletter-
+         ongevoelig. */
+    var nodes = [], stukken = [], lengte = 0, n;
+    var loper = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (k) {
+        if (!k.nodeValue) return NodeFilter.FILTER_REJECT;
+        var p = k.parentElement;
+        if (!p || p.closest("#la-bar,#la-popup,#la-wees,#la-sesmeld,script,style,noscript")) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    while ((n = loper.nextNode())) {
+      nodes.push({ node: n, start: lengte, lengte: n.nodeValue.length });
+      stukken.push(n.nodeValue);
+      lengte += n.nodeValue.length;
+    }
+    if (!nodes.length) return null;
+    var hooi = stukken.join("");
+
+    var re;
+    try {
+      re = new RegExp(doel.split(/\s+/).map(escRe).join("\\s+"), "i");
+    } catch (e) { return null; }
+    var m = re.exec(hooi);
+    if (!m) return null;
+
+    function plek(pos) {
+      for (var i = 0; i < nodes.length; i++) {
+        var e = nodes[i];
+        if (pos >= e.start && pos <= e.start + e.lengte) {
+          return { node: e.node, offset: pos - e.start };
+        }
+      }
+      return null;
+    }
+    var van = plek(m.index), tot = plek(m.index + m[0].length);
+    if (!van || !tot) return null;
+    try {
+      var r = document.createRange();
+      r.setStart(van.node, van.offset);
+      r.setEnd(tot.node, tot.offset);
+      var b = r.getBoundingClientRect();
+      if (!b.width && !b.height) return null;
+      return { x: Math.round(b.left + scrollX), y: Math.round(b.top + scrollY),
+               w: Math.round(b.width), h: Math.round(b.height) };
+    } catch (e) { return null; }
+  }
+
+  /* ---- tekenen --------------------------------------------------- */
+  /* Een annotatie verliest haar anker precies doordat de tekst is aangepast: dat
+     is eerder het signaal dat ze verwerkt IS dan een foutmelding. Daarom staat het
+     kaartje er als "waarschijnlijk verwerkt, afvinken?" met per regel een vinkje,
+     en niet als alarm. Standaard ingeklapt (stand in localStorage). */
+  var WEESKEY = KEY + ":wees-open";
+  function weesOpen() {
+    try { return localStorage.getItem(WEESKEY) === "1"; } catch (e) { return false; }
+  }
+  function toonWezen(lijst) {
+    var oud = document.getElementById("la-wees"); if (oud) oud.remove();
+    if (!lijst.length) return;
+    var box = document.createElement("div"); box.id = "la-wees";
+    if (weesOpen()) box.classList.add("la-open");
+    var kop = document.createElement("button");
+    kop.className = "la-wees-kop";
+    kop.innerHTML = '<span class="la-chev">&#9656;</span><span class="la-wees-tel"></span>';
+    kop.querySelector(".la-wees-tel").textContent =
+      lijst.length + " annotatie" + (lijst.length > 1 ? "s" : "") + " waarschijnlijk verwerkt";
+    kop.title = "Anker niet meer gevonden op de pagina. Klik om te bekijken en af te vinken.";
+    kop.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var nu = !box.classList.contains("la-open");
+      box.classList.toggle("la-open", nu);
+      try { localStorage.setItem(WEESKEY, nu ? "1" : "0"); } catch (e) {}
+    });
+    box.appendChild(kop);
+    var lijstEl = document.createElement("div"); lijstEl.className = "la-wees-lijst";
+    var uitleg = document.createElement("p"); uitleg.className = "la-wees-uitleg";
+    uitleg.textContent = "Anker weg na een paginawijziging. Vink af (✓) wat verwerkt is.";
+    lijstEl.appendChild(uitleg);
+    lijst.forEach(function (a) {
+      var rij = document.createElement("div"); rij.className = "la-wees-rij";
+      var b = document.createElement("button"); b.className = "la-wees-tekst";
+      b.textContent = "#" + a.nr + " · " + ((a.comment || a.selectedText || a.target || "").slice(0, 70) || "(geen tekst)");
+      b.addEventListener("click", function (ev) { ev.stopPropagation(); openPopup(a); });
+      var ok = document.createElement("button"); ok.className = "la-wees-ok";
+      ok.innerHTML = "&#10003;"; ok.title = "Markeer als verwerkt (blijft in de historie staan)";
+      ok.addEventListener("click", function (ev) { ev.stopPropagation(); markeerVerwerkt(a); });
+      rij.appendChild(b); rij.appendChild(ok);
+      lijstEl.appendChild(rij);
+    });
+    box.appendChild(lijstEl);
+    document.body.appendChild(box);
+    mijdKnoppenbalk(box);
+  }
+  /* De knoppenbalk rechtsonder is breed en groeit mee met zijn tekst; op een smal
+     venster botst het kaartje ertegenaan. Meten en het kaartje er dan boven zetten. */
+  function mijdKnoppenbalk(box) {
+    box = box || document.getElementById("la-wees");
+    var bar = document.getElementById("la-bar");
+    if (!box || !bar) return;
+    box.style.bottom = "12px";
+    var b = box.getBoundingClientRect(), k = bar.getBoundingClientRect();
+    if (b.right > k.left && b.bottom > k.top) {
+      box.style.bottom = Math.round(innerHeight - k.top + 8) + "px";
+    }
+  }
+  addEventListener("resize", function () { mijdKnoppenbalk(); });
+
+  /* Badges hangen aan gemeten posities, dus ze moeten mee zodra de layout
+     verschuift. Dat gebeurt bij het laden van fonts en afbeeldingen, bij een
+     resize, en vooral zodra een <details> open- of dichtklapt: alles eronder
+     schuift dan, en zonder hertekenen wijzen de badges naar het verkeerde stuk
+     of lijken ze zelfs kwijt. */
+  var hertekenTimer = null, bezigMetTekenen = false;
+  function herteken() {
+    if (bezigMetTekenen) return;
+    clearTimeout(hertekenTimer);
+    hertekenTimer = setTimeout(function () {
+      bezigMetTekenen = true;
+      try { render(); } finally {
+        setTimeout(function () { bezigMetTekenen = false; }, 0);
+      }
+    }, 60);
+  }
+  addEventListener("load", herteken);
+  addEventListener("resize", herteken);
+  /* toggle bubbelt niet, dus in de capture-fase meeluisteren */
+  document.addEventListener("toggle", function (ev) {
+    if (ev.target && ev.target.tagName === "DETAILS") herteken();
+  }, true);
+  if (window.ResizeObserver) {
+    try { new ResizeObserver(herteken).observe(document.body); } catch (e) {}
+  }
+
+  function render() {
+    document.querySelectorAll(".la-badge,.la-rect").forEach(function (n) { n.remove(); });
+    var wezen = [];
+    anns.forEach(function (a) {
+      var rect = a.rect;
+      /* tekstannotaties: anker opnieuw opzoeken op basis van de selectie zelf */
+      if (a.type === "text" && a.selectedText) {
+        var nieuw = zoekTekst(a.selectedText);
+        if (nieuw) { a.rect = rect = nieuw; }
+        else { wezen.push(a); return; }
+      } else if (a.stale) {
+        /* regio-annotatie van een oudere paginaversie: coördinaten zijn verdacht */
+        wezen.push(a); return;
+      }
+      if (!rect || (!rect.w && !rect.h)) { wezen.push(a); return; }
+      var tekst = a.type === "text";
+      var r = el("div"); r.className = "la-rect" + (tekst ? " la-tekst" : "");
+      r.style.left = rect.x + "px"; r.style.top = rect.y + "px";
+      r.style.width = rect.w + "px"; r.style.height = rect.h + "px";
+      var b = el("div"); b.className = "la-badge" + (tekst ? " la-tekst" : ""); b.textContent = a.nr;
+      b.style.left = (rect.x + rect.w - 8) + "px"; b.style.top = (rect.y - 12) + "px";
+      b.title = a.comment || "";
+      b.addEventListener("click", function (ev) { ev.stopPropagation(); openPopup(a); });
+    });
+    toonWezen(wezen);
+  }
+
+  /* ---- popup ----------------------------------------------------- */
+  var popup = null, hangendeGhost = null;
+  function ruimGhostOp() { if (hangendeGhost) { hangendeGhost.remove(); hangendeGhost = null; } }
+  function sluitPopup() { if (popup) { popup.remove(); popup = null; } ruimGhostOp(); }
+  function openPopup(a) {
+    /* alleen de popup sluiten, niet de zojuist vastgezette selectie opruimen */
+    if (popup) { popup.remove(); popup = null; }
+    popup = document.createElement("div"); popup.id = "la-popup";
+    /* annotaties zonder bruikbaar anker openen gewoon in beeld */
+    var pr = (a.rect && (a.rect.w || a.rect.h)) ? a.rect
+      : { x: scrollX + 20, y: scrollY + 60, w: 0, h: 0 };
+    popup.style.left = Math.max(8, Math.min(pr.x, document.documentElement.scrollWidth - 360)) + "px";
+    popup.style.top = (pr.y + pr.h + 10) + "px";
+    popup.innerHTML =
+      (a.type === "text" ? '<div class="la-quote"></div>' : "") +
+      '<textarea placeholder="Schrijf je comment... (⌘↵ opslaan, afbeelding plakken mag ook)"></textarea>' +
+      '<div class="la-imgwrap"></div>' +
+      '<div class="la-rij">' +
+      '<button class="la-del" title="Verwijder">&#128465;</button>' +
+      '<button class="la-attach" title="Afbeelding toevoegen">&#128206;</button>' +
+      '<button class="la-done" title="Markeer als verwerkt (blijft in de historie)">&#10003;</button>' +
+      '<span class="la-spacer"></span>' +
+      '<button class="la-cancel">Cancel</button>' +
+      '<button class="la-save">Save</button></div>' +
+      '<div class="la-hint"></div>';
+    document.body.appendChild(popup);
+    if (a.type === "text") popup.querySelector(".la-quote").textContent = a.selectedText || "";
+    var hint = popup.querySelector(".la-hint");
+    if (brug.ok) {
+      hint.textContent = a.type === "text"
+        ? "Wordt direct opgeslagen in ronde " + brug.round + " (tekst, geen screenshot)."
+        : "Wordt direct opgeslagen in ronde " + brug.round + " met screenshot-crop.";
+    } else {
+      hint.className = "la-hint la-waarschuwing";
+      hint.textContent = "Bridge draait niet: alleen localStorage, nog niets op schijf.";
+    }
+    var ta = popup.querySelector("textarea"); ta.value = a.comment || "";
+    var wrap = popup.querySelector(".la-imgwrap");
+    function toonImg() { wrap.innerHTML = a.img ? '<img class="la-img" src="' + a.img + '">' : ""; }
+    toonImg();
+    ta.addEventListener("paste", function (ev) {
+      var items = (ev.clipboardData || {}).items || [];
+      for (var i = 0; i < items.length; i++) if (items[i].type.indexOf("image") === 0) {
+        var fr = new FileReader();
+        fr.onload = function () { a.img = fr.result; toonImg(); };
+        fr.readAsDataURL(items[i].getAsFile()); ev.preventDefault();
+      }
+    });
+    popup.querySelector(".la-attach").addEventListener("click", function () {
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+      inp.onchange = function () {
+        if (!inp.files[0]) return;
+        var fr = new FileReader();
+        fr.onload = function () { a.img = fr.result; toonImg(); };
+        fr.readAsDataURL(inp.files[0]);
+      };
+      inp.click();
+    });
+    popup.querySelector(".la-del").addEventListener("click", function () {
+      verwijder(a); sluitPopup();
+    });
+    popup.querySelector(".la-done").addEventListener("click", function () {
+      markeerVerwerkt(a); sluitPopup();
+    });
+    popup.querySelector(".la-cancel").addEventListener("click", function () { render(); sluitPopup(); });
+    function opslaan() {
+      a.comment = ta.value.trim();
+      bewaarAnnotatie(a); sluitPopup();
+    }
+    popup.querySelector(".la-save").addEventListener("click", opslaan);
+    /* Cmd+Enter (of Ctrl+Enter) slaat op, Escape annuleert */
+    ta.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {
+        ev.preventDefault(); ev.stopPropagation(); opslaan();
+      } else if (ev.key === "Escape") {
+        ev.preventDefault(); ev.stopPropagation(); render(); sluitPopup();
+      }
+    });
+    ta.focus();
+  }
+
+  /* ---- opslaan / verwijderen ------------------------------------- */
+  function bewaarAnnotatie(a) {
+    if (!anns.some(function (x) { return x.id === a.id; })) anns.push(a);
+    bewaarLokaal(); render();
+    return post("/save", Object.assign(basis(), {
+      annotation: {
+        id: a.id, type: a.type, rect: a.rect, comment: a.comment, target: a.target,
+        selectedText: a.selectedText || null, img: a.img || null, createdAt: a.createdAt
+      }
+    })).then(function (j) {
+      brug.ok = true; brug.jsonPath = j.jsonPath; brug.count = j.count; brug.round = j.round;
+      a.nr = j.nr; bewaarLokaal(); render();
+      zetStatus(true, "round " + j.round + " - " + j.count + " annotaties opgeslagen", j.jsonPath);
+      return j;
+    }).catch(function (e) {
+      brug.ok = false;
+      zetStatus(false, "bridge uit - alleen localStorage",
+        "Start de bridge: python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
+      alert("Let op: de bridge draait niet, dus er staat niets op schijf.\n" +
+        "Je annotatie zit alleen in localStorage. Start de bridge met:\n" +
+        "python3 ~/.claude/skills/html-annotator/annotator-bridge.py\n" +
+        "of gebruik 'Bewaar feedback' voor een download.");
+      throw e;
+    });
+  }
+
+  function verwijder(a) {
+    anns = anns.filter(function (x) { return x.id !== a.id; });
+    bewaarLokaal(); render();
+    return post("/delete", Object.assign(basis(), { id: a.id })).then(function (j) {
+      brug.count = j.count;
+      zetStatus(true, "round " + j.round + " - " + j.count + " annotaties opgeslagen", j.jsonPath);
+    }).catch(function () { /* offline: localStorage is al bijgewerkt */ });
+  }
+
+  /* Verwerkt afvinken: nooit weggooien, alleen resolved zetten in de JSON. De
+     annotatie verdwijnt van de pagina, de historie blijft op schijf staan. */
+  function markeerVerwerkt(a) {
+    if (!brug.ok) {
+      alert("De bridge draait niet, dus afvinken kan niet worden weggeschreven.\n" +
+        "Start hem met: ~/.claude/skills/html-annotator/ensure-bridge.sh");
+      return Promise.resolve(null);
+    }
+    return post("/resolve", Object.assign(basis(), { ids: [a.id], nrs: [a.nr] }))
+      .then(function (j) {
+        anns = anns.filter(function (x) { return x.id !== a.id; });
+        bewaarLokaal(); render();
+        brug.count = j.open;
+        zetStatus(true, "round " + j.round + " - " + j.open + " annotaties opgeslagen", j.jsonPath);
+        return j;
+      }).catch(function (e) {
+        alert("Afvinken mislukt: " + (e && e.message ? e.message : e));
+        throw e;
+      });
+  }
+
+  /* ---- regio-selectie (snipping) --------------------------------- */
+  var overlay = null, start = null, ghost = null;
+  function tekstBij(rect) {
+    var e = document.elementFromPoint(
+      Math.max(0, Math.min(innerWidth - 2, rect.x + rect.w / 2 - scrollX)),
+      Math.max(0, Math.min(innerHeight - 2, rect.y + 12 - scrollY)));
+    var t = e ? (e.innerText || e.textContent || "") : "";
+    return t.replace(/\s+/g, " ").trim().slice(0, 120);
+  }
+  function zetModus(aan) {
+    document.getElementById("la-toggle").classList.toggle("la-aan", aan);
+    if (!aan) { if (overlay) overlay.remove(); overlay = null; return; }
+    overlay = document.createElement("div"); overlay.id = "la-overlay";
+    document.body.appendChild(overlay);
+    overlay.addEventListener("mousedown", function (ev) {
+      start = { x: ev.pageX, y: ev.pageY };
+      ghost = el("div"); ghost.className = "la-ghost";
+    });
+    overlay.addEventListener("mousemove", function (ev) {
+      if (!start || !ghost) return;
+      var x = Math.min(start.x, ev.pageX), y = Math.min(start.y, ev.pageY);
+      ghost.style.left = x + "px"; ghost.style.top = y + "px";
+      ghost.style.width = Math.abs(ev.pageX - start.x) + "px";
+      ghost.style.height = Math.abs(ev.pageY - start.y) + "px";
+    });
+    overlay.addEventListener("mouseup", function (ev) {
+      if (!start) return;
+      var rect = {
+        x: Math.round(Math.min(start.x, ev.pageX)), y: Math.round(Math.min(start.y, ev.pageY)),
+        w: Math.round(Math.abs(ev.pageX - start.x)), h: Math.round(Math.abs(ev.pageY - start.y))
+      };
+      start = null;
+      var g = ghost; ghost = null;
+      zetModus(false);
+      if (rect.w < 8 || rect.h < 8) { if (g) g.remove(); return; }
+      /* de selectie blijft staan zolang de comment-popup open is */
+      ruimGhostOp();
+      if (g) { g.classList.add("la-ghost-vast"); hangendeGhost = g; }
+      teller += 1;
+      openPopup({
+        id: Date.now() + "-" + teller, nr: teller, type: "region", rect: rect,
+        target: tekstBij(rect), comment: "", img: null,
+        createdAt: new Date().toISOString()
+      });
+    });
+  }
+  document.getElementById("la-toggle").addEventListener("click", function () { zetModus(!overlay); });
+
+  /* ---- tekstselectie --------------------------------------------- */
+  var selKnop = null;
+  function verbergSelKnop() { if (selKnop) { selKnop.remove(); selKnop = null; } }
+  function huidigeSelectie() {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    var tekst = sel.toString().replace(/\s+/g, " ").trim();
+    if (tekst.length < 2) return null;
+    var node = sel.anchorNode;
+    var host = node && (node.nodeType === 1 ? node : node.parentElement);
+    if (host && host.closest && host.closest("#la-popup,#la-bar")) return null;
+    var r = sel.getRangeAt(0).getBoundingClientRect();
+    if (!r.width && !r.height) return null;
+    return {
+      tekst: tekst,
+      rect: { x: Math.round(r.left + scrollX), y: Math.round(r.top + scrollY),
+              w: Math.round(r.width), h: Math.round(r.height) }
+    };
+  }
+  document.addEventListener("mouseup", function () {
+    setTimeout(function () {
+      if (overlay || popup) return;
+      var s = huidigeSelectie();
+      verbergSelKnop();
+      if (!s) return;
+      selKnop = document.createElement("button");
+      selKnop.id = "la-selknop"; selKnop.textContent = "✎ Annoteer selectie";
+      selKnop.style.left = s.rect.x + "px";
+      selKnop.style.top = (s.rect.y + s.rect.h + 6) + "px";
+      document.body.appendChild(selKnop);
+      selKnop.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+      selKnop.addEventListener("click", function (ev) {
+        ev.stopPropagation(); verbergSelKnop();
+        teller += 1;
+        openPopup({
+          id: Date.now() + "-" + teller, nr: teller, type: "text", rect: s.rect,
+          selectedText: s.tekst, target: s.tekst.slice(0, 120), comment: "", img: null,
+          createdAt: new Date().toISOString()
+        });
+      });
+    }, 10);
+  });
+  document.addEventListener("scroll", verbergSelKnop, true);
+
+  /* ---- remove all ------------------------------------------------ */
+  document.getElementById("la-wisalles").addEventListener("click", function () {
+    if (!anns.length && !brug.count) { alert("Er zijn geen annotaties om te wissen."); return; }
+    if (!confirm("Alle annotaties van de lopende ronde verwijderen?\n" +
+        "Eerdere rondes op schijf blijven staan. Dit kan niet ongedaan gemaakt worden.")) return;
+    var was = anns.length;
+    anns = []; teller = 0; bewaarLokaal(); render(); sluitPopup();
+    post("/remove-all", basis()).then(function (j) {
+      brug.count = 0; brug.round = j.nextRound;
+      zetStatus(true, "round " + j.nextRound + " - 0 annotaties opgeslagen", j.jsonPath || "");
+      alert("Ronde " + j.round + " gewist (" + j.cleared + " annotaties). " +
+        "Nieuwe annotaties komen in ronde " + j.nextRound + ".");
+    }).catch(function () {
+      alert("Lokaal gewist (" + was + "), maar de bridge draait niet, dus op schijf is niets veranderd.");
+    });
+  });
+
+  /* ---- versturen naar een verwerkende agent ----------------------- */
+  function kopieer(tekst) {
+    return (navigator.clipboard ? navigator.clipboard.writeText(tekst) : Promise.reject());
+  }
+  /* "Stuur direct" = wat Luc anders met de hand doet: eerst alles naar schijf
+     laten bevestigen (/session), dan een verse Claude Code-sessie openen met het
+     verwerk-promptje erin (/sessie → `open claude://code/new?q=...`). Lukt dat
+     openen niet, dan valt hij terug op het klembord en zegt hij dat ook. Zonder
+     bridge staat er niets op schijf en is er dus niets te verwerken: dan meldt
+     hij dat eerlijk in plaats van stil te falen. */
+  document.getElementById("la-send").addEventListener("click", function () {
+    verversSessie().then(function (j) {
+      if (!j) {
+        alert("De bridge draait niet, dus er staat niets op schijf en er valt niets te verwerken.\n\n" +
+          "Start hem en probeer opnieuw:\n~/.claude/skills/html-annotator/ensure-bridge.sh");
+        return;
+      }
+      if (!j.count) { alert("Geen openstaande annotaties in round " + j.round + "."); return; }
+      var prompt = "Verwerk mijn feedback op " + (j.jsonPath || "") +
+        " (round " + j.round + ", " + j.count + " openstaande annotaties). Gebruik de skill " +
+        "html-annotator: lees de annotaties met hun crops, verwerk ze in " +
+        (paginaBestand() || location.href) +
+        " en markeer ze daarna resolved via POST /resolve.";
+      return post("/sessie", { prompt: prompt }).then(function () {
+        alert("Nieuwe Claude Code-sessie geopend met " + j.count + " annotaties uit round " + j.round + ".");
+      }).catch(function (e) {
+        return kopieer(prompt).then(function () {
+          alert("Sessie openen lukte niet (" + (e && e.message ? e.message : e) + ").\n" +
+            "Het verwerk-promptje staat nu op je klembord; plak het in de Claude-chat.");
+        }).catch(function () { alert("Sessie openen lukte niet. Promptje:\n\n" + prompt); });
+      });
+    });
+  });
+
+  /* ---- test/debug-API -------------------------------------------- */
+  window.LucAnnotator = {
+    anns: function () { return anns; },
+    bridge: function () { return brug; },
+    session: verversSessie,
+    save: bewaarAnnotatie,
+    remove: verwijder,
+    resolve: markeerVerwerkt,
+    add: function (a) {
+      teller += 1;
+      a.nr = teller; a.type = a.type || (a.selectedText ? "text" : "region");
+      a.id = a.id || Date.now() + "-" + teller;
+      a.createdAt = a.createdAt || new Date().toISOString();
+      if (!a.rect) a.rect = { x: 0, y: 0, w: 0, h: 0 };
+      return bewaarAnnotatie(a);
+    }
+  };
+  /* ---- knoppen naar een nieuwe Claude-sessie ---------------------- */
+  /* Een ingebedde browser (zoals de preview-pane) geeft custom schemes als
+     claude:// niet door aan het OS: de klik doet dan stilzwijgend niets.
+     We proberen te navigeren en merken aan het uitblijven van een blur dat het
+     mislukt is; dan kopiëren we de link, zodat Luc hem kan plakken. */
+  function meldSessie(tekst, fout) {
+    var m = document.getElementById("la-sesmeld") || el("div");
+    m.id = "la-sesmeld";
+    m.className = fout ? "la-sesmeld la-fout" : "la-sesmeld";
+    m.textContent = tekst;
+    clearTimeout(m._t);
+    m._t = setTimeout(function () { if (m.parentNode) m.remove(); }, 7000);
+  }
+  function naarKlembord(url) {
+    var klaar = function () {
+      meldSessie("Deze weergave opent geen Claude-links. De link staat op je klembord, plak hem in Spotlight (cmd+spatie).", true);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(klaar, function () {
+        meldSessie("Kon de sessie niet openen. Start de bridge, of open deze pagina in je eigen browser.", true);
+      });
+      return;
+    }
+    var t = document.createElement("textarea");
+    t.value = url; t.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(t); t.select();
+    try { document.execCommand("copy"); klaar(); } catch (e) {
+      meldSessie("Kon de sessie niet openen. Start de bridge, of open deze pagina in je eigen browser.", true);
+    }
+    t.remove();
+  }
+
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest && ev.target.closest("a.la-sessie");
+    if (!a) return;
+    ev.preventDefault();
+    var url = a.getAttribute("href") || "";
+    /* Eerst de bridge: die draait buiten de browser en kan het scheme wel
+       openen. Lukt dat niet, dan pas navigeren en anders het klembord. */
+    post("/sessie", { url: url }).then(function () {
+      meldSessie("Nieuwe Claude-sessie geopend.");
+    }).catch(function () {
+      var vertrokken = false;
+      function weg() { vertrokken = true; }
+      window.addEventListener("blur", weg, { once: true });
+      document.addEventListener("visibilitychange", weg, { once: true });
+      try { window.location.href = url; } catch (e) { /* geblokkeerd */ }
+      setTimeout(function () {
+        window.removeEventListener("blur", weg);
+        if (!vertrokken) naarKlembord(url);
+      }, 700);
+    });
+  }, true);
+
+  render();
+  verversSessie();
+})();
+</script>
+<!-- /LUC-ANNOTATOR -->
