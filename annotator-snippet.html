@@ -58,6 +58,20 @@
     font: 12px/1.45 -apple-system, "Segoe UI", Arial, sans-serif;
     box-shadow: 0 3px 14px rgba(0,0,0,.28); }
   .la-sesmeld.la-fout { background: #7a3b06; }
+  /* Tracked changes op een conceptbericht: Luc herschrijft de tekst zelf en het
+     verschil met de oorspronkelijke versie wordt de annotatie. */
+  .la-draft-txt.la-bewerk { outline: 2px solid #7a5cff; outline-offset: 5px; border-radius: 4px;
+    background: #fffdf6; }
+  .la-draft-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px;
+    font: 12px/1.4 -apple-system, "Segoe UI", Arial, sans-serif; }
+  .la-draft-bar button { font: inherit; padding: 4px 11px; border-radius: 999px;
+    border: 1px solid #c8ccd3; background: #fff; color: #16181d; cursor: pointer; }
+  .la-draft-bar button:hover { border-color: #16181d; }
+  .la-draft-bar button.la-actief { background: #16181d; color: #fff; border-color: #16181d; }
+  .la-draft-bar .la-draft-meld { color: #6b6b66; }
+  .la-draft-txt ins { background: #dcfce7; color: #14532d; text-decoration: underline;
+    text-decoration-thickness: 1px; }
+  .la-draft-txt del { background: #fee2e2; color: #7f1d1d; text-decoration: line-through; }
   .la-draft-na { font-size: 13px; color: var(--muted, #6b6b66); margin-top: 12px; padding-top: 10px; border-top: 1px solid #eee4cd; }
 </style>
 <script>
@@ -128,6 +142,8 @@
         id: a.id, nr: a.nr, type: a.type || "region",
         rect: a.rect || null, comment: a.comment || "", target: a.target || "",
         selectedText: a.selectedText || "", img: null,
+        veld: a.veld || "", origineel: a.origineel || "", nieuw: a.nieuw || "",
+        diff: a.diff || [],
         createdAt: a.createdAt, stale: !!a.stale
       };
     });
@@ -323,6 +339,11 @@
     var wezen = [];
     anns.forEach(function (a) {
       var rect = a.rect;
+      /* Bewerkingen van een conceptbericht hebben geen plek op de pagina: ze zijn al
+         zichtbaar in de kaart zelf, als doorhaling en onderstreping. Een badge zou
+         nergens op slaan, en zonder rechthoek zouden ze in de weeslijst belanden en
+         daar als "waarschijnlijk verwerkt" gaan staan terwijl er niets aan de hand is. */
+      if (a.type === "edit") { return; }
       /* tekstannotaties: anker opnieuw opzoeken op basis van de selectie zelf */
       if (a.type === "text" && a.selectedText) {
         var nieuw = zoekTekst(a.selectedText);
@@ -433,7 +454,10 @@
     return post("/save", Object.assign(basis(), {
       annotation: {
         id: a.id, type: a.type, rect: a.rect, comment: a.comment, target: a.target,
-        selectedText: a.selectedText || null, img: a.img || null, createdAt: a.createdAt
+        selectedText: a.selectedText || null, img: a.img || null, createdAt: a.createdAt,
+        /* bewerkingen op een conceptbericht; leeg voor de andere types */
+        veld: a.veld || null, origineel: a.origineel || null, nieuw: a.nieuw || null,
+        diff: a.diff || null
       }
     })).then(function (j) {
       brug.ok = true; brug.jsonPath = j.jsonPath; brug.count = j.count; brug.round = j.round;
@@ -625,6 +649,195 @@
     });
   });
 
+  /* ---- tracked changes op conceptberichten ------------------------
+     Een comment naast de tekst laat Luc uitleggen wat er anders moet; vaak is het
+     sneller om het gewoon anders op te schrijven. Daarom is elke .la-draft-txt te
+     bewerken, en wordt het verschil met de oorspronkelijke tekst zelf de annotatie:
+     voor, na, en de losse wijzigingen. Zo hoeft er niets vertaald te worden van
+     bedoeling naar tekst. */
+
+  function laTokens(s) { return s.match(/\s+|\S+/g) || []; }
+
+  /* Woord-diff via LCS. Woordniveau, niet teken- of regelniveau: bij lopende tekst
+     leest dat als tracked changes in plaats van als ruis. */
+  function laDiff(oud, nieuw) {
+    var a = laTokens(oud), b = laTokens(nieuw), n = a.length, m = b.length;
+    var uit = [];
+    function duw(op, t) {
+      var l = uit[uit.length - 1];
+      if (l && l.op === op) { l.t += t; } else { uit.push({ op: op, t: t }); }
+    }
+    /* Bij extreem lange teksten is de matrix niet de moeite; dan is "alles vervangen"
+       een eerlijker antwoord dan een bevroren tabblad. */
+    if (n * m > 400000) {
+      if (oud) duw("-", oud);
+      if (nieuw) duw("+", nieuw);
+      return uit;
+    }
+    var d = [], i, j;
+    for (i = 0; i <= n; i++) { d.push(new Uint32Array(m + 1)); }
+    for (i = n - 1; i >= 0; i--) {
+      for (j = m - 1; j >= 0; j--) {
+        d[i][j] = a[i] === b[j] ? d[i + 1][j + 1] + 1 : Math.max(d[i + 1][j], d[i][j + 1]);
+      }
+    }
+    i = 0; j = 0;
+    while (i < n && j < m) {
+      if (a[i] === b[j]) { duw("=", a[i]); i++; j++; }
+      else if (d[i + 1][j] >= d[i][j + 1]) { duw("-", a[i]); i++; }
+      else { duw("+", b[j]); j++; }
+    }
+    while (i < n) { duw("-", a[i++]); }
+    while (j < m) { duw("+", b[j++]); }
+    return uit;
+  }
+
+  function laTeken(box, ops) {
+    box.textContent = "";
+    ops.forEach(function (o) {
+      if (o.op === "=") { box.appendChild(document.createTextNode(o.t)); return; }
+      var e = document.createElement(o.op === "+" ? "ins" : "del");
+      e.textContent = o.t;
+      box.appendChild(e);
+    });
+  }
+
+  /* Naam van het concept, om een bewerking na een reload bij de goede kaart terug te
+     vinden. De kop van de kaart is stabieler dan een index: kaarten worden verplaatst. */
+  function laVeld(box, index) {
+    var kaart = box.closest ? box.closest(".la-draft") : null;
+    var kop = kaart && kaart.querySelector(".la-draft-hdr");
+    var t = (kop && kop.textContent || "").replace(/\s+/g, " ").trim();
+    return t ? t.slice(0, 160) : "concept-" + (index + 1);
+  }
+
+  function laDraftInit() {
+    var boxen = document.querySelectorAll(".la-draft-txt");
+    Array.prototype.forEach.call(boxen, function (box, index) {
+      if (box.__laKlaar) return;
+      box.__laKlaar = true;
+      box.__origineel = box.textContent;
+      box.__nieuw = box.textContent;
+      box.__veld = laVeld(box, index);
+
+      var bar = document.createElement("div");
+      bar.className = "la-draft-bar";
+      var bBewerk = document.createElement("button");
+      bBewerk.textContent = "✎ Bewerk tekst";
+      var bHerstel = document.createElement("button");
+      bHerstel.textContent = "↺ Herstel origineel";
+      bHerstel.style.display = "none";
+      var meld = document.createElement("span");
+      meld.className = "la-draft-meld";
+      bar.appendChild(bBewerk); bar.appendChild(bHerstel); bar.appendChild(meld);
+      box.parentNode.insertBefore(bar, box.nextSibling);
+      box.__bar = { bewerk: bBewerk, herstel: bHerstel, meld: meld };
+
+      function toonMarkup() {
+        var ops = laDiff(box.__origineel, box.__nieuw);
+        var gewijzigd = ops.some(function (o) { return o.op !== "="; });
+        if (gewijzigd) { laTeken(box, ops); } else { box.textContent = box.__nieuw; }
+        bHerstel.style.display = gewijzigd ? "" : "none";
+        meld.textContent = gewijzigd
+          ? (box.__nr ? "opgeslagen als annotatie " + box.__nr : "wijziging nog niet opgeslagen")
+          : "";
+        return ops;
+      }
+      box.__toonMarkup = toonMarkup;
+
+      function stopBewerken() {
+        if (!box.__bewerkt) return;
+        box.__bewerkt = false;
+        box.removeAttribute("contenteditable");
+        box.classList.remove("la-bewerk");
+        bBewerk.classList.remove("la-actief");
+        bBewerk.textContent = "✎ Bewerk tekst";
+        box.__nieuw = box.textContent;
+        var ops = toonMarkup();
+        if (ops.some(function (o) { return o.op !== "="; })) { laBewaarBewerking(box, ops); }
+      }
+      box.__stopBewerken = stopBewerken;
+
+      bBewerk.addEventListener("click", function () {
+        if (box.__bewerkt) { stopBewerken(); return; }
+        box.__bewerkt = true;
+        box.textContent = box.__nieuw;      /* markup weg, kale tekst om in te typen */
+        box.setAttribute("contenteditable", "plaintext-only");
+        box.classList.add("la-bewerk");
+        bBewerk.classList.add("la-actief");
+        bBewerk.textContent = "✓ Klaar met bewerken";
+        meld.textContent = "typ je wijzigingen; klaar = opslaan";
+        box.focus();
+      });
+
+      bHerstel.addEventListener("click", function () {
+        box.__nieuw = box.__origineel;
+        box.textContent = box.__origineel;
+        toonMarkup();
+        if (box.__annId) {
+          var a = anns.filter(function (x) { return x.id === box.__annId; })[0];
+          if (a) { verwijder(a); }
+          box.__annId = null; box.__nr = null;
+        }
+        meld.textContent = "origineel hersteld";
+      });
+
+      box.addEventListener("blur", function () { setTimeout(stopBewerken, 0); });
+      box.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape") { ev.preventDefault(); box.blur(); }
+      });
+    });
+  }
+
+  function laBewaarBewerking(box, ops) {
+    var a = {
+      id: box.__annId || ("edit-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6)),
+      type: "edit",
+      veld: box.__veld,
+      target: box.__veld,
+      origineel: box.__origineel,
+      nieuw: box.__nieuw,
+      diff: ops,
+      comment: "Tekst herschreven in het concept",
+      rect: { x: 0, y: 0, w: 0, h: 0 }
+    };
+    var bestaand = box.__annId && anns.filter(function (x) { return x.id === box.__annId; })[0];
+    if (bestaand) {
+      Object.keys(a).forEach(function (k) { bestaand[k] = a[k]; });
+      a = bestaand;
+    } else {
+      teller += 1; a.nr = teller; a.createdAt = new Date().toISOString();
+      anns.push(a);
+    }
+    box.__annId = a.id;
+    return bewaarAnnotatie(a).then(function () {
+      box.__nr = a.nr;
+      box.__bar.meld.textContent = "opgeslagen als annotatie " + a.nr;
+      return a;
+    }).catch(function () {
+      box.__bar.meld.textContent = "niet opgeslagen — bridge onbereikbaar";
+    });
+  }
+
+  /* Na een reload staan de bewerkingen op schijf maar de kaart toont weer de
+     oorspronkelijke tekst. Deze koppelt ze terug op hun veld. */
+  function laHerstelBewerkingen() {
+    var perVeld = {};
+    anns.forEach(function (a) { if (a.type === "edit" && a.veld) { perVeld[a.veld] = a; } });
+    Array.prototype.forEach.call(document.querySelectorAll(".la-draft-txt"), function (box) {
+      var a = perVeld[box.__veld];
+      if (!a || !box.__toonMarkup) return;
+      /* Is de kaart zelf herschreven sinds die bewerking, dan zou terugzetten Lucs
+         oude tekst over de nieuwe heen leggen. Dan liever niets doen. */
+      if (a.origineel && a.origineel !== box.__origineel) {
+        box.__bar.meld.textContent = "let op: de concepttekst is gewijzigd sinds annotatie " + a.nr;
+        return;
+      }
+      box.__annId = a.id; box.__nr = a.nr; box.__nieuw = a.nieuw || box.__origineel;
+      box.__toonMarkup();
+    });
+  }
+
   /* ---- test/debug-API -------------------------------------------- */
   window.LucAnnotator = {
     anns: function () { return anns; },
@@ -633,6 +846,12 @@
     save: bewaarAnnotatie,
     remove: verwijder,
     resolve: markeerVerwerkt,
+    drafts: function () {
+      return Array.prototype.map.call(document.querySelectorAll(".la-draft-txt"), function (b) {
+        return { veld: b.__veld, origineel: b.__origineel, nieuw: b.__nieuw, nr: b.__nr || null };
+      });
+    },
+    diff: laDiff,
     add: function (a) {
       teller += 1;
       a.nr = teller; a.type = a.type || (a.selectedText ? "text" : "region");
@@ -697,7 +916,8 @@
   }, true);
 
   render();
-  verversSessie();
+  laDraftInit();
+  verversSessie().then(function () { laHerstelBewerkingen(); });
   /* De bridge komt vaak later omhoog dan de pagina: de hook start hem pas ná de
      schrijf-actie, en soms start iemand hem met de hand. Zonder deze poller blijft een
      al openstaande pagina tot een reload op "bridge uit" staan, ook als de bridge

@@ -182,6 +182,31 @@ grep -o 'origin=[^ ]*' ~/.claude/skills/html-annotator/bridge.log | sort -u
 De logging die dit mogelijk maakt zit in `annotator-bridge.py` en blijft permanent aan;
 dat viel buiten de oorspronkelijke scope en is nadien door Luc bekrachtigd (18-08-2026).
 
+## AC-5 — Bewerkingen op een conceptbericht komen als diff op schijf
+
+**Gegeven** een pagina met een conceptkaart (`la-draft-txt`),
+**wanneer** Luc de tekst daarin herschrijft en de bewerking afsluit,
+**dan** toont de kaart het verschil als doorhaling en onderstreping, **en** staat er een
+annotatie van `type: "edit"` op schijf met `origineel`, `nieuw` en een `diff` die alleen
+het gewijzigde deel aanwijst, **en** overleeft die weergave een reload.
+
+Waarom dit bestaat: een comment naast de tekst dwingt Luc uit te leggen wat er anders
+moet, terwijl het vaak sneller is om het gewoon anders op te schrijven. Dan hoeft er ook
+niets vertaald te worden van bedoeling naar tekst.
+
+Uitkomst: rood aangetoond en groen gemaakt in drie rondes
+(`red/ronde-11-case05.txt`). Wat de rondes opleverden:
+
+- de bewerkvelden vielen weg in de payload naar de bridge én in het antwoord terug — twee
+  aparte plekken met een vaste veldenlijst, waardoor de opslag leeg was terwijl de pagina
+  klopte;
+- de eerste assertie toetste of meer dan de helft van de tekst onveranderd bleef. Bij het
+  herschrijven van een hele zin klopt dat niet, en de assertie is vervangen door een
+  scherpere: aanhef en afsluiting moeten aantoonbaar als onveranderd in de diff staan;
+- de browsercheck vond wat de test niet zag: een bewerking belandde als ankerloze
+  annotatie in de weeslijst en stond daar als "waarschijnlijk verwerkt" terwijl er niets
+  aan de hand was. Daar staat nu een eigen assertie op.
+
 ## Wat de suite niet toetst
 
 De echte Claude Desktop-sideviewer. AC-1 wordt getoetst in systeem-Chrome over twee

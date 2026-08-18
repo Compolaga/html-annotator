@@ -255,6 +255,10 @@ def h_session(payload):
             "comment": a.get("comment") or "",
             "target": a.get("target") or "",
             "selectedText": a.get("selectedText") or "",
+            "veld": a.get("veld") or "",
+            "origineel": a.get("origineel") or "",
+            "nieuw": a.get("nieuw") or "",
+            "diff": a.get("diff") or [],
             "createdAt": a.get("createdAt"),
             # anker is verdacht zodra de pagina sinds die annotatie gewijzigd is
             "stale": bool(a.get("contentHash")) and a.get("contentHash") != h,
@@ -341,6 +345,15 @@ def h_save(payload):
 
     if rec["type"] == "text":
         rec["selectedText"] = ann.get("selectedText") or ""
+    elif rec["type"] == "edit":
+        # Luc heeft de tekst van een conceptbericht zelf herschreven. Bewaren als
+        # voor/na plus de losse wijzigingen, zodat een agent ziet wat er moet
+        # veranderen zonder de twee versies te hoeven vergelijken. Geen crop: het
+        # bewijs is de tekst zelf.
+        rec["veld"] = (ann.get("veld") or "").strip()
+        rec["origineel"] = ann.get("origineel") or ""
+        rec["nieuw"] = ann.get("nieuw") or ""
+        rec["diff"] = ann.get("diff") or []
     else:
         rect = ann.get("rect") or {}
         rel = "screenshots/annotatie-%02d.png" % nummer

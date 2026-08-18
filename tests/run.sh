@@ -77,6 +77,13 @@ if wil 01; then
   echo
 fi
 
+if wil 05; then
+  echo "case-05: tracked changes op een conceptbericht"
+  node ./case-05-tracked-changes.mjs
+  [ $? -ne 0 ] && FALEN=$((FALEN + 1))
+  echo
+fi
+
 echo "NIET GEAUTOMATISEERD — de echte Claude Desktop sideviewer. Case-02 draait in"
 echo "systeem-Chrome; Electron heeft eigen CSP en flags. Handmatig gemeten 18-08-2026"
 echo "(criteria.md, AC-4): als BESTAND openen werkt daar niet en herstelt niet; via"

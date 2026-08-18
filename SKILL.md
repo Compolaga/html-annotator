@@ -219,6 +219,12 @@ Per annotatie:
   Read-tool en lees de crop naast de comment. Zelf croppen hoeft niet meer, dat
   is al gebeurd op het moment van opslaan. `_rect` is intern, negeer het.
 - `type: "text"` → gebruik `selectedText`; er is geen screenshot.
+- `type: "edit"` → Luc heeft de tekst van een conceptbericht zelf herschreven. `diff`
+  geeft de wijzigingen (`-` eruit, `+` erin), `origineel` en `nieuw` de twee volledige
+  versies. Neem `nieuw` over als de tekst van dat concept; er valt hier niets te
+  interpreteren, hij heeft het al opgeschreven zoals hij het wil. Vraag alleen door als
+  zijn herschrijving iets aanraakt dat elders in de pagina ook staat.
+  `toon-annotaties.py` drukt dit af als een leesbare diff.
 - `attachment` staat er als Luc zelf een afbeelding plakte of bijvoegde; ook
   die met de Read-tool bekijken.
 
@@ -335,6 +341,18 @@ Luc</div>
   <div class="la-draft-na">Openstaand: welk issue heb je ingeschoten? Zodra je dat zegt maak ik de eerste zin concreet.</div>
 </div>
 ```
+
+**Tracked changes.** Elke `la-draft-txt` is bewerkbaar: onder de kaart staat
+"✎ Bewerk tekst". Luc typt zijn versie, klikt "Klaar", en het verschil met de
+oorspronkelijke tekst verschijnt als doorhaling en onderstreping — en gaat als annotatie
+van `type: "edit"` naar de bridge. Dat is vaak sneller dan een comment: in plaats van
+uitleggen wat er anders moet, schrijft hij het gewoon anders op. "↺ Herstel origineel"
+zet de kaart terug en verwijdert de bewerking.
+
+Een bewerking krijgt bewust géén badge en komt niet in de weeslijst: hij is al zichtbaar
+in de kaart zelf. Na een reload wordt hij teruggezet, gekoppeld op de kop van de kaart.
+Is de concepttekst zelf gewijzigd sinds de bewerking, dan zet het snippet niets terug —
+dat zou Lucs oude tekst over de nieuwe heen leggen — maar meldt het dat bij de kaart.
 
 Regels bij het gebruik:
 
