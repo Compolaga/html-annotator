@@ -1,0 +1,12 @@
+### mutatie: geen-poller
+  (mutatie actief: geen-poller — herstel hoort uit te blijven)
+  PASS  case-02[file]: mutatie "geen-poller" gedroeg zich zoals voorspeld (herstel: false)
+   exit=0
+### mutatie: geen-interval
+  (mutatie actief: geen-interval — herstel hoort uit te blijven)
+  PASS  case-02[file]: mutatie "geen-interval" gedroeg zich zoals voorspeld (herstel: false)
+   exit=0
+### mutatie: geen-listeners
+  (mutatie actief: geen-listeners — herstel moet blijven werken)
+  PASS  case-02[file]: mutatie "geen-listeners" gedroeg zich zoals voorspeld (herstel: true)
+   exit=0

@@ -1,0 +1,13 @@
+=== annotator-bridge suite · 2026-08-18 19:06:18 ===
+snippet: 0479237cce6a  hook: 73d62cdf69ef  ensure: 580bfd15e933
+
+case-01 run 1/1
+case-01: verse agent laat de bridge draaien
+  FAIL  claude -p eindigde met exit 1 — er is niets getest. Laatste output:
+        You've hit your monthly spend limit · raise it at claude.ai/settings/usage?from=cc_cli_limit_message
+case-01: 0/1 geslaagd, 1 geblokkeerd (drempel: 1/1)
+
+NIET GETOETST — de echte Claude Desktop sideviewer. Case-02 draait in systeem-Chrome
+over file:// en data:; Electron heeft eigen CSP en flags. Zie criteria.md, AC-4.
+
+ROOD — 1 gefaald, 1 geblokkeerd

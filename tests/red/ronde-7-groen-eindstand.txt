@@ -1,0 +1,21 @@
+=== annotator-bridge suite · 2026-08-18 19:19:04 ===
+snippet: 0479237cce6a  hook: ed2fd46ae9e2  ensure: 580bfd15e933
+
+  PASS  case-02[file]: pil herstelde zonder reload ("bridge uit - alleen localStorage" -> "round 1 - 0 annotaties opgeslagen")
+  PASS  case-02[file]: annotatie teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-selfheal-1787073544430/ronde-01/annotations.json
+        console: Failed to load resource: net::ERR_CONNECTION_REFUSED
+  PASS  case-02[data]: geblokkeerd om de verwachte reden (Private Network Access), zoals gedocumenteerd
+        console: Failed to load resource: net::ERR_CONNECTION_REFUSED | Access to fetch at 'http://127.0.0.1:8791/session' from origin 'null' has been blocked by CORS policy: The request client is not a secure context and the resource is in more-private address space `loopback`. | Failed to load resource: net::ERR_F
+
+case-03: ensure-bridge.sh liegt niet over een bezette poort
+  PASS  exit 1 past bij de werkelijkheid (ping: leeg)
+
+case-04: bridge komt omhoog los van de schrijfroute
+  PASS  hook geregistreerd op SessionStart (onafhankelijk van de schrijfroute)
+  PASS  SessionStart-hook bracht de bridge omhoog (pid 40005)
+  PASS  PostToolUse-tak (Write) brengt de bridge nog steeds omhoog
+
+NIET GETOETST — de echte Claude Desktop sideviewer. Case-02 draait in systeem-Chrome
+over file:// en data:; Electron heeft eigen CSP en flags. Zie criteria.md, AC-4.
+
+GROEN — alle gedraaide cases geslaagd

@@ -698,6 +698,21 @@
 
   render();
   verversSessie();
+  /* De bridge komt vaak later omhoog dan de pagina: de hook start hem pas ná de
+     schrijf-actie, en soms start iemand hem met de hand. Zonder deze poller blijft een
+     al openstaande pagina tot een reload op "bridge uit" staan, ook als de bridge
+     inmiddels antwoordt. Eén boolean-check per 3 seconden, alleen bij een zichtbare
+     pagina; zodra de bridge er is doet hij niets meer, en valt hij later weg dan pakt
+     dezelfde timer het weer op. */
+  setInterval(function () {
+    if (!brug.ok && !document.hidden) verversSessie();
+  }, 3000);
+  document.addEventListener("visibilitychange", function () {
+    if (!brug.ok && !document.hidden) verversSessie();
+  });
+  window.addEventListener("focus", function () {
+    if (!brug.ok) verversSessie();
+  });
 })();
 </script>
 <!-- /LUC-ANNOTATOR -->

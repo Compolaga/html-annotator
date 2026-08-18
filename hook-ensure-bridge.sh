@@ -12,15 +12,28 @@ set -u
 
 DIR="$HOME/.claude/skills/html-annotator"
 
-file=$(/usr/bin/python3 -c '
+gelezen=$(/usr/bin/python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)
 except Exception:
-    print("")
+    print("\t")
 else:
-    print(d.get("tool_input", {}).get("file_path", "") or "")
+    print("%s\t%s" % (d.get("hook_event_name", ""),
+                      d.get("tool_input", {}).get("file_path", "") or ""))
 ' 2>/dev/null)
+
+event=${gelezen%%$'\t'*}
+file=${gelezen#*$'\t'}
+
+# SessionStart: één keer per sessie de bridge omhoog, ongeacht hoe deze sessie straks
+# HTML wegschrijft. De PostToolUse-tak hieronder ziet alleen Edit/Write en mist dus een
+# agent die het bestand via Bash wegschrijft — in auto-mode juist de voorgeschreven
+# route. Zie tests/case-04.
+if [ "$event" = "SessionStart" ]; then
+  "$DIR/ensure-bridge.sh" >>"$DIR/bridge-hook.log" 2>&1
+  exit 0
+fi
 
 [ -n "$file" ] || exit 0
 

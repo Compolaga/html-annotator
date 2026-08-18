@@ -1,2 +1,5 @@
 bridge.log
 bridge.pid
+tests/node_modules/
+tests/package-lock.json
+bridge-hook.log

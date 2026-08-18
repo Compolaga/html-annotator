@@ -460,7 +460,14 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "LucAnnotatorBridge/2.0"
 
     def log_message(self, fmt, *args):
-        sys.stderr.write("[bridge] %s\n" % (fmt % args))
+        # Origin/Referer meeloggen: dat is de enige manier om vast te stellen vanaf welke
+        # origin een ingebedde weergave (preview-pane, sideviewer) de bridge aanroept.
+        # Zonder die waarde blijft elke uitspraak daarover een aanname. Zie tests/criteria.md, AC-4.
+        try:
+            herkomst = self.headers.get("Origin") or self.headers.get("Referer") or ""
+        except Exception:
+            herkomst = ""
+        sys.stderr.write("[bridge] %s%s\n" % (fmt % args, (" origin=%s" % herkomst) if herkomst else ""))
 
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")

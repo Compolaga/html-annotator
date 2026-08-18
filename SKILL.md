@@ -34,12 +34,36 @@ output naar `bridge.log` in de skill-map, en wacht het tot hij antwoordt (max
 5 seconden). Sla dit nooit over: zonder bridge annoteert Luc in localStorage en
 staat er niets op schijf.
 
-**Vangnet.** Een PostToolUse-hook op `Edit|Write` (gedefinieerd in
-`~/.claude/settings.local.json`) draait na elke schrijf-actie
-`hook-ensure-bridge.sh` uit deze skill-map: is het geschreven bestand een
-`.html`/`.htm` met de marker `LUC-ANNOTATOR`, dan roept het `ensure-bridge.sh`
-aan (log: `bridge-hook.log`). Vergeten = automatisch gerepareerd, maar alleen
-voor pagina's die via Edit/Write op schijf komen.
+**Vangnet, twee lagen.** Beide draaien `hook-ensure-bridge.sh` uit deze skill-map
+(log: `bridge-hook.log`), geregistreerd in `~/.claude/settings.local.json`:
+
+- **SessionStart** — één aanroep per sessie, ongeacht hoe die sessie straks HTML
+  wegschrijft. Dit is de laag die telt: de PostToolUse-laag mist een agent die het
+  bestand via Bash wegschrijft, en in auto-mode is Bash juist de voorgeschreven route.
+- **PostToolUse op `Edit|Write`** — is het geschreven bestand een `.html`/`.htm` met de
+  marker `LUC-ANNOTATOR`, dan gaat de bridge omhoog.
+
+De matcher is niet verbreed naar `Bash`, want dat zou op élke Bash-call in élk project
+vuren. Wat de gekozen route wél doet: de SessionStart-registratie staat op user-niveau met
+een lege matcher, dus hij draait bij het starten van élke Claude Code-sessie op deze
+machine, ook sessies die niets met annotaties doen. Dat is één curl per sessie, en niets
+meer als de bridge al luistert. **Luc heeft dat bewust zo gekozen** (18-08-2026), nadat het
+verschil in bereik expliciet was voorgelegd: hij wil dat de bridge praktisch altijd
+aanstaat. Verklein dit niet zonder hem te vragen.
+
+**Zelfherstel in de pagina.** Het snippet controleert de bridge niet één keer bij het
+laden, maar blijft elke 3 seconden opnieuw proberen zolang hij niet antwoordt (plus bij
+`visibilitychange` en `focus`). Komt de bridge later omhoog — door de hook, of met de
+hand — dan slaat de statuspil vanzelf om en is er geen reload nodig. Dit was een echte
+bug: een al openstaande pagina bleef anders op "bridge uit" staan en waarschuwde dat er
+niets bewaard werd, terwijl opslaan inmiddels wel lukte.
+
+Verificatie hiervan staat in `tests/` — zie `tests/criteria.md` voor de criteria en
+`tests/run.sh` voor de suite. Twee grenzen die je moet kennen voordat je op groen
+vertrouwt: (1) dat een **verse agent** dit in de praktijk goed doet is nooit geverifieerd
+— die case liep op een spend-limit en meldt zich als BLOKKED, niet als pass; (2) de
+verborgen-paneel-variant emuleert `document.hidden` en toetst dus de branch-logica van het
+snippet, niet Chrome's throttling van timers in een echte achtergrondtab.
 
 **Open de pagina altijd via de bridge, nooit via `file://` of de preview-pane.**
 De bridge serveert lokale bestanden zelf op `GET /p/<pad-vanaf-home>`:
@@ -55,8 +79,15 @@ geeft de bridge 403.
 
 Dit lost een echt probleem op: de preview-pane van Claude Code serveert een
 lokaal bestand als `data:`-snapshot, en vanuit zo'n snapshot blokkeert Chrome elk
-verzoek naar localhost. De statuspil bleef dan op "bridge uit" staan terwijl de
-bridge wel draaide, en er werd niets weggeschreven. Via `/p/` is de pagina
+verzoek naar localhost. Gemeten reden (`tests/case-02-selfheal.mjs`, origin `data`):
+*"the resource is in more-private address space `loopback`"* — Private Network Access.
+Dat is browserbeleid, niet iets wat een CORS-header of een hook kan repareren. De
+statuspil bleef dan op "bridge uit" staan terwijl de bridge wel draaide, en er werd niets
+weggeschreven.
+
+De bridge logt daarom `origin=<waarde>` bij elk verzoek, zodat van een ingebedde weergave
+vast te stellen is vanaf welke origin hij aanroept in plaats van het te moeten aannemen.
+Blijft permanent aan, op verzoek van Luc (18-08-2026). Via `/p/` is de pagina
 same-origin met de bridge en werkt opslaan altijd. Het snippet leidt het
 bestandspad uit zo'n `/p/`-URL af, dus rondedetectie en crops blijven werken.
 
@@ -248,7 +279,35 @@ getekend, maar verschijnen in het kaartje "waarschijnlijk verwerkt" linksonder. 
 zo'n annotatie, dan verdwijnt hij daaruit zodra je hem resolved zet; Luc kan hem
 daar ook zelf afvinken met het ✓.
 
-## Deel 5: de concept-berichtkaart
+## Deel 5: taken spawnen vanaf de todolijst
+
+Vraagt Luc om een taak te spawnen (`spawn_task`), dan hangt die altijd aan een punt op
+zijn HTML-todolijst, en het nummer van dat punt hoort in de sessietitel. De volledige
+conventie staat in de skill **`task-spawnen`** — lees die voordat je spawnt; hier staat
+alleen wat je moet weten om er te komen.
+
+**Zoek de lijst, onthoud hem niet.** Het bestand verhuist en wordt hernoemd, dus nooit
+een pad uit je hoofd of uit een eerder gesprek:
+
+```bash
+~/.claude/skills/html-annotator/vind-todolijst.sh        # pad
+~/.claude/skills/html-annotator/vind-todolijst.sh -v     # met hoogste nummer erbij
+```
+
+Het script kiest de meest recent gewijzigde HTML op het bureaublad die genummerde punten
+heeft (`<span class="num">`) én zich als todolijst laat herkennen. Vindt hij niets, dan
+verzin je er geen: vraag het Luc.
+
+Daarna, in het kort — de details en de reden erachter staan in `task-spawnen`:
+
+1. Zoek het punt waar de taak bij hoort en pak zijn nummer. Bestaat het nog niet, maak
+   het dan eerst aan op de lijst, met een nummer dat één hoger is dan het hoogste in het
+   **hele** bestand (de prioriteitsbanden delen één doorlopende reeks).
+2. Noem de sessie `XX.YY-kebab-case-naam`, met twee cijfers per segment.
+3. Zet in de meegegeven prompt dat de gespawnde sessie zichzelf aan het eind hernoemt
+   naar `[DONE]-<titel>`.
+
+## Deel 6: de concept-berichtkaart
 
 Een conceptbericht (mail, Teams, WhatsApp) dat nog niet verstuurd is, hoort niet
 als platte tekst in de chat maar als kaart in de HTML. Dan kan Luc de tekst zien

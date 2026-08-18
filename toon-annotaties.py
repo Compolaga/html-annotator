@@ -42,6 +42,9 @@ WERKREGEL = """
 │ tijd dan een vraag.
 │
 │ Verwerk pas daarna, en vink af wat af is via POST /resolve.
+│
+│ Spawnt Luc hierna een taak? Die hangt aan zijn todolijst:
+│ vind-todolijst.sh geeft het pad, skill `task-spawnen` de titel.
 ╰───────────────────────────────────────────────────────────────────
 """
 
