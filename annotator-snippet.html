@@ -60,7 +60,10 @@
   .la-sesmeld.la-fout { background: #7a3b06; }
   /* Tracked changes op een conceptbericht: Luc herschrijft de tekst zelf en het
      verschil met de oorspronkelijke versie wordt de annotatie. */
-  .la-draft-txt.la-bewerk { outline: 2px solid #7a5cff; outline-offset: 5px; border-radius: 4px;
+  .la-draft-txt.la-bewerkbaar { border-radius: 4px; outline: 1px dashed transparent;
+    outline-offset: 5px; transition: outline-color .12s ease; cursor: text; }
+  .la-draft-txt.la-bewerkbaar:hover { outline-color: #d8cdb0; }
+  .la-draft-txt.la-bewerkbaar:focus { outline: 2px solid #7a5cff; outline-offset: 5px;
     background: #fffdf6; }
   .la-draft-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px;
     font: 12px/1.4 -apple-system, "Segoe UI", Arial, sans-serif; }
@@ -711,6 +714,45 @@
     return t ? t.slice(0, 160) : "concept-" + (index + 1);
   }
 
+  /* Positie van een klik, uitgedrukt in tekens van de kale tekst: alles in een <del>
+     telt niet mee, want dat staat er straks niet meer. */
+  function laKlikOffset(box, x, y) {
+    var r = null;
+    if (document.caretRangeFromPoint) { r = document.caretRangeFromPoint(x, y); }
+    else if (document.caretPositionFromPoint) {
+      var cp = document.caretPositionFromPoint(x, y);
+      if (cp) { r = document.createRange(); r.setStart(cp.offsetNode, cp.offset); }
+    }
+    if (!r || !box.contains(r.startContainer)) return null;
+    var doel = r.startContainer, offset = r.startOffset, telling = 0, klaar = false;
+    (function loop(node) {
+      if (klaar) return;
+      if (node.nodeType === 3) {
+        if (node === doel) { telling += offset; klaar = true; return; }
+        telling += node.nodeValue.length;
+        return;
+      }
+      if (node.nodeName === "DEL") {
+        /* geklikt ín een doorhaling: die tekst verdwijnt, dus de rand ervan is het
+           dichtstbijzijnde punt dat straks nog bestaat */
+        if (node.contains(doel)) { klaar = true; }
+        return;
+      }
+      for (var i = 0; i < node.childNodes.length && !klaar; i++) { loop(node.childNodes[i]); }
+    })(box);
+    return Math.min(telling, box.__nieuw.length);
+  }
+
+  function laZetCaret(box, offset) {
+    var t = box.firstChild;
+    if (!t || t.nodeType !== 3) return;
+    var r = document.createRange();
+    r.setStart(t, Math.max(0, Math.min(offset, t.nodeValue.length)));
+    r.collapse(true);
+    var sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+
   function laDraftInit() {
     var boxen = document.querySelectorAll(".la-draft-txt");
     Array.prototype.forEach.call(boxen, function (box, index) {
@@ -720,73 +762,107 @@
       box.__nieuw = box.textContent;
       box.__veld = laVeld(box, index);
 
+      /* Altijd bewerkbaar. Een knop om "de bewerkmodus aan te zetten" is een drempel
+         voor iets wat Luc gewoon wil kunnen doen: klikken waar hij wil en typen. */
+      box.setAttribute("contenteditable", "plaintext-only");
+      box.classList.add("la-bewerkbaar");
+
       var bar = document.createElement("div");
       bar.className = "la-draft-bar";
-      var bBewerk = document.createElement("button");
-      bBewerk.textContent = "✎ Bewerk tekst";
       var bHerstel = document.createElement("button");
       bHerstel.textContent = "↺ Herstel origineel";
       bHerstel.style.display = "none";
       var meld = document.createElement("span");
       meld.className = "la-draft-meld";
-      bar.appendChild(bBewerk); bar.appendChild(bHerstel); bar.appendChild(meld);
+      meld.textContent = "klik in de tekst om te bewerken";
+      bar.appendChild(bHerstel); bar.appendChild(meld);
       box.parentNode.insertBefore(bar, box.nextSibling);
-      box.__bar = { bewerk: bBewerk, herstel: bHerstel, meld: meld };
+      box.__bar = { herstel: bHerstel, meld: meld };
 
+      /* De opgemaakte weergave (doorhaling + onderstreping) is alleen te zien als de
+         cursor er niet in staat. Zodra Luc erin klikt gaat hij terug naar kale tekst,
+         anders zou hij in zijn eigen doorhalingen zitten typen. */
       function toonMarkup() {
+        if (box.__actief) return null;
         var ops = laDiff(box.__origineel, box.__nieuw);
         var gewijzigd = ops.some(function (o) { return o.op !== "="; });
-        if (gewijzigd) { laTeken(box, ops); } else { box.textContent = box.__nieuw; }
+        if (gewijzigd) { laTeken(box, ops); box.__markup = true; }
+        else { box.textContent = box.__nieuw; box.__markup = false; }
         bHerstel.style.display = gewijzigd ? "" : "none";
         meld.textContent = gewijzigd
           ? (box.__nr ? "opgeslagen als annotatie " + box.__nr : "wijziging nog niet opgeslagen")
-          : "";
+          : "klik in de tekst om te bewerken";
         return ops;
       }
       box.__toonMarkup = toonMarkup;
 
-      function stopBewerken() {
-        if (!box.__bewerkt) return;
-        box.__bewerkt = false;
-        box.removeAttribute("contenteditable");
-        box.classList.remove("la-bewerk");
-        bBewerk.classList.remove("la-actief");
-        bBewerk.textContent = "✎ Bewerk tekst";
-        box.__nieuw = box.textContent;
-        var ops = toonMarkup();
-        if (ops.some(function (o) { return o.op !== "="; })) { laBewaarBewerking(box, ops); }
+      function toonPlat() {
+        if (!box.__markup) return;
+        box.textContent = box.__nieuw;
+        box.__markup = false;
       }
-      box.__stopBewerken = stopBewerken;
 
-      bBewerk.addEventListener("click", function () {
-        if (box.__bewerkt) { stopBewerken(); return; }
-        box.__bewerkt = true;
-        box.textContent = box.__nieuw;      /* markup weg, kale tekst om in te typen */
-        box.setAttribute("contenteditable", "plaintext-only");
-        box.classList.add("la-bewerk");
-        bBewerk.classList.add("la-actief");
-        bBewerk.textContent = "✓ Klaar met bewerken";
-        meld.textContent = "typ je wijzigingen; klaar = opslaan";
+      /* Klikken terwijl de opmaak zichtbaar is, is het lastige geval. De doorgehaalde
+         tekst verdwijnt bij het terugschakelen naar kale tekst, dus de regel loopt anders
+         en de cursor van de browser landt op de verkeerde plek. Daarom rekenen we de
+         klikpositie zelf om: waar zat die klik in de kale tekst, de doorhalingen niet
+         meegeteld — en dáár zetten we de cursor terug. */
+      box.addEventListener("mousedown", function (ev) {
+        if (!box.__markup) return;
+        var doel = laKlikOffset(box, ev.clientX, ev.clientY);
+        ev.preventDefault();
+        box.__actief = true;
+        toonPlat();
         box.focus();
+        if (doel !== null) { laZetCaret(box, doel); }
+      });
+      box.addEventListener("focus", function () { box.__actief = true; toonPlat(); });
+
+      function bewaarNu() {
+        box.__nieuw = box.textContent;
+        var ops = laDiff(box.__origineel, box.__nieuw);
+        if (ops.some(function (o) { return o.op !== "="; })) { laBewaarBewerking(box, ops); }
+        else if (box.__annId) { laVerwijderBewerking(box); }
+        return ops;
+      }
+      box.__bewaarNu = bewaarNu;
+
+      /* Tijdens het typen alleen opslaan, niet opmaken: de cursor mag niet verspringen. */
+      var timer = null;
+      box.addEventListener("input", function () {
+        clearTimeout(timer);
+        meld.textContent = "aan het typen…";
+        timer = setTimeout(function () { bewaarNu(); meld.textContent =
+          box.__nr ? "opgeslagen als annotatie " + box.__nr : "opgeslagen"; }, 900);
+      });
+
+      box.addEventListener("blur", function () {
+        clearTimeout(timer);
+        box.__actief = false;
+        bewaarNu();
+        toonMarkup();
+      });
+
+      box.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape") { ev.preventDefault(); box.blur(); }
       });
 
       bHerstel.addEventListener("click", function () {
         box.__nieuw = box.__origineel;
+        box.__markup = false;
         box.textContent = box.__origineel;
-        toonMarkup();
-        if (box.__annId) {
-          var a = anns.filter(function (x) { return x.id === box.__annId; })[0];
-          if (a) { verwijder(a); }
-          box.__annId = null; box.__nr = null;
-        }
+        laVerwijderBewerking(box);
+        bHerstel.style.display = "none";
         meld.textContent = "origineel hersteld";
       });
-
-      box.addEventListener("blur", function () { setTimeout(stopBewerken, 0); });
-      box.addEventListener("keydown", function (ev) {
-        if (ev.key === "Escape") { ev.preventDefault(); box.blur(); }
-      });
     });
+  }
+
+  function laVerwijderBewerking(box) {
+    if (!box.__annId) return;
+    var a = anns.filter(function (x) { return x.id === box.__annId; })[0];
+    if (a) { verwijder(a); }
+    box.__annId = null; box.__nr = null;
   }
 
   function laBewaarBewerking(box, ops) {

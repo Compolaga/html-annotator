@@ -185,7 +185,7 @@ dat viel buiten de oorspronkelijke scope en is nadien door Luc bekrachtigd (18-0
 ## AC-5 — Bewerkingen op een conceptbericht komen als diff op schijf
 
 **Gegeven** een pagina met een conceptkaart (`la-draft-txt`),
-**wanneer** Luc de tekst daarin herschrijft en de bewerking afsluit,
+**wanneer** Luc in de tekst klikt, herschrijft, en er weer uit klikt,
 **dan** toont de kaart het verschil als doorhaling en onderstreping, **en** staat er een
 annotatie van `type: "edit"` op schijf met `origineel`, `nieuw` en een `diff` die alleen
 het gewijzigde deel aanwijst, **en** overleeft die weergave een reload.
@@ -206,6 +206,17 @@ Uitkomst: rood aangetoond en groen gemaakt in drie rondes
 - de browsercheck vond wat de test niet zag: een bewerking belandde als ankerloze
   annotatie in de weeslijst en stond daar als "waarschijnlijk verwerkt" terwijl er niets
   aan de hand was. Daar staat nu een eigen assertie op.
+
+Daarna verviel de knop "Bewerk tekst" op Lucs verzoek: klikken in de tekst zet de cursor
+en typen werkt meteen. Dat bracht één echt probleem mee — terugklikken terwijl de opmaak
+zichtbaar is. De doorgehaalde tekst verdwijnt dan, de regel loopt anders, en de cursor
+landt naast de klik. Opgelost door de klikpositie om te rekenen naar de kale tekst.
+
+De assertie daarop was eerst blind: hij klikte op "Groet,", een regel ónder de wijziging,
+waar de tekst toch niet verschuift — en bleef groen toen de omrekening werd uitgezet. Met
+een klikpunt op dezelfde regel ná de wijziging wordt die mutatie wél betrapt (de cursor
+springt dan naar het begin van de tekst). Zonder die mutatieproef was een nutteloze check
+als dekking doorgegaan.
 
 ## Wat de suite niet toetst
 

@@ -46,18 +46,18 @@ const zeg = (ok, tekst) => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  case-05: ${
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage();
 await page.goto(url, { waitUntil: 'load' });
-await page.waitForSelector('.la-draft-bar button', { timeout: 5000 });
+await page.waitForSelector('.la-draft-txt.la-bewerkbaar', { timeout: 5000 });
 
-// 1. Luc klikt "Bewerk tekst" en herschrijft een zin
-await page.click('.la-draft-bar button');
+// 1. Luc klikt in de tekst en herschrijft een zin — geen knop, direct typen
+await page.click('.la-draft-txt');   // klikken in de tekst zet de cursor
 const NIEUW = ORIGINEEL.replace('Ik wil even bijpraten over de security-afscherming.',
   'Kunnen we deze week de security-afscherming doornemen?');
 await page.evaluate((t) => {
   const box = document.querySelector('.la-draft-txt');
   box.textContent = t;
 }, NIEUW);
-await page.click('.la-draft-bar button');   // klaar met bewerken -> opslaan
-await sleep(1200);
+await page.evaluate(() => document.querySelector('.la-draft-txt').blur());  // eruit klikken
+await sleep(1500);
 
 // 2. de markup moet ins én del tonen, niet alleen de nieuwe tekst
 const markup = await page.evaluate(() => {
@@ -100,6 +100,44 @@ if (opSchijf) {
   const gelijk = (opSchijf.diff || []).filter((o) => o.op === '=').map((o) => o.t).join('');
   zeg(/Hi Anne,/.test(gelijk) && /Groet,/.test(gelijk) && /Luc/.test(gelijk),
     'aanhef en afsluiting staan als onveranderd in de diff, niet als vervangen');
+}
+
+// 3b. Terugklikken terwijl de doorhaling zichtbaar is. Dit is het geval waar het
+// misging: de doorgehaalde tekst verdwijnt, de regel loopt anders, en de cursor van de
+// browser landt naast de plek waar Luc klikte. Het klikpunt moet op dezelfde regel
+// liggen als de wijziging en erna: alleen daar verschuift de tekst echt. Een punt op een
+// latere regel is ongevoelig — dat bleek toen de mutatie "omrekening uit" gewoon groen
+// bleef met "Groet," als doel.
+const punt = await page.evaluate(() => {
+  const box = document.querySelector('.la-draft-txt');
+  const w = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = w.nextNode())) {
+    const i = n.nodeValue.indexOf('security-afscherming');
+    if (i >= 0) {
+      const r = document.createRange();
+      r.setStart(n, i); r.setEnd(n, i + 1);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + 1, y: b.top + b.height / 2 };
+    }
+  }
+  return null;
+});
+if (!punt) {
+  zeg(false, 'kon "Groet," niet lokaliseren om op te klikken');
+} else {
+  await page.mouse.click(punt.x, punt.y);
+  await page.keyboard.type('XX');
+  const naKlik = await page.evaluate(() => document.querySelector('.la-draft-txt').textContent);
+  zeg(/XXsecurity-afscherming/.test(naKlik),
+    `cursor landt waar geklikt is, ook met opmaak in beeld (${JSON.stringify((naKlik.match(/.{0,8}XX.{0,10}/) || ['niet gevonden'])[0])})`);
+  // opruimen: de XX weer weg, anders meet stap 4 iets anders dan bedoeld
+  await page.evaluate(() => {
+    const box = document.querySelector('.la-draft-txt');
+    box.textContent = box.textContent.replace('XX', '');
+    box.blur();
+  });
+  await sleep(1500);
 }
 
 // 4. overleeft het een reload? Anders is Lucs werk weg zodra hij ververst.

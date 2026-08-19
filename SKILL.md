@@ -342,12 +342,17 @@ Luc</div>
 </div>
 ```
 
-**Tracked changes.** Elke `la-draft-txt` is bewerkbaar: onder de kaart staat
-"✎ Bewerk tekst". Luc typt zijn versie, klikt "Klaar", en het verschil met de
-oorspronkelijke tekst verschijnt als doorhaling en onderstreping — en gaat als annotatie
-van `type: "edit"` naar de bridge. Dat is vaak sneller dan een comment: in plaats van
-uitleggen wat er anders moet, schrijft hij het gewoon anders op. "↺ Herstel origineel"
-zet de kaart terug en verwijdert de bewerking.
+**Tracked changes.** Elke `la-draft-txt` is direct bewerkbaar: Luc klikt in de tekst,
+de cursor staat waar hij klikte, en hij typt. Er is bewust geen knop om "de bewerkmodus
+aan te zetten" — dat was een drempel voor iets wat hij gewoon wil kunnen doen. Klikt hij
+eruit, dan verschijnt het verschil met de oorspronkelijke tekst als doorhaling en
+onderstreping, en gaat het als annotatie van `type: "edit"` naar de bridge. Dat is vaak
+sneller dan een comment: in plaats van uitleggen wat er anders moet, schrijft hij het
+gewoon anders op. "↺ Herstel origineel" zet de kaart terug en verwijdert de bewerking.
+
+Klikt hij terug in een tekst waar de opmaak zichtbaar is, dan wordt de klikpositie
+omgerekend naar de kale tekst voordat de cursor gezet wordt. Zonder dat sprong de cursor,
+want de doorgehaalde tekst verdwijnt bij het terugschakelen en de regel loopt dan anders.
 
 Een bewerking krijgt bewust géén badge en komt niet in de weeslijst: hij is al zichtbaar
 in de kaart zelf. Na een reload wordt hij teruggezet, gekoppeld op de kop van de kaart.
