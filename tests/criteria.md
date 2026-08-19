@@ -271,3 +271,24 @@ De echte Claude Desktop-sideviewer. AC-1 wordt getoetst in systeem-Chrome over t
 origins (`file://` en een `data:`-snapshot). Dat is een benadering: Electron heeft
 eigen CSP en flags. De runner drukt dit als SKIPPED af, zodat groen niet als volledige
 dekking leest.
+
+## AC-7: geneste subpunten hangen visueel onder hun ouder
+
+Vastgelegd 2026-08-19. Bron: Luc — "Ik wil sws dat de todos met subtodo's echt visueel
+onder elkaar hangen. Dus soort van indented. Hoe meer subsubsub iets is, hoe meer
+indented."
+
+Deze opmaak stond eerst ad hoc in één todolijst, met selectors die aan de `.card` en het
+`--line`-token van díe pagina hingen. Bij de volgende lijst was hij weg. Het criterium is
+daarom niet "de CSS staat in het snippet", maar dat hij werkt zonder medewerking van de
+pagina:
+
+- elk niveau springt een vaste stap verder in dan het vorige, tot minstens vier diep;
+- een subpunt tekent een verbindingshaakje naar zijn ouder, op elk blok-element — ook een
+  `<li>` op een pagina die geen `.card` of ander eigen kader kent;
+- de lijn volgt `--line` als de pagina die definieert en is zonder dat token nog steeds
+  zichtbaar (de faalmodus is een onzichtbare lijn, niet een verkeerd grijs);
+- de inspringstap is te verstellen met `--la-stap`, en het haakje schuift mee.
+
+Gemeten via computed styles in de browser (`case-07`), niet uit de CSS-tekst: een selector
+die niet matcht leest in de bron nog steeds goed. Rood-bewijs: `red/ronde-14-subindentatie-rood.txt`.

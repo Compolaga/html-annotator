@@ -3,8 +3,8 @@
 
 Gebruik:
   toon-annotaties.py                    laatste ronde van de enige/laatste pagina
-  toon-annotaties.py todos-uit-mail     laatste ronde van die pagina
-  toon-annotaties.py todos-uit-mail 8   ronde 8
+  toon-annotaties.py todos     laatste ronde van die pagina
+  toon-annotaties.py todos 8   ronde 8
   toon-annotaties.py --alles            elke pagina, elke ronde, alleen tellingen
   toon-annotaties.py --open             alleen nog niet resolved annotaties
 

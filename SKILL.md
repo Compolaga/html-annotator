@@ -69,8 +69,8 @@ snippet, niet Chrome's throttling van timers in een echte achtergrondtab.
 De bridge serveert lokale bestanden zelf op `GET /p/<pad-vanaf-home>`:
 
 ```
-/Users/lucmahieu/Desktop/todos-uit-mail.html
-→ http://127.0.0.1:8791/p/Desktop/todos-uit-mail.html
+/Users/lucmahieu/Desktop/todos.html
+→ http://127.0.0.1:8791/p/Desktop/todos.html
 ```
 
 Bouwen doe je zo: neem het absolute pad, haal de home-map (`/Users/lucmahieu/`)
@@ -273,7 +273,7 @@ nog ziet wat nog open staat. Doe dit per verwerkte batch, niet pas aan het eind:
 ```bash
 curl -s -X POST http://127.0.0.1:8791/resolve \
   -H 'Content-Type: application/json' \
-  -d '{"jsonPath":"~/Desktop/annotaties/todos-uit-mail/ronde-09/annotations.json","nrs":[1,3,4]}'
+  -d '{"jsonPath":"~/Desktop/annotaties/todos/ronde-09/annotations.json","nrs":[1,3,4]}'
 ```
 
 Antwoord: `{"ok":true,"round":9,"resolved":[1,3,4],"notFound":[],"open":2,"total":5}`.
@@ -384,3 +384,41 @@ Regels bij het gebruik:
   dat er nog niets verstuurd is.
 - Een concept in de pagina zetten is geen goedkeuring. De verzendregel uit
   CLAUDE.md en de skill `bericht-sturen` blijft onverkort gelden.
+
+## Deel 7: geneste subpunten (`la-sub`)
+
+Heeft een punt subtaken, dan wil Luc die visueel onder hun ouder zien hangen: hoe
+dieper genest, hoe verder ingesprongen. Een platte lijst waarin de hiërarchie
+alleen uit de tekst blijkt kost hem leeswerk dat de opmaak gratis kan doen.
+
+De CSS zit in `annotator-snippet.html`, dus elke pagina met het snippet heeft het
+al. Zet de klasse op het blok zelf, naast wat de pagina er verder aan geeft:
+
+```html
+<div class="card">34 · Ouderpunt</div>
+<div class="card la-sub">34a · Subtaak</div>
+<div class="card la-sub2">34a1 · Sub-subtaak</div>
+<div class="card la-sub3">34a1a · Nog een niveau dieper</div>
+```
+
+`la-sub` = niveau 1, `la-sub2` t/m `la-sub4` = dieper. Vier niveaus omdat daaronder
+de inspringing meer leesbaarheid kost dan hij oplevert; heb je toch een vijfde nodig,
+dan is dat één regel bij in het snippet (`--la-diepte: 5`).
+
+Waarom klassen en geen `data-diepte`: `attr()` is in CSS niet in `calc()` te gebruiken,
+dus een attribuut vraagt evengoed één selector per niveau. Dan zijn klassen korter,
+en ze sluiten aan op wat er al op de todolijst stond.
+
+Punten om op te letten:
+
+- De klassen hangen bewust aan niets anders dan zichzelf — geen `.card` of andere
+  pagina-klasse — zodat ze op elk blok-element werken: een kaart, een `<li>`, een
+  losse `<div>` in een analyse of vergelijkingspagina.
+- Het snippet zet zelf `position: relative` op het element, want het haakje is een
+  `::before` die daaraan hangt. Positioneer zo'n element dus niet zelf absoluut.
+- De lijnkleur volgt `--line` als de pagina die definieert, met een lichte grijze
+  fallback. Zo is het haakje ook zichtbaar op een pagina zonder kleurtokens.
+- De inspringstap is 30px en te overschrijven met `--la-stap` op een ouder-element,
+  bijvoorbeeld `20px` op een smalle pagina. Het haakje rekent mee.
+- Nesting is puur visueel: de blokken blijven zussen in de HTML. Dat is bewust —
+  echte nesting zou de annotator, de banden en de tellingen op de todolijst raken.

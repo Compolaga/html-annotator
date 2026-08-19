@@ -580,7 +580,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "bridge": "luc-annotator", "version": 2,
                                     "root": ROOT, "pillow": HEEFT_PILLOW})
         # /p/<pad-vanaf-home> serveert een lokale pagina same-origin met de bridge.
-        # Voorbeeld: http://127.0.0.1:8791/p/Desktop/todos-uit-mail.html
+        # Voorbeeld: http://127.0.0.1:8791/p/Desktop/todos.html
         if pad.startswith("/p/"):
             rel = urllib.parse.unquote(pad[3:])
             doel = os.path.realpath(os.path.join(os.path.expanduser("~"), rel))

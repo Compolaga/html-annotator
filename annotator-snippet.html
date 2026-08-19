@@ -78,6 +78,30 @@
     text-decoration-thickness: 1px; }
   .la-draft-txt del { background: #fee2e2; color: #7f1d1d; text-decoration: line-through; }
   .la-draft-na { font-size: 13px; color: var(--muted, #6b6b66); margin-top: 12px; padding-top: 10px; border-top: 1px solid #eee4cd; }
+
+  /* Geneste subpunten: elk niveau springt een stap verder in en krijgt een haakje
+     naar zijn ouder, zodat een lijst met subtaken op het oog te lezen is. Zie
+     SKILL.md deel 7. Hangt bewust aan niets anders dan de eigen klasse — geen
+     .card of andere pagina-klasse — zodat het op elk blok-element werkt (kaart,
+     li, div). De lijnkleur volgt --line als de pagina die definieert, met een
+     lichte fallback zodat het haakje ook zonder tokens zichtbaar is. */
+  .la-sub, .la-sub2, .la-sub3, .la-sub4 {
+    --la-diepte: 1;
+    position: relative;
+    margin-left: calc(var(--la-diepte) * var(--la-stap, 30px));
+  }
+  .la-sub2 { --la-diepte: 2 }
+  .la-sub3 { --la-diepte: 3 }
+  .la-sub4 { --la-diepte: 4 }
+  .la-sub::before, .la-sub2::before, .la-sub3::before, .la-sub4::before {
+    content: ""; position: absolute;
+    left: calc(-0.53 * var(--la-stap, 30px));
+    width: calc(0.47 * var(--la-stap, 30px));
+    top: -10px; bottom: 50%;
+    border-left: 2px solid var(--line, #d8d8d2);
+    border-bottom: 2px solid var(--line, #d8d8d2);
+    border-bottom-left-radius: 8px;
+  }
 </style>
 <script>
 (function () {
