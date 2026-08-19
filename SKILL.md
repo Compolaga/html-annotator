@@ -219,9 +219,19 @@ Per annotatie:
   Read-tool en lees de crop naast de comment. Zelf croppen hoeft niet meer, dat
   is al gebeurd op het moment van opslaan. `_rect` is intern, negeer het.
 - `type: "text"` → gebruik `selectedText`; er is geen screenshot.
-- `type: "edit"` → Luc heeft de tekst van een conceptbericht zelf herschreven. `diff`
-  geeft de wijzigingen (`-` eruit, `+` erin), `origineel` en `nieuw` de twee volledige
-  versies. Neem `nieuw` over als de tekst van dat concept; er valt hier niets te
+- `type: "edit"` → Luc heeft de tekst van een conceptbericht zelf herschreven. `hunks`
+  geeft de wijzigingen als losse blokken, elk met de omringende tekst als anker
+  (`voor`/`na`), het `alinea`-nummer om naar te verwijzen, en `verwijderd`/`toegevoegd`.
+  `diff` is dezelfde informatie als platte reeks, `origineel` en `nieuw` de twee volledige
+  versies. Blokken zijn los toe te passen en los af te vinken:
+
+  ```bash
+  ~/.claude/skills/html-annotator/pas-hunk-toe.py <json> --nr 1 --hunks 2 --afvinken
+  ```
+
+  Het anker is de tekst, niet de positie — een blok blijft dus plaatsbaar als de pagina
+  intussen elders veranderd is. Vind je een blok niet terug, verzin dan geen plek: meld
+  het en vraag. Neem `nieuw` over als de tekst van dat concept; er valt hier niets te
   interpreteren, hij heeft het al opgeschreven zoals hij het wil. Vraag alleen door als
   zijn herschrijving iets aanraakt dat elders in de pagina ook staat.
   `toon-annotaties.py` drukt dit af als een leesbare diff.
@@ -349,6 +359,11 @@ eruit, dan verschijnt het verschil met de oorspronkelijke tekst als doorhaling e
 onderstreping, en gaat het als annotatie van `type: "edit"` naar de bridge. Dat is vaak
 sneller dan een comment: in plaats van uitleggen wat er anders moet, schrijft hij het
 gewoon anders op. "↺ Herstel origineel" zet de kaart terug en verwijdert de bewerking.
+
+Meerdere wijzigingen in dezelfde kaart worden losse blokken, genummerd in de tekst (¹ ² ³)
+zodat Luc en jij hetzelfde blok bedoelen. Je kunt ze los doorvoeren en los afvinken; wat
+nog openstaat blijft na een reload zichtbaar, herplaatst op zijn anker in de tekst zoals
+die dan is.
 
 Klikt hij terug in een tekst waar de opmaak zichtbaar is, dan wordt de klikpositie
 omgerekend naar de kale tekst voordat de cursor gezet wordt. Zonder dat sprong de cursor,

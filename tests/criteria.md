@@ -218,6 +218,53 @@ een klikpunt op dezelfde regel ná de wijziging wordt die mutatie wél betrapt (
 springt dan naar het begin van de tekst). Zonder die mutatieproef was een nutteloze check
 als dekking doorgegaan.
 
+## AC-6 — Meerdere wijzigingen zijn los van elkaar te behandelen
+
+**Gegeven** een conceptkaart waarin Luc op meerdere plekken iets verandert,
+**dan** wordt elke aaneengesloten wijziging een eigen blok met de omringende tekst als
+anker, **en** is elk blok apart toe te passen en apart af te vinken, **en** blijft een
+blok plaatsbaar nadat de pagina elders is gewijzigd, **en** geldt de bewerking pas als
+verwerkt zodra er geen enkel blok meer openstaat.
+
+Aanleiding: Luc vroeg of regelnummers niet logischer waren, zoals bij code. Twee dingen
+klopten daar niet aan. Git slaat geen diffs op maar volledige blobs — de `@@`-regels
+worden berekend bij het tonen — dus `nieuw` bewaren ís het git-model. En de nummers in een
+unified diff zijn niet het anker: de contextregels doen het werk, en daarom plaatst
+`patch` een hunk met een verschoven nummer alsnog. Voor proza is "regel" bovendien de
+verkeerde eenheid: een alinea is één regel die alleen visueel afbreekt, dus een regel-diff
+zou "hele alinea vervangen" melden waar we nu het gewijzigde woord aanwijzen. Wat wél
+ontbrak was het hunk-begrip zelf; dat is overgenomen, de nummers niet.
+
+Uitkomst: groen (`red/ronde-13-hunks.txt`). Toepassen gaat met
+`pas-hunk-toe.py <json> --nr N --hunks 2,3`, dat drie plaatsingspogingen doet van streng
+naar soepel en per blok meldt welke het werd.
+
+Na een gedeeltelijke verwerking blijft de kaart tonen wat nog openstaat: bij het laden
+worden alleen de niet-afgevinkte blokken één voor één op hun anker teruggeplaatst in de
+tekst zoals die nu is, in plaats van de opgeslagen eindtekst in één keer terug te zetten.
+Zonder dat verdween Lucs openstaande wijziging uit beeld zodra er één blok van verwerkt
+was, met de melding "concepttekst is gewijzigd" — technisch een terechte beveiliging,
+praktisch het slechtste moment om het overzicht af te pakken.
+
+Drie keer moest de test zelf worden gecorrigeerd in plaats van de code, en dat is het
+vermelden waard omdat twee ervan groen stonden zonder iets te bewijzen:
+
+- de eerste opzet verwachtte drie blokken bij drie "wijzigingen", maar één ervan bestond
+  uit twee losse woordwijzigingen met ongewijzigde tekst ertussen. Vier blokken was
+  correct; de diff had gelijk en de test niet.
+- de assertie die de kernclaim moest dragen — context maakt een blok plaatsbaar waar een
+  positie faalt — bleef groen toen de ankers eruit werden gemutileerd, omdat de te
+  wijzigen tekst toevallig uniek was en `pas-hunk-toe.py` terugviel op de kale variant.
+  Het scenario is daarom ambigu gemaakt: hetzelfde woord staat er twee keer en alleen de
+  tweede wordt gewijzigd. Nu valt de plaatsing zelf om zodra de ankers weg zijn.
+- de assertie op het herplaatsen verwachtte dat blok 1 als "Hoi Laurens," zou terugkomen,
+  terwijl alleen "Hoi" veranderde. Ook hier had de diff gelijk en de test niet.
+
+Wat de suite in dit rondje uit de eigen implementatie haalde: de blokummers zijn
+`<sup>`-elementen in de tekst, en die werden meegeteld bij het omrekenen van de
+klikpositie. Daardoor stond de cursor per voorafgaand blok één teken naast. De
+cursor-assertie uit AC-5 ving dat direct op.
+
 ## Wat de suite niet toetst
 
 De echte Claude Desktop-sideviewer. AC-1 wordt getoetst in systeem-Chrome over twee

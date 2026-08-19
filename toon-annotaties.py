@@ -113,13 +113,30 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
             # zodat je hem kunt overnemen zonder de wijzigingen te hoeven toepassen.
             if (a.get("veld") or "") != (a.get("target") or ""):
                 print("      veld   : %s" % (a.get("veld") or "?"))
-            for o in a.get("diff") or []:
-                if o.get("op") == "=":
-                    continue
-                teken = "-" if o.get("op") == "-" else "+"
-                for regel in (o.get("t") or "").splitlines() or [""]:
-                    if regel.strip():
-                        print("      %s %s" % (teken, regel.strip()[:110]))
+            hunks = a.get("hunks") or []
+            if hunks:
+                # Per blok, zodat je ze los kunt beoordelen en toepassen. Het
+                # alineanummer is om naar te verwijzen; het anker is de tekst eromheen.
+                for h in hunks:
+                    vlag = " (afgevinkt)" if h.get("resolved") else ""
+                    print("      blok %s, alinea %s%s"
+                          % (h.get("n"), h.get("alinea"), vlag))
+                    if h.get("verwijderd"):
+                        print("        - %s" % h["verwijderd"].replace("\n", " ")[:100])
+                    if h.get("toegevoegd"):
+                        print("        + %s" % h["toegevoegd"].replace("\n", " ")[:100])
+                    context = (h.get("voor") or "").replace("\n", " ")[-40:]
+                    if context.strip():
+                        print("          volgt op: ...%s" % context.strip())
+                print("      toepassen: pas-hunk-toe.py <json> --nr %s --hunks <n>" % a.get("nr"))
+            else:
+                for o in a.get("diff") or []:
+                    if o.get("op") == "=":
+                        continue
+                    teken = "-" if o.get("op") == "-" else "+"
+                    for regel in (o.get("t") or "").splitlines() or [""]:
+                        if regel.strip():
+                            print("      %s %s" % (teken, regel.strip()[:110]))
             nieuwe = a.get("nieuw") or ""
             if nieuwe:
                 print("      nieuwe tekst:")

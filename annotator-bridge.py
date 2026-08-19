@@ -259,6 +259,7 @@ def h_session(payload):
             "origineel": a.get("origineel") or "",
             "nieuw": a.get("nieuw") or "",
             "diff": a.get("diff") or [],
+            "hunks": a.get("hunks") or [],
             "createdAt": a.get("createdAt"),
             # anker is verdacht zodra de pagina sinds die annotatie gewijzigd is
             "stale": bool(a.get("contentHash")) and a.get("contentHash") != h,
@@ -295,27 +296,63 @@ def h_resolve(payload):
 
     nrs = set(int(x) for x in (payload.get("nrs") or []))
     ids = set(str(x) for x in (payload.get("ids") or []))
+    hunks = set(int(x) for x in (payload.get("hunks") or []))
+    if hunks and len(nrs) != 1:
+        # Een hunknummer is alleen betekenisvol binnen één bewerking; zonder die
+        # koppeling zou "hunk 2" van drie annotaties tegelijk afgevinkt worden.
+        raise ValueError("geef bij hunks precies één nr mee")
     if not nrs and not ids:
         raise ValueError("geef nrs of ids mee")
     waarde = payload.get("resolved", True) is not False
     nu = time.strftime("%Y-%m-%dT%H:%M:%S%z")
 
     geraakt = []
+    hunks_geraakt = []
+    hunks_ontbreken = []
     for a in data.get("annotations", []):
-        if a.get("nr") in nrs or str(a.get("id")) in ids:
-            a["resolved"] = waarde
-            if waarde:
+        if not (a.get("nr") in nrs or str(a.get("id")) in ids):
+            continue
+        if hunks:
+            # Alleen de genoemde blokken afvinken. De bewerking zelf geldt pas als
+            # verwerkt zodra er geen enkel blok meer openstaat.
+            gevonden = set()
+            for h in a.get("hunks") or []:
+                if h.get("n") in hunks:
+                    h["resolved"] = waarde
+                    gevonden.add(h.get("n"))
+            hunks_geraakt = sorted(gevonden)
+            hunks_ontbreken = sorted(hunks - gevonden)
+            alle = a.get("hunks") or []
+            a["resolved"] = bool(alle) and all(h.get("resolved") for h in alle)
+            if a["resolved"]:
                 a["resolvedAt"] = nu
             else:
                 a.pop("resolvedAt", None)
             geraakt.append(a.get("nr"))
+            continue
+        a["resolved"] = waarde
+        if waarde:
+            a["resolvedAt"] = nu
+        else:
+            a.pop("resolvedAt", None)
+        # de hele bewerking afvinken vinkt ook alle losse blokken af
+        for h in a.get("hunks") or []:
+            h["resolved"] = waarde
+        geraakt.append(a.get("nr"))
     ontbreekt = sorted(nrs - set(geraakt))
     data["updatedAt"] = nu
     schrijf(json_pad, data)
     open_n = len([a for a in data.get("annotations", []) if not a.get("resolved")])
-    return {"ok": True, "round": nr, "jsonPath": json_pad, "resolved": sorted(geraakt),
-            "notFound": ontbreekt, "open": open_n,
-            "total": len(data.get("annotations", []))}
+    uit = {"ok": True, "round": nr, "jsonPath": json_pad, "resolved": sorted(geraakt),
+           "notFound": ontbreekt, "open": open_n,
+           "total": len(data.get("annotations", []))}
+    if hunks:
+        uit["hunksResolved"] = hunks_geraakt
+        uit["hunksNotFound"] = hunks_ontbreken
+        uit["hunksOpen"] = sum(
+            1 for a in data.get("annotations", []) for h in (a.get("hunks") or [])
+            if not h.get("resolved"))
+    return uit
 
 
 def h_save(payload):
@@ -354,6 +391,21 @@ def h_save(payload):
         rec["origineel"] = ann.get("origineel") or ""
         rec["nieuw"] = ann.get("nieuw") or ""
         rec["diff"] = ann.get("diff") or []
+        # Per hunk bewaren we of hij al verwerkt is. Bestond deze bewerking al, dan
+        # blijven eerder afgevinkte hunks afgevinkt zolang ze inhoudelijk hetzelfde
+        # zijn — anders zou een nieuwe wijziging elders het hele blok heropenen.
+        oude_hunks = {}
+        if bestaande:
+            for h in bestaande.get("hunks") or []:
+                sleutel = (h.get("verwijderd", ""), h.get("toegevoegd", ""))
+                oude_hunks[sleutel] = h.get("resolved", False)
+        hunks = []
+        for h in ann.get("hunks") or []:
+            h = dict(h)
+            sleutel = (h.get("verwijderd", ""), h.get("toegevoegd", ""))
+            h["resolved"] = oude_hunks.get(sleutel, False)
+            hunks.append(h)
+        rec["hunks"] = hunks
     else:
         rect = ann.get("rect") or {}
         rel = "screenshots/annotatie-%02d.png" % nummer

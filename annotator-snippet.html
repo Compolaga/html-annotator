@@ -72,6 +72,8 @@
   .la-draft-bar button:hover { border-color: #16181d; }
   .la-draft-bar button.la-actief { background: #16181d; color: #fff; border-color: #16181d; }
   .la-draft-bar .la-draft-meld { color: #6b6b66; }
+  .la-draft-txt .la-hunk-nr { font-size: 10px; font-weight: 700; color: #7a5cff;
+    vertical-align: super; padding: 0 2px; user-select: none; }
   .la-draft-txt ins { background: #dcfce7; color: #14532d; text-decoration: underline;
     text-decoration-thickness: 1px; }
   .la-draft-txt del { background: #fee2e2; color: #7f1d1d; text-decoration: line-through; }
@@ -146,7 +148,7 @@
         rect: a.rect || null, comment: a.comment || "", target: a.target || "",
         selectedText: a.selectedText || "", img: null,
         veld: a.veld || "", origineel: a.origineel || "", nieuw: a.nieuw || "",
-        diff: a.diff || [],
+        diff: a.diff || [], hunks: a.hunks || [],
         createdAt: a.createdAt, stale: !!a.stale
       };
     });
@@ -460,7 +462,7 @@
         selectedText: a.selectedText || null, img: a.img || null, createdAt: a.createdAt,
         /* bewerkingen op een conceptbericht; leeg voor de andere types */
         veld: a.veld || null, origineel: a.origineel || null, nieuw: a.nieuw || null,
-        diff: a.diff || null
+        diff: a.diff || null, hunks: a.hunks || null
       }
     })).then(function (j) {
       brug.ok = true; brug.jsonPath = j.jsonPath; brug.count = j.count; brug.round = j.round;
@@ -695,10 +697,80 @@
     return uit;
   }
 
+  /* Van een platte lijst wijzigingen naar hunks, zoals een unified diff dat doet.
+     Elke aaneengesloten wijziging wordt een eigen blok met de tekst eromheen als anker.
+     Waarom context en geen positie: een regel- of tekennummer klopt niet meer zodra er
+     iets bóven de wijziging verandert, terwijl de omringende woorden een blok ook in een
+     gewijzigd document nog terugvindbaar maken. Dat is precies waarom `patch` een hunk
+     met een verschoven nummer alsnog plaatst.
+
+     Het alineanummer is er om naar te kúnnen verwijzen ("alinea 3"), niet om op te
+     zoeken. Verwar de twee niet: het anker is de tekst. */
+  function laStaart(t, n) {
+    if (t.length <= n) return t;
+    var deel = t.slice(t.length - n);
+    var sp = deel.search(/\S/);
+    var w = deel.indexOf(" ");
+    return w > 0 && w < 12 ? deel.slice(w + 1) : deel.slice(sp < 0 ? 0 : sp);
+  }
+  function laKop(t, n) {
+    if (t.length <= n) return t;
+    var deel = t.slice(0, n);
+    var w = deel.lastIndexOf(" ");
+    return w > n - 12 && w > 0 ? deel.slice(0, w) : deel;
+  }
+  function laAlinea(tekst, pos) {
+    var voor = tekst.slice(0, Math.max(0, pos));
+    return (voor.split(/\n\s*\n/).length);
+  }
+
+  function laHunks(ops, nieuweTekst) {
+    var lijst = [], posNieuw = 0;
+    ops.forEach(function (o) {
+      lijst.push({ op: o.op, t: o.t, nieuw: posNieuw });
+      if (o.op !== "-") posNieuw += o.t.length;
+    });
+    var hunks = [], i = 0, n = 0;
+    while (i < lijst.length) {
+      if (lijst[i].op === "=") { i++; continue; }
+      var start = i, verwijderd = "", toegevoegd = "";
+      while (i < lijst.length && lijst[i].op !== "=") {
+        if (lijst[i].op === "-") { verwijderd += lijst[i].t; }
+        else { toegevoegd += lijst[i].t; }
+        i++;
+      }
+      n += 1;
+      hunks.push({
+        n: n,
+        alinea: laAlinea(nieuweTekst, lijst[start].nieuw),
+        voor: start > 0 ? laStaart(lijst[start - 1].t, 40) : "",
+        na: i < lijst.length ? laKop(lijst[i].t, 40) : "",
+        verwijderd: verwijderd,
+        toegevoegd: toegevoegd
+      });
+    }
+    return hunks;
+  }
+
   function laTeken(box, ops) {
     box.textContent = "";
+    var n = 0, vorigeWasWijziging = false;
     ops.forEach(function (o) {
-      if (o.op === "=") { box.appendChild(document.createTextNode(o.t)); return; }
+      if (o.op === "=") {
+        box.appendChild(document.createTextNode(o.t));
+        vorigeWasWijziging = false;
+        return;
+      }
+      if (!vorigeWasWijziging) {
+        /* nummer vóór elk blok, zodat "hunk 2" in de chat hetzelfde blok aanwijst
+           als het nummer op het scherm */
+        n += 1;
+        var sup = document.createElement("sup");
+        sup.className = "la-hunk-nr";
+        sup.textContent = n;
+        box.appendChild(sup);
+        vorigeWasWijziging = true;
+      }
       var e = document.createElement(o.op === "+" ? "ins" : "del");
       e.textContent = o.t;
       box.appendChild(e);
@@ -730,6 +802,13 @@
       if (node.nodeType === 3) {
         if (node === doel) { telling += offset; klaar = true; return; }
         telling += node.nodeValue.length;
+        return;
+      }
+      if (node.nodeName === "SUP" && node.className === "la-hunk-nr") {
+        /* Het blokummer is opmaak, geen tekst: het staat niet in de echte tekst en mag
+           dus niet meetellen, anders staat de cursor per voorafgaand blok één teken
+           naast. Klikken óp het nummer telt als de rand van dat blok. */
+        if (node.contains(doel)) { klaar = true; }
         return;
       }
       if (node.nodeName === "DEL") {
@@ -874,6 +953,7 @@
       origineel: box.__origineel,
       nieuw: box.__nieuw,
       diff: ops,
+      hunks: laHunks(ops, box.__nieuw),
       comment: "Tekst herschreven in het concept",
       rect: { x: 0, y: 0, w: 0, h: 0 }
     };
@@ -895,22 +975,66 @@
     });
   }
 
-  /* Na een reload staan de bewerkingen op schijf maar de kaart toont weer de
-     oorspronkelijke tekst. Deze koppelt ze terug op hun veld. */
+  /* Een blok terugplaatsen in de huidige tekst, op zijn anker. Dezelfde drie pogingen
+     van streng naar soepel als pas-hunk-toe.py: volledige context, linkercontext, kaal —
+     en alleen als de treffer uniek is, want anders zou hij op de verkeerde plek landen. */
+  function laPlaatsHunk(tekst, h) {
+    var voor = h.voor || "", na = h.na || "";
+    var weg = h.verwijderd || "", erbij = h.toegevoegd || "";
+    var pogingen = [[voor + weg + na, voor + erbij + na], [voor + weg, voor + erbij]];
+    if (weg) { pogingen.push([weg, erbij]); }
+    for (var i = 0; i < pogingen.length; i++) {
+      var zoek = pogingen[i][0], vervang = pogingen[i][1];
+      if (!zoek) continue;
+      var eerste = tekst.indexOf(zoek);
+      if (eerste >= 0 && tekst.indexOf(zoek, eerste + 1) < 0) {
+        return tekst.slice(0, eerste) + vervang + tekst.slice(eerste + zoek.length);
+      }
+    }
+    return null;
+  }
+
+  /* Na een reload staan de bewerkingen op schijf maar toont de kaart weer de tekst zoals
+     hij nu is. Openstaande blokken worden daar één voor één op teruggeplaatst — niet de
+     opgeslagen eindtekst in één keer. Dat verschil telt zodra een agent één blok heeft
+     doorgevoerd: de pagina is dan veranderd, en alleen wat nog openstaat hoort nog te
+     worden getoond. Blokken die al verwerkt zijn verdwijnen vanzelf. */
   function laHerstelBewerkingen() {
     var perVeld = {};
     anns.forEach(function (a) { if (a.type === "edit" && a.veld) { perVeld[a.veld] = a; } });
     Array.prototype.forEach.call(document.querySelectorAll(".la-draft-txt"), function (box) {
       var a = perVeld[box.__veld];
       if (!a || !box.__toonMarkup) return;
-      /* Is de kaart zelf herschreven sinds die bewerking, dan zou terugzetten Lucs
-         oude tekst over de nieuwe heen leggen. Dan liever niets doen. */
-      if (a.origineel && a.origineel !== box.__origineel) {
-        box.__bar.meld.textContent = "let op: de concepttekst is gewijzigd sinds annotatie " + a.nr;
+      var hunks = (a.hunks || []).filter(function (h) { return !h.resolved; });
+
+      if (!hunks.length) {
+        /* Oudere bewerking zonder blokken: alleen terugzetten als de tekst nog exact
+           is zoals hij was, anders zou Lucs oude versie over de nieuwe heen komen. */
+        if (a.origineel && a.origineel !== box.__origineel) {
+          box.__bar.meld.textContent = "let op: de concepttekst is gewijzigd sinds annotatie " + a.nr;
+          return;
+        }
+        box.__annId = a.id; box.__nr = a.nr; box.__nieuw = a.nieuw || box.__origineel;
+        box.__toonMarkup();
         return;
       }
-      box.__annId = a.id; box.__nr = a.nr; box.__nieuw = a.nieuw || box.__origineel;
+
+      var tekst = box.__origineel, geplaatst = 0, kwijt = [];
+      hunks.forEach(function (h) {
+        var r = laPlaatsHunk(tekst, h);
+        if (r === null) { kwijt.push(h.n); } else { tekst = r; geplaatst += 1; }
+      });
+      if (!geplaatst) {
+        box.__bar.meld.textContent =
+          "annotatie " + a.nr + ": de tekst is te veel veranderd om de wijziging te tonen";
+        return;
+      }
+      box.__annId = a.id; box.__nr = a.nr; box.__nieuw = tekst;
       box.__toonMarkup();
+      if (kwijt.length) {
+        box.__bar.meld.textContent = "annotatie " + a.nr + ": blok " + kwijt.join(", ") +
+          " niet meer terug te vinden in de tekst";
+      }
     });
   }
 
