@@ -27,8 +27,9 @@ HTML-pagina  ──►  annotator-snippet.html   (badges, snipping-UI, conceptka
                                             screenshots/annotatie-01.png
 ```
 
-- **Rondes** — een ronde blijft open tot je "Remove all" doet. Oude rondes worden nooit
-  overschreven, dus de feedbackgeschiedenis van een pagina blijft staan.
+- **Rondes** — een ronde blijft open tot hij via `POST /remove-all` wordt
+  afgesloten. Oude rondes worden nooit overschreven, dus de feedbackgeschiedenis
+  van een pagina blijft staan.
 - **Resolven** — een verwerkte annotatie wordt afgevinkt bij de bridge en verdwijnt van
   de pagina, maar blijft in de JSON als historie.
 - **Zelfherstel** — de pagina blijft de bridge elke 3 seconden opnieuw proberen, dus als

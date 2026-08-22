@@ -124,7 +124,7 @@ def bepaal_ronde(payload, maak=False):
 
     De lopende ronde is de hoogste bestaande ronde die niet gesloten is. Een
     gewijzigde pagina-inhoud opent dus GEEN nieuwe ronde meer; alleen een
-    afgesloten ronde (Remove all) doet dat. De contentHash wordt nog wel
+    afgesloten ronde (POST /remove-all) doet dat. De contentHash wordt nog wel
     bijgehouden, als context bij welke paginaversie de feedback hoorde.
     """
     map_pad, bestand = pagina_map(payload)

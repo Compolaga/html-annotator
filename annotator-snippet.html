@@ -3,7 +3,6 @@
   #la-bar { position: fixed; right: 14px; bottom: 12px; z-index: 99999; display: flex; align-items: center; gap: 6px; font-family: -apple-system, "Segoe UI", Arial, sans-serif; }
   #la-bar button { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid #c8ccd3; background: #fff; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
   #la-bar button.la-aan { background: #16181d; color: #fff; border-color: #16181d; }
-  #la-bar button.la-gevaar { color: #a4262c; border-color: #e6b8ba; }
   #la-status { font-size: 11px; padding: 5px 9px; border-radius: 999px; border: 1px solid #cfe2cf; background: #eef7ee; color: #256029; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
   #la-status.la-uit { border-color: #e6c9a8; background: #fdf3e6; color: #8a4b08; cursor: help; }
   #la-overlay { position: fixed; inset: 0; z-index: 99998; cursor: crosshair; background: rgba(20,25,35,.06); }
@@ -208,9 +207,7 @@
   /* ---- knoppenbalk ---------------------------------------------- */
   var bar = document.createElement("div"); bar.id = "la-bar";
   bar.innerHTML = '<span id="la-status">bridge checken...</span>' +
-    '<button id="la-toggle">&#9998; Annotate selection</button>' +
-    '<button id="la-wisalles" class="la-gevaar">Remove all</button>' +
-    '<button id="la-send">Stuur direct</button>';
+    '<button id="la-toggle">&#9998; Annotate selection</button>';
   document.body.appendChild(bar);
 
   /* ---- anker terugvinden na een pagina-wijziging ------------------ */
@@ -626,57 +623,6 @@
     }, 10);
   });
   document.addEventListener("scroll", verbergSelKnop, true);
-
-  /* ---- remove all ------------------------------------------------ */
-  document.getElementById("la-wisalles").addEventListener("click", function () {
-    if (!anns.length && !brug.count) { alert("Er zijn geen annotaties om te wissen."); return; }
-    if (!confirm("Alle annotaties van de lopende ronde verwijderen?\n" +
-        "Eerdere rondes op schijf blijven staan. Dit kan niet ongedaan gemaakt worden.")) return;
-    var was = anns.length;
-    anns = []; teller = 0; bewaarLokaal(); render(); sluitPopup();
-    post("/remove-all", basis()).then(function (j) {
-      brug.count = 0; brug.round = j.nextRound;
-      zetStatus(true, "round " + j.nextRound + " - 0 annotaties opgeslagen", j.jsonPath || "");
-      alert("Ronde " + j.round + " gewist (" + j.cleared + " annotaties). " +
-        "Nieuwe annotaties komen in ronde " + j.nextRound + ".");
-    }).catch(function () {
-      alert("Lokaal gewist (" + was + "), maar de bridge draait niet, dus op schijf is niets veranderd.");
-    });
-  });
-
-  /* ---- versturen naar een verwerkende agent ----------------------- */
-  function kopieer(tekst) {
-    return (navigator.clipboard ? navigator.clipboard.writeText(tekst) : Promise.reject());
-  }
-  /* "Stuur direct" = wat Luc anders met de hand doet: eerst alles naar schijf
-     laten bevestigen (/session), dan een verse Claude Code-sessie openen met het
-     verwerk-promptje erin (/sessie → `open claude://code/new?q=...`). Lukt dat
-     openen niet, dan valt hij terug op het klembord en zegt hij dat ook. Zonder
-     bridge staat er niets op schijf en is er dus niets te verwerken: dan meldt
-     hij dat eerlijk in plaats van stil te falen. */
-  document.getElementById("la-send").addEventListener("click", function () {
-    verversSessie().then(function (j) {
-      if (!j) {
-        alert("De bridge draait niet, dus er staat niets op schijf en er valt niets te verwerken.\n\n" +
-          "Start hem en probeer opnieuw:\n~/.claude/skills/html-annotator/ensure-bridge.sh");
-        return;
-      }
-      if (!j.count) { alert("Geen openstaande annotaties in round " + j.round + "."); return; }
-      var prompt = "Verwerk mijn feedback op " + (j.jsonPath || "") +
-        " (round " + j.round + ", " + j.count + " openstaande annotaties). Gebruik de skill " +
-        "html-annotator: lees de annotaties met hun crops, verwerk ze in " +
-        (paginaBestand() || location.href) +
-        " en markeer ze daarna resolved via POST /resolve.";
-      return post("/sessie", { prompt: prompt }).then(function () {
-        alert("Nieuwe Claude Code-sessie geopend met " + j.count + " annotaties uit round " + j.round + ".");
-      }).catch(function (e) {
-        return kopieer(prompt).then(function () {
-          alert("Sessie openen lukte niet (" + (e && e.message ? e.message : e) + ").\n" +
-            "Het verwerk-promptje staat nu op je klembord; plak het in de Claude-chat.");
-        }).catch(function () { alert("Sessie openen lukte niet. Promptje:\n\n" + prompt); });
-      });
-    });
-  });
 
   /* ---- tracked changes op conceptberichten ------------------------
      Een comment naast de tekst laat Luc uitleggen wat er anders moet; vaak is het

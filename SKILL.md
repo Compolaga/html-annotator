@@ -101,14 +101,7 @@ Wat Luc kan:
 - **Tekstselectie**: gewoon tekst selecteren → er verschijnt een paars knopje
   "Annoteer selectie" → comment typen → Save. De geselecteerde tekst komt in de
   JSON, er wordt geen screenshot gemaakt.
-- **Remove all**: wist na een bevestiging alle annotaties van de lopende ronde.
-  Eerdere rondes op schijf blijven staan.
-- **Stuur direct**: bevestigt eerst wat er op schijf staat (`/session`) en opent
-  daarna via `POST /sessie` een verse Claude Code-sessie met het verwerk-promptje
-  (pad naar `annotations.json`, ronde, aantal, en de opdracht om achteraf te
-  resolven). Lukt het openen niet, dan komt datzelfde promptje op het klembord.
-  Draait de bridge niet, dan zegt de knop dat er niets op schijf staat; hij faalt
-  niet stil. Er is geen download-knop meer: de bridge is de enige opslagroute.
+- Er is geen download-knop: de bridge is de enige opslagroute.
 - Badges: blauw = regio, paars = tekstselectie. Klik erop om te bekijken,
   bewerken of verwijderen.
 - Statuspil links van de knoppen: `round N - X annotaties opgeslagen` (X = het
@@ -190,9 +183,10 @@ doorgeeft; zie de skill `nieuwe-sessie`.
 De slug komt van de bestandsnaam van de pagina (file://) of anders van de
 paginatitel. Oude rondes worden nooit overschreven.
 
-Een nieuwe ronde begint **alleen na Remove all**: de lopende ronde wordt
-leeggemaakt en op `"closed": true` gezet, en de volgende annotatie opent ronde+1.
-De lopende ronde is dus altijd de hoogste bestaande ronde die niet gesloten is.
+Een nieuwe ronde begint **alleen** als de lopende ronde via `POST /remove-all`
+wordt afgesloten: die ronde wordt leeggemaakt en op `"closed": true` gezet, en
+de volgende annotatie opent ronde+1. In de pagina zelf zit daar geen knop meer
+voor. De lopende ronde is altijd de hoogste bestaande ronde die niet gesloten is.
 
 Een gewijzigde pagina-inhoud opent **geen** nieuwe ronde meer. Pas jij de HTML
 aan naar aanleiding van feedback, dan blijft de ronde staan met de annotaties die
