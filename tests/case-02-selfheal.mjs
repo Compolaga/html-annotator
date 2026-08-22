@@ -194,7 +194,7 @@ for (const origin of ORIGINS) {
     }
     await sleep(6000);
     const tussenpil = await page.textContent('#la-status');
-    if (/round \d+/.test(tussenpil || '')) {
+    if (/annotaties opgeslagen/.test(tussenpil || '')) {
       console.log(`  FAIL  ${label}: herstelde al terwijl de pagina verborgen was ("${tussenpil}") — deze variant toetst de listener dan niet`);
       falen++;
       await page.close();
@@ -210,7 +210,7 @@ for (const origin of ORIGINS) {
   // 3. de pil moet vanzelf omslaan — geen reload, geen klik
   let hersteld = true;
   await page.waitForFunction(
-    () => /round \d+/.test(document.getElementById('la-status')?.textContent || ''),
+    () => /annotaties opgeslagen/.test(document.getElementById('la-status')?.textContent || ''),
     null, { timeout: VERBORGEN ? 3000 : PILL_TIMEOUT_MS },
   ).catch(() => { hersteld = false; });
   const pilNa = await page.textContent('#la-status');

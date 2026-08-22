@@ -194,7 +194,7 @@
       try { localStorage.setItem(KEY + ":ronde", JSON.stringify(j.round)); } catch (e) {}
       uitBridge(j);
       brug.ok = true; brug.jsonPath = j.jsonPath; brug.count = j.count; brug.round = j.round;
-      zetStatus(true, "round " + j.round + " - " + j.count + " annotaties opgeslagen", j.jsonPath);
+      zetStatus(true, j.count + " annotaties opgeslagen", j.jsonPath);
       return j;
     }).catch(function () {
       brug.ok = false; brug.jsonPath = null;
@@ -488,7 +488,7 @@
     })).then(function (j) {
       brug.ok = true; brug.jsonPath = j.jsonPath; brug.count = j.count; brug.round = j.round;
       a.nr = j.nr; bewaarLokaal(); render();
-      zetStatus(true, "round " + j.round + " - " + j.count + " annotaties opgeslagen", j.jsonPath);
+      zetStatus(true, j.count + " annotaties opgeslagen", j.jsonPath);
       return j;
     }).catch(function (e) {
       brug.ok = false;
@@ -507,7 +507,7 @@
     bewaarLokaal(); render();
     return post("/delete", Object.assign(basis(), { id: a.id })).then(function (j) {
       brug.count = j.count;
-      zetStatus(true, "round " + j.round + " - " + j.count + " annotaties opgeslagen", j.jsonPath);
+      zetStatus(true, j.count + " annotaties opgeslagen", j.jsonPath);
     }).catch(function () { /* offline: localStorage is al bijgewerkt */ });
   }
 
@@ -524,7 +524,7 @@
         anns = anns.filter(function (x) { return x.id !== a.id; });
         bewaarLokaal(); render();
         brug.count = j.open;
-        zetStatus(true, "round " + j.round + " - " + j.open + " annotaties opgeslagen", j.jsonPath);
+        zetStatus(true, j.open + " annotaties opgeslagen", j.jsonPath);
         return j;
       }).catch(function (e) {
         alert("Afvinken mislukt: " + (e && e.message ? e.message : e));

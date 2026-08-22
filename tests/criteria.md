@@ -32,7 +32,7 @@ tussenstanden van dezelfde groene suite.
 
 **Gegeven** een pagina met het snippet die al open staat terwijl de bridge niet draait,
 **wanneer** de bridge daarna omhoog komt,
-**dan** slaat de statuspil binnen 10 seconden om naar `round N - X annotaties opgeslagen`
+**dan** slaat de statuspil binnen 10 seconden om naar `X annotaties opgeslagen`
 zonder dat de pagina herladen wordt, **en** landt een annotatie die daarna wordt
 opgeslagen daadwerkelijk in `annotations.json` op schijf.
 

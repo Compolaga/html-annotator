@@ -104,9 +104,8 @@ Wat Luc kan:
 - Er is geen download-knop: de bridge is de enige opslagroute.
 - Badges: blauw = regio, paars = tekstselectie. Klik erop om te bekijken,
   bewerken of verwijderen.
-- Statuspil links van de knoppen: `round N - X annotaties opgeslagen` (X = het
-  aantal **openstaande** annotaties op schijf), of "bridge uit - alleen
-  localStorage".
+- Statuspil links van de knoppen: `X annotaties opgeslagen` (X = het aantal
+  **openstaande** annotaties op schijf), of "bridge uit - alleen localStorage".
 - **Afvinken in de UI**: elk kaartje in de weeslijst heeft een ✓, en de popup van
   elke badge ook. Dat zet `resolved` via de bridge; de annotatie verdwijnt van de
   pagina en blijft in de JSON staan.
@@ -146,7 +145,7 @@ python3 ~/.claude/skills/html-annotator/annotator-bridge.py
 
 Draait hij? `curl -s http://127.0.0.1:8791/ping` geeft
 `{"ok": true, "bridge": "luc-annotator", "version": 2, ...}`. In de pagina zelf
-is het te zien aan de groene statuspil ("round N - X annotaties opgeslagen"). Staat die pil
+is het te zien aan de groene statuspil ("X annotaties opgeslagen"). Staat die pil
 oranje op "bridge uit - alleen localStorage", dan is er niets weggeschreven;
 de pagina valt dan terug op localStorage en zegt dat ook bij elke Save.
 
