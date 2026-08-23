@@ -1,13 +1,301 @@
 # Criteria
 
-Source of truth for behaviour. `VERIFICATION.md` is the freeze;
-`docs/DECISIONS.md` is why a choice stayed. A criterion without a check
-is a named gap, not silent coverage.
+An annotation the reviewer places lands on disk and does not disappear
+after a restart, a reload, or an edit elsewhere on the page. Pages open
+via `/p/`. The repo is a skill someone else can install, without
+personal workflow files.
 
-Intent: an annotation the reviewer places lands on disk and does not
-disappear after a restart, a reload, or an edit elsewhere on the page.
-Pages open via `/p/`. The repo is a skill someone else can install,
-without personal workflow files.
+Proof is `~/Desktop/annotaties/<slug>/ronde-NN/annotations.json`, not
+the chat. `tests/run.sh` covers a **subset**. A BLOCKED case never
+counts as green. Dated choices: `docs/DECISIONS.md`.
+
+## Out of scope
+
+- Model behaviour (agent pastes the snippet / calls resolve) is not
+  enforceable by the suite.
+- A sideviewer is allowed, but only via `/p/`, never as `file://`/`data:`.
+- Chrome throttling of a real background tab is untested.
+- Identifiers stay: `window.LucAnnotator`, `<!-- LUC-ANNOTATOR -->`,
+  bridge identity `luc-annotator`, localStorage `luc-annotaties`,
+  `LUC_ANNOTATOR_*`. Renaming them orphans existing pages unless a
+  migration ships with the rename.
+
+## Functional requirements
+
+<details><summary><strong>B1 — <code>/ping</code> returns 200, CORS <code>*</code>, OPTIONS 204.</strong></summary>
+
+*Expected behaviour:* `GET /ping` answers; any origin is allowed; a
+preflight is 204.
+
+*Evidence:* `tests/test_bridge_contract.py`.
+
+*Gap:* no mutation on identity or CORS.
+
+</details>
+
+<details><summary><strong>B2 — <code>/p/</code> outside home is 403.</strong></summary>
+
+*Expected behaviour:* a path that leaves the home directory is refused.
+
+*Evidence:* `tests/test_bridge_contract.py` · `tests/mutate-contract.sh`.
+
+</details>
+
+<details><summary><strong>B3 — POST <code>/session</code> <code>/save</code> <code>/delete</code> <code>/remove-all</code> <code>/resolve</code> <code>/sessie</code> exist; <code>/resolve</code> sets <code>resolved</code> on disk.</strong></summary>
+
+*Expected behaviour:* each route answers; resolve writes `resolved` on
+the record.
+
+*Evidence:* `tests/test_bridge_contract.py` · mutate (resolve-noop).
+
+*Gap:* no mutation per remaining route.
+
+</details>
+
+<details><summary><strong>B4 — A round is never overwritten; a new round only after <code>/remove-all</code>.</strong></summary>
+
+*Expected behaviour:* a second save stays in the current round; a new
+`ronde-NN` appears only after remove-all.
+
+*Evidence:* `tests/test_bridge_contract.py` · `tests/mutate-contract.sh`.
+
+</details>
+
+<details><summary><strong>B5 — <code>contentHash</code> ignores the annotator block.</strong></summary>
+
+*Expected behaviour:* editing only the snippet does not change the page hash.
+
+*Evidence:* `tests/test_bridge_contract.py` · `tests/mutate-contract.sh`.
+
+</details>
+
+<details><summary><strong>B6 — A crop failure still stores the annotation.</strong></summary>
+
+*Expected behaviour:* when `maak_crop` raises, the JSON record is still written.
+
+*Evidence:* `h_save` with a raising crop (no live Chrome) · mutate.
+
+</details>
+
+<details><summary><strong>B7 — JSON write is atomic (tmp + replace); a dump error leaves the original.</strong></summary>
+
+*Expected behaviour:* a failed dump does not truncate `annotations.json`.
+
+*Evidence:* `tests/test_bridge_contract.py` (direct `schrijf`). Tmp cleanup is B21.
+
+</details>
+
+<details><summary><strong>B8 — <code>toon-annotaties.py --open</code> prints the work rule, expands refs, shows locator.</strong></summary>
+
+*Expected behaviour:* open items include the work rule, resolved refs, and the locator.
+
+*Evidence:* `tests/test_toon.py` · mutate (work rule).
+
+*Gap:* refs and locator are not mutated.
+
+</details>
+
+<details><summary><strong>B9 — Missing refs: do not guess, do warn.</strong></summary>
+
+*Expected behaviour:* `refsIncomplete` asks to save again; the CLI does not invent a target.
+
+*Evidence:* `tests/test_toon.py` · `tests/test_record.py`.
+
+*Gap:* no mutation.
+
+</details>
+
+<details><summary><strong>B10 — Pill self-heals and a later save lands on disk.</strong></summary>
+
+*Expected behaviour:* given a page that is already open while the bridge
+is down, when the bridge comes up the pill flips to `X saved` within 10s
+without a reload, and a save after that lands in `annotations.json`.
+The hidden-panel variant emulates `document.hidden`; it does not
+measure Chrome timer throttling (B19).
+
+*Evidence:* `tests/case-02-selfheal.mjs`.
+
+*Gap:* no contract mutation.
+
+</details>
+
+<details><summary><strong>B11 — SessionStart brings the bridge up.</strong></summary>
+
+*Expected behaviour:* given the hooks in `settings.local.json`, a route
+exists that starts the bridge without depending on how the agent writes
+the file, and the `Edit|Write` route still works. SessionStart covers
+Bash writes; the matcher is not widened to every Bash call.
+
+*Evidence:* `tests/case-04-bridge-omhoog-los-van-schrijfroute.sh`.
+
+*Gap:* no contract mutation.
+
+</details>
+
+<details><summary><strong>B12 — <code>ensure-bridge.sh</code> does not lie.</strong></summary>
+
+*Expected behaviour:* given port 8791 held by a non-bridge,
+`ensure-bridge.sh` ends with a live answering bridge or a non-zero
+exit — never exit 0 while `/ping` is empty. Stale pidfile is removed.
+
+*Evidence:* `tests/case-03-ensure-bridge-eerlijk.sh`.
+
+*Gap:* no contract mutation.
+
+</details>
+
+<details><summary><strong>B13 — A draft edit lands as <code>type: edit</code>.</strong></summary>
+
+*Expected behaviour:* click-edit in a draft card stores `type: edit`
+with original, new, and a diff that points at the changed span, and
+survives reload. No badge, no orphan list.
+
+*Evidence:* `tests/case-05` (draft edit).
+
+*Gap:* no contract mutation.
+
+</details>
+
+<details><summary><strong>B14 — Hunks are independently applicable.</strong></summary>
+
+*Expected behaviour:* each contiguous edit is its own hunk with
+surrounding text as the anchor. Hunks apply and resolve independently.
+The edit is done only when no hunk is open.
+
+*Evidence:* `tests/case-06-hunks.mjs` · `bin/pas-hunk-toe.py`.
+
+*Gap:* no contract mutation.
+
+</details>
+
+<details><summary><strong>B15 — <code>la-sub*</code> +30px, hook without page CSS.</strong></summary>
+
+*Expected behaviour:* each nest level steps 30px further in, at least
+four deep. A child draws a hook on any block element, including a bare
+`<li>`. Line colour follows `--line` when set, and stays visible
+without it. `--la-stap` moves indent and hook together.
+
+*Evidence:* `tests/case-07`.
+
+*Gap:* no contract mutation.
+
+</details>
+
+<details><summary><strong>B16 — Locator survives a row insert; orphan only when the text is gone; repeated cell text stays on the labeled row.</strong></summary>
+
+*Expected behaviour:* inserting a row above does not move the mark;
+deleting the text orphans it; two identical cells keep the mark on the
+row the locator named.
+
+*Evidence:* `tests/case-08-locator-tabel.mjs` · `tests/mutate-contract.sh`.
+
+*Gap:* no real Reconi page in the repo.
+
+</details>
+
+<details><summary><strong>B17 — Sideviewer origin.</strong></summary>
+
+*Expected behaviour:* opening a file in the sideviewer is a `data:`
+snapshot and cannot reach the bridge. The same page via `/p/` works,
+including self-heal.
+
+*Evidence:* `tests/sideview-test.sh` (manual). Measured 2026-08-18.
+
+</details>
+
+<details><summary><strong>B18 — A fresh agent pastes the snippet.</strong></summary>
+
+*Expected behaviour:* a fresh agent asked to ship HTML via Bash starts
+the bridge (new pid) and includes the `LUC-ANNOTATOR` marker. All runs
+must pass.
+
+*Evidence:* `tests/case-01`. Currently BLOCKED on a spend limit; not in
+default `tests/run.sh`.
+
+</details>
+
+<details><summary><strong>[gap]</strong> <s>B19 — Chrome throttling of a real background tab.</s> — untested, leave it.</summary>
+
+*Evidence:* not collected.
+
+</details>
+
+<details><summary><strong>[gap]</strong> <s>B20 — The model pastes the snippet / calls resolve.</s> — not enforceable.</summary>
+
+*Evidence:* not collected.
+
+</details>
+
+<details><summary><strong>B21 — A dump error removes the <code>.tmp</code>.</strong></summary>
+
+*Expected behaviour:* after a failed dump the leftover tmp file is gone.
+
+*Evidence:* `tests/test_bridge_contract.py` · mutate (`os.remove`).
+
+</details>
+
+<details><summary><strong>B22 — A page under <code>/p/</code> on a non-default port talks to that port.</strong></summary>
+
+*Expected behaviour:* when the bridge is not on 8791, the snippet still
+posts to the port that served `/p/`.
+
+*Evidence:* `tests/case-08-locator-tabel.mjs` (requires `LUC_ANNOTATOR_PORT`)
+· `tests/mutate-contract.sh`.
+
+</details>
+
+## Architecture
+
+<details><summary><strong>A1 — Root holds only ports.</strong></summary>
+
+*Expected behaviour:* root files are README, SKILL, INSTALL, CRITERIA,
+`install.sh`, `.gitignore`. Directories: `annotator/` `bin/`
+`references/` `tests/` `docs/`. Snippet lives in `references/`.
+Gitignored runtime does not count.
+
+*Evidence:* `tests/test_layout.py`.
+
+</details>
+
+<details><summary><strong>A2 — No <code>memories/</code>. Agent rules live in <code>references/</code>.</strong></summary>
+
+*Evidence:* `tests/test_layout.py`.
+
+</details>
+
+<details><summary><strong>A3 — <code>extras/</code> gone; not installed.</strong></summary>
+
+*Evidence:* `tests/test_layout.py` · `install.sh`.
+
+</details>
+
+<details><summary><strong>A4 — CLIs and hooks live in <code>bin/</code>; install/hooks point there.</strong></summary>
+
+*Evidence:* `tests/test_layout.py`.
+
+</details>
+
+<details><summary><strong>A5 — Python modules: <code>snake_case</code>. Scripts in <code>bin/</code>: kebab-case.</strong></summary>
+
+*Evidence:* `tests/test_layout.py`.
+
+</details>
+
+<details><summary><strong>A6 — Agent-facing text names no person.</strong></summary>
+
+*Expected behaviour:* allowlist (behaviour): `LucAnnotator`,
+`LucAnnotatorBridge`, `LUC-ANNOTATOR`, `luc-annotator`,
+`luc-annotaties`, `LUC_ANNOTATOR_*`. Exempt: `docs/DECISIONS.md`.
+
+*Evidence:* `tests/test_layout.py`.
+
+</details>
+
+<details><summary><strong>A7 — B1–B15 plus B16/B21/B22 stay green.</strong></summary>
+
+*Evidence:* `tests/run.sh` (default: 00 02–09 11).
+
+</details>
 
 ## Seams
 
@@ -18,91 +306,12 @@ public paths in `bin/` plus root contents.
 
 No tests against internal helpers, no snapshots of whole JSON dumps.
 
-## Existing behaviour (lock)
+## Release gate
 
-| ID | Criterion | Check | Gap |
-|---|---|---|---|
-| B1 | `/ping` 200, CORS `*`, OPTIONS 204 | `test_bridge_contract.py` | no mutation (identity/CORS) |
-| B2 | `/p/` outside home → 403 | same + `mutate-contract.sh` | |
-| B3 | POST `/session` `/save` `/delete` `/remove-all` `/resolve` `/sessie` exist; `/resolve` sets `resolved` on disk | same + mutate (resolve-noop) | no mutation per remaining route |
-| B4 | A round is never overwritten; a new round only after `/remove-all` | same + mutate | |
-| B5 | `contentHash` ignores the annotator block | same + mutate | |
-| B6 | A crop failure still stores the annotation | `h_save` + raising `maak_crop` (no live Chrome) + mutate | |
-| B7 | JSON write is atomic (tmp + replace); a dump error leaves the original | same (direct `schrijf`) | tmp cleanup is B21 |
-| B8 | `toon-annotaties.py --open` prints the work rule, expands refs, shows locator | `test_toon.py` + mutate (work rule) | refs/locator not mutated |
-| B9 | Missing refs: do not guess, do warn | same + `test_record.py` | no mutation |
-| B10 | Pill self-heals and a later save lands on disk | case-02 | no contract mutation |
-| B11 | SessionStart brings the bridge up | case-04 | no contract mutation |
-| B12 | `ensure-bridge.sh` does not lie | case-03 | no contract mutation |
-| B13 | A draft edit lands as `type: edit` | case-05 | no contract mutation |
-| B14 | Hunks are independently applicable | case-06 + `pas-hunk-toe.py` | no contract mutation |
-| B15 | `la-sub*` +30px, hook without page CSS | case-07 | no contract mutation |
-| B17 | Sideviewer origin | `sideview-test.sh` | manual |
-| B18 | A fresh agent pastes the snippet | case-01 | BLOCKED (spend limit); not in default `run.sh` |
-| B19 | Chrome throttling of a real background tab | — | untested, leave it |
-| B20 | The model pastes the snippet / calls resolve | — | not enforceable |
-
-### Case notes (what the suite actually measures)
-
-**B10 / case-02.** Given a page that is already open while the bridge is
-down, when the bridge comes up, the pill flips to `X saved` within 10s
-without a reload, and a save after that lands in `annotations.json`.
-The hidden-panel variant emulates `document.hidden`; it does not
-measure Chrome timer throttling (B19).
-
-**B11 / case-04.** Given the hooks in `settings.local.json`, a route
-exists that starts the bridge without depending on how the agent writes
-the file, and the `Edit|Write` route still works. SessionStart covers
-Bash writes; the matcher is not widened to every Bash call.
-
-**B12 / case-03.** Given port 8791 held by a non-bridge, `ensure-bridge.sh`
-ends with a live answering bridge or a non-zero exit — never exit 0
-while `/ping` is empty.
-
-**B13 / case-05.** Click-edit in a draft card stores `type: edit` with
-original, new, and a diff that points at the changed span, and survives
-reload. No badge, no orphan list.
-
-**B14 / case-06.** Each contiguous edit is its own hunk with surrounding
-text as the anchor. Hunks apply and resolve independently. The edit is
-done only when no hunk is open.
-
-**B15 / case-07.** Each nest level steps 30px further in, at least four
-deep. A child draws a hook on any block element, including a bare
-`<li>`. Line colour follows `--line` when set, and stays visible
-without it. `--la-stap` moves indent and hook together.
-
-**B17.** Manual: `tests/sideview-test.sh`. Opening a file in the
-sideviewer is a `data:` snapshot and cannot reach the bridge. The same
-page via `/p/` works, including self-heal. Measured 2026-08-18.
-
-**B18 / case-01.** A fresh agent asked to ship HTML via Bash must start
-the bridge (new pid) and include the `LUC-ANNOTATOR` marker. All runs
-must pass. Currently BLOCKED on a spend limit.
-
-## Architecture
-
-| ID | Criterion | Check |
-|---|---|---|
-| A1 | Root holds only ports: README, SKILL, INSTALL, VERIFICATION, CRITERIA, install.sh, `.gitignore`, plus `annotator/` `bin/` `references/` `tests/` `docs/`. Snippet lives in `references/`. Gitignored runtime does not count. | `test_layout.py` |
-| A2 | No `memories/`. Agent rules live in `references/` | same |
-| A3 | `extras/` gone; not installed | same + install.sh |
-| A4 | CLIs and hooks live in `bin/`; install/hooks point there | same |
-| A5 | Python modules: `snake_case`. Scripts in `bin/`: kebab-case | same |
-| A6 | Agent-facing text names no person. Allowlist (behaviour): `LucAnnotator`, `LucAnnotatorBridge`, `LUC-ANNOTATOR`, `luc-annotator`, `luc-annotaties`, `LUC_ANNOTATOR_*`. Exempt: `docs/DECISIONS.md`, `VERIFICATION.md`. | `test_layout.py` |
-| A7 | B1–B15 plus B16/B21/B22 stay green | `tests/run.sh` (default: 00 02–09 11) |
-
-## Changed behaviour (not a lock of 472cf63)
-
-| ID | Criterion | Check | Gap |
-|---|---|---|---|
-| B16 | Locator survives a row insert; orphan only when the text is gone; repeated cell text stays on the labeled row | case-08 + mutate | no real Reconi page in the repo |
-| B21 | A dump error removes the `.tmp` | `test_bridge_contract.py` + mutate (`os.remove`) | |
-| B22 | A page under `/p/` on a non-default port talks to that port | case-08 (requires `LUC_ANNOTATOR_PORT`) + mutate | |
-
-## Identifiers (non-goal)
-
-`window.LucAnnotator`, `<!-- LUC-ANNOTATOR -->`, the bridge identity
-`luc-annotator`, the localStorage prefix `luc-annotaties` and
-`LUC_ANNOTATOR_*` stay. Renaming them orphans existing annotated pages
-unless a migration ships with the rename.
+1. `python3 -m compileall -q annotator bin`
+2. Hook files live in `bin/`; `install.sh` registers
+   `bin/hook-ensure-bridge.sh`.
+3. `install.sh` copies no memories; agent rules live in `references/`.
+4. Suite: `tests/run.sh` — red if a case fails or BLOCKED is treated as pass.
+5. No diff on snippet CSS or English UI strings, except paths into
+   `bin/` and comment headers.

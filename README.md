@@ -14,8 +14,8 @@ No libraries, no CDN. One pasteable snippet and a local Python bridge
 3. Check: `curl -s http://127.0.0.1:8791/ping`.
 4. Open pages only via `http://127.0.0.1:8791/p/<path-from-home>`.
 5. Agent behaviour: [SKILL.md](SKILL.md) + required [references/agent-handbook.md](references/agent-handbook.md).
-6. What green means: [VERIFICATION.md](VERIFICATION.md) · `tests/run.sh`.
-7. Criteria: [CRITERIA.md](CRITERIA.md). Why something is that way: [docs/DECISIONS.md](docs/DECISIONS.md).
+6. Criteria and what green means: [CRITERIA.md](CRITERIA.md) · `tests/run.sh`.
+7. Why something is that way: [docs/DECISIONS.md](docs/DECISIONS.md).
 
 Teardown: hooks live in `~/.claude/settings.local.json` (backup next to
 the file). Skill symlink: `~/.claude/skills/html-annotator`.
@@ -59,4 +59,4 @@ The script links the skill and registers the hooks. Details:
 
 - macOS is the tested environment.
 - `~/Desktop/annotaties` and `bin/find-todo-list.sh` → Desktop stay the default.
-- Two blind spots in the suite: see VERIFICATION.md / INSTALL.md step 4.
+- Two blind spots in the suite: see CRITERIA.md (B18, B19) / INSTALL.md step 4.

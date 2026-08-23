@@ -9,13 +9,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # A1: ports. Snippet and handbook live in references/. Decisions in docs/.
 ROOT_OK = {
-    "README.md", "SKILL.md", "INSTALL.md", "VERIFICATION.md",
+    "README.md", "SKILL.md", "INSTALL.md",
     "CRITERIA.md", "install.sh", ".gitignore",
 }
 ROOT_DIRS_OK = {"annotator", "bin", "references", "tests", "docs", ".git"}
 
 # Agent-facing: what a stranger or installer reads. No tests/, no docs/
-# history, no VERIFICATION.md (dated freeze).
+# history.
 AGENT_FILES = (
     "SKILL.md", "README.md", "INSTALL.md", "CRITERIA.md", "install.sh",
 )

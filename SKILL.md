@@ -18,8 +18,7 @@ todo-list spawn, draft cards (`la-draft`) and `la-sub`. This file is
 only the port: embed, start the bridge, `/p/` URL, plus the short
 process trigger.
 
-The freeze (what must not change) is `VERIFICATION.md`. Dated choices: `docs/DECISIONS.md`. Install: `INSTALL.md`.
-Criteria: `CRITERIA.md`.
+Criteria (and what must stay green): `CRITERIA.md`. Dated choices: `docs/DECISIONS.md`. Install: `INSTALL.md`.
 
 ## Part 1: embed (every HTML deliverable)
 
@@ -77,10 +76,9 @@ on load; it retries every 3 seconds until it answers (plus on
 the hook, or by hand — the status pill flips on its own and no reload
 is needed.
 
-Verification: `tests/run.sh`, criteria in `CRITERIA.md`, freeze in
-`VERIFICATION.md`. Two known gaps: (1) the fresh-agent case is
-BLOCKED; (2) the hidden-panel variant emulates `document.hidden`, not
-Chrome throttling.
+Verification: `tests/run.sh`, criteria in `CRITERIA.md`. Two known
+gaps: (1) the fresh-agent case is BLOCKED; (2) the hidden-panel
+variant emulates `document.hidden`, not Chrome throttling.
 
 **Always open the page through the bridge, never via `file://` or a
 preview pane.** The bridge serves local files on `GET /p/<path-from-home>`:

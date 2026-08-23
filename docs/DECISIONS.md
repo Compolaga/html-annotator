@@ -58,5 +58,5 @@ location-relative. Agent-facing docs name no person;
 
 ## 2026-08-23 — Criteria at root, decisions in docs
 
-`CRITERIA.md` is the contract (what + check). Dated lab notes live in
-`tests/red/`. Binding choices live in this file.
+`CRITERIA.md` is the contract (criterion, expected behaviour, evidence).
+Dated lab notes live in `tests/red/`. Binding choices live in this file.
