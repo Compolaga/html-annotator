@@ -1,5 +1,10 @@
 # Acceptatiecriteria: bridge draait, annotaties landen op schijf
 
+Dit bestand is de **suite-narratie** (wat de cases meten en waarom). De
+volledige freeze — inclusief untested MUSTS — staat in
+[`VERIFICATION.md`](../VERIFICATION.md). Een groene suite is nodig, niet
+voldoende, om gedrag gelijk te houden.
+
 Vastgelegd 2026-08-18, vóór de implementatie. Bron: Luc, deze sessie.
 
 Wat moet gelden: **Luc verliest nooit een annotatie.** Alle criteria hieronder zijn

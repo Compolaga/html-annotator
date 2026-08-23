@@ -1,0 +1,17 @@
+# Annotation-record
+
+Velden die `POST /save` (`h_save`) nu al schrijft. Geen extra verplichte
+velden. Dit is documentatie van de bestaande interface, geen nieuw schema.
+
+| veld | wanneer |
+|---|---|
+| `nr`, `id`, `type`, `comment`, `target`, `createdAt`, `contentHash` | altijd |
+| `selectedText`, `locator` | `type: text` |
+| `refs`, `commentExpanded`, `refsIncomplete` | als er chips zijn / als markers ontbreken |
+| `_rect`, `image`, `imageError` | `type: region` |
+| `veld`, `origineel`, `nieuw`, `diff`, `hunks` | `type: edit` |
+| `attachment` | geplakte/bijgevoegde afbeelding |
+| `resolved`, `resolvedAt` | na `/resolve` |
+
+`locator`: `path`, `start`/`end` (`path`, `node`, `offset`), `nth`, `label`.
+`refs[]`: `id`, `selectedText`, optioneel `locator`.

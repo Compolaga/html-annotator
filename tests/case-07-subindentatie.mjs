@@ -15,8 +15,10 @@ import { chromium } from 'playwright-core';
 import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SKILL = join(homedir(), '.claude', 'skills', 'html-annotator');
+const SKILL = process.env.LUC_ANNOTATOR_SKILL_DIR
+  || join(fileURLToPath(new URL('..', import.meta.url)));
 const PORT = process.env.LUC_ANNOTATOR_PORT || '8791';
 
 const slug = `zz-test-subindent-${Date.now()}`;

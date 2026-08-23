@@ -17,7 +17,7 @@
 # Uitlezen doe je met lees-sideview-probe.sh.
 
 set -uo pipefail
-SKILL_DIR="$HOME/.claude/skills/html-annotator"
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DOEL="$HOME/Desktop/sideview-probe.html"
 PORT="${LUC_ANNOTATOR_PORT:-8791}"
 

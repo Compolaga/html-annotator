@@ -58,9 +58,10 @@ SLUG="$(printf '%s' "$PROJECT" | tr '/' '-')"
 MEMDIR="$HOME/.claude/projects/$SLUG/memory"
 mkdir -p "$MEMDIR"
 
-for f in "$BRON"/memories/*.md; do
-  naam="$(basename "$f")"
-  [ "$naam" = "MEMORY-index-regels.md" ] && continue
+# Alleen annotator-memories. Geen glob: extras/luc-memories/ hoort hier niet.
+for naam in html-annotator-standaard.md punt-verwerk-annotaties.md annotator-bridge-autostart.md; do
+  f="$BRON/memories/$naam"
+  [ -f "$f" ] || { fout "memory ontbreekt: $naam"; continue; }
   if [ -e "$MEMDIR/$naam" ]; then
     info "memory bestaat al, niet overschreven: $naam"
   else

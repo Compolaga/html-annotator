@@ -14,7 +14,8 @@ verkorte opdracht om openstaande annotaties te verwerken — hetzelfde als
 
 ## Wat te doen
 
-1. Lees skill `html-annotator` (deel 4).
+1. Lees skill `html-annotator` en daarna `references/agent-handbook.md`
+   (sectie “Deel 4: feedback verwerken”).
 2. Zoek zelf de open ronde: `~/.claude/skills/html-annotator/toon-annotaties.py --open`
    (of de bridge / `~/Desktop/annotaties/`).
 3. Eerst begrijpen, dan verwerken; resolved markeren via `POST /resolve`.

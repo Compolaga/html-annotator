@@ -18,11 +18,10 @@ import os
 import re
 import sys
 
-ROOT = os.path.expanduser("~/Desktop/annotaties")
-
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
+from annotator_config import ROOT
 from annotator_refs import expand_comment, validate_refs
 
 # Komt mee zodra er open annotaties zijn. Staat hier en niet alleen in SKILL.md,

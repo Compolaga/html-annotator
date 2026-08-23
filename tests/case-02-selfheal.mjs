@@ -24,8 +24,10 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdtempSync, existsSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SKILL = join(homedir(), '.claude', 'skills', 'html-annotator');
+const SKILL = process.env.LUC_ANNOTATOR_SKILL_DIR
+  || join(fileURLToPath(new URL('..', import.meta.url)));
 const PORT = process.env.LUC_ANNOTATOR_PORT || '8791';
 const PILL_TIMEOUT_MS = 10_000;
 const ORIGINS = (process.env.CASE02_ORIGINS || 'file,data').split(',');

@@ -1,8 +1,8 @@
 #!/bin/bash
 # Gedeelde helpers voor de bridge-tests. Source dit, draai het niet.
 
-SKILL_DIR="$HOME/.claude/skills/html-annotator"
-TESTS_DIR="$SKILL_DIR/tests"
+TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 PORT="${LUC_ANNOTATOR_PORT:-8791}"
 BRIDGE_URL="http://127.0.0.1:$PORT"
 

@@ -26,13 +26,11 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-HOST = "127.0.0.1"
-PORT = int(os.environ.get("LUC_ANNOTATOR_PORT", "8791"))
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
+from annotator_config import HOST, PORT, ROOT
 from annotator_refs import expand_comment, validate_refs
-ROOT = os.path.expanduser(os.environ.get("LUC_ANNOTATOR_ROOT", "~/Desktop/annotaties"))
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 CACHE = os.path.join(tempfile.gettempdir(), "luc-annotator-shots")
 MARGE = 12

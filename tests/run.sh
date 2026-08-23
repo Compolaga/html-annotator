@@ -30,7 +30,7 @@ echo
 if wil 02; then
   if [ ! -d node_modules/playwright-core ]; then
     echo "BLOKKED case-02: playwright-core ontbreekt. Installeer met:"
-    echo "  (cd ~/.claude/skills/html-annotator/tests && npm i --no-save playwright-core)"
+    echo "  (cd \"$(cd "$(dirname "$0")" && pwd)\" && npm i --no-save playwright-core)"
     BLOKKED=$((BLOKKED + 1))
   else
     node ./case-02-selfheal.mjs

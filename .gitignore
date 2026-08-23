@@ -3,3 +3,5 @@ bridge.pid
 tests/node_modules/
 tests/package-lock.json
 bridge-hook.log
+__pycache__/
+*.pyc

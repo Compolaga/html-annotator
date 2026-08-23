@@ -34,11 +34,10 @@ Bestaat er al iets op dat pad, overschrijf dat dan niet zonder te vragen.
 
 ## Stap 2 — memories installeren
 
-**Dit is geen optionele stap.** De skill triggert zichzelf niet alleen op zijn
-`description`; het gedrag dat de gebruiker gewend is (het component standaard
-inbouwen, altijd de `/p/`-URL opleveren, verwerkte annotaties resolven) zit voor een
-deel in de memories. Zonder die memories doet een verse agent het minder goed of pas
-op expliciet verzoek.
+**Dit is geen optionele stap.** De drie annotator-memories (standaard inbouwen,
+`.` = verwerken, bridge-autostart) horen bij het gedrag dat een verse agent
+zonder extra prompt moet doen. Andere Luc-workflow-memories zitten in
+`extras/luc-memories/` en gaan niet mee.
 
 De memories staan in `memories/` in deze repo. Ze horen in de memory-map van het
 project waar de gebruiker werkt:
@@ -52,9 +51,9 @@ De slug is het absolute projectpad met elke `/` vervangen door `-`. Voor
 
 Doe dit:
 
-1. Kopieer alle `.md`-bestanden uit `memories/` naar die map, behalve
-   `MEMORY-index-regels.md`. Bestaat een bestand daar al, overschrijf het dan niet —
-   meld het en vraag.
+1. Kopieer alleen `html-annotator-standaard.md`, `punt-verwerk-annotaties.md` en
+   `annotator-bridge-autostart.md` uit `memories/`. Bestaat een bestand daar al,
+   overschrijf het dan niet — meld het en vraag. (`install.sh` doet dit al.)
 2. Vul `MEMORY.md` in die map aan met de regels uit `memories/MEMORY-index-regels.md`.
    **Aanvullen, niet overschrijven** — `MEMORY.md` is de index van alle memories van
    dat project, niet alleen die van deze skill. Sla regels over die er al staan.
