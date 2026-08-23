@@ -1,6 +1,6 @@
 #!/bin/bash
 # De echte sideviewer meten — het ene oppervlak dat de geautomatiseerde suite niet kan
-# toetsen (tests/criteria.md, AC-4). Eén commando voor Luc; de rest doet dit script.
+# cover (CRITERIA.md B17). One command; the script does the rest.
 #
 #   ~/.claude/skills/html-annotator/tests/sideview-test.sh [wachttijd]
 #

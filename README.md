@@ -1,57 +1,62 @@
 # html-annotator
 
-Skill die van elke HTML die een agent voor de reviewer maakt een annoteerbare pagina
-maakt. Feedback landt als JSON plus crops op schijf.
+Visual HTML annotation skill for fast iteration in agentic work. Every
+HTML page an agent ships becomes annotatable. Feedback lands as JSON
+plus crops on disk.
 
-Geen libraries, geen CDN. Eén plakbaar snippet en een lokale Python-bridge
+No libraries, no CDN. One pasteable snippet and a local Python bridge
 (stdlib).
 
-## Start hier
+## Start here
 
-| Voor | Bestand |
-|---|---|
-| Installeren / uitrollen | [HANDOFF.md](HANDOFF.md) → [INSTALL.md](INSTALL.md) |
-| Wat een agent moet doen | [SKILL.md](SKILL.md) + verplicht [references/agent-handbook.md](references/agent-handbook.md) |
-| Wat groen betekent | [VERIFICATION.md](VERIFICATION.md) · `tests/run.sh` |
-| Waarom iets zo is | [decisions.md](decisions.md) |
+1. Read [INSTALL.md](INSTALL.md) and run `./install.sh` (or `--copy`).
+2. Start the bridge: `~/.claude/skills/html-annotator/bin/ensure-bridge.sh`.
+3. Check: `curl -s http://127.0.0.1:8791/ping`.
+4. Open pages only via `http://127.0.0.1:8791/p/<path-from-home>`.
+5. Agent behaviour: [SKILL.md](SKILL.md) + required [references/agent-handbook.md](references/agent-handbook.md).
+6. What green means: [VERIFICATION.md](VERIFICATION.md) · `tests/run.sh`.
+7. Criteria: [CRITERIA.md](CRITERIA.md). Why something is that way: [docs/DECISIONS.md](docs/DECISIONS.md).
 
-## Hoe het werkt
+Teardown: hooks live in `~/.claude/settings.local.json` (backup next to
+the file). Skill symlink: `~/.claude/skills/html-annotator`.
+
+## How it works
 
 ```
-HTML-pagina  ──►  annotator-snippet.html
-                     fetch 127.0.0.1:8791
-                          ▼
-                  bin/annotator-bridge.py
-                          ▼
-        ~/Desktop/annotaties/<pagina>/ronde-NN/annotations.json
+HTML page  ──►  references/annotator-snippet.html
+                   fetch 127.0.0.1:8791
+                        ▼
+                bin/annotator-bridge.py
+                        ▼
+      ~/Desktop/annotaties/<page>/ronde-NN/annotations.json
 ```
 
-Open pagina's via `http://127.0.0.1:8791/p/<pad-vanaf-home>`, niet via
-`file://` of een preview-pane. Een `data:`-origin kan loopback niet bereiken.
+Open pages via `http://127.0.0.1:8791/p/<path-from-home>`, not via
+`file://` or a preview pane. A `data:` origin cannot reach loopback.
 
-## Installeren
+## Install
 
 ```bash
-git clone https://github.com/kompolaga/html-annotator.git ~/repos/html-annotator
+git clone https://github.com/Compolaga/html-annotator.git ~/repos/html-annotator
 ~/repos/html-annotator/install.sh
 ```
 
-Het script linkt de skill en registreert de hooks. Details:
+The script links the skill and registers the hooks. Details:
 [INSTALL.md](INSTALL.md).
 
-## Wat er in zit
+## What's in here
 
-| pad | rol |
+| path | role |
 |---|---|
-| `SKILL.md` | agent-poort (inbouwen, `/p/`, `.`) |
-| `references/` | handbook, record, acceptatiecriteria |
-| `annotator-snippet.html` | het blok onderaan elke HTML |
-| `annotator/` | Python-bibliotheek (config, record, refs) |
-| `bin/` | bridge, ensure/hook, toon, hunks, todolijst |
+| `SKILL.md` | agent port (embed, `/p/`, `.`) |
+| `CRITERIA.md` | acceptance criteria |
+| `references/` | handbook, snippet, record schema |
+| `annotator/` | Python library (config, record, refs) |
+| `bin/` | bridge, ensure/hook, show, hunks, todo list |
 | `tests/` | suite |
 
-## Grenzen
+## Limits
 
-- macOS is de geteste omgeving.
-- `~/Desktop/annotaties` en `bin/vind-todolijst.sh` → Desktop blijven de default.
-- Twee blinde vlekken in de suite: zie VERIFICATION.md / INSTALL.md stap 4.
+- macOS is the tested environment.
+- `~/Desktop/annotaties` and `bin/find-todo-list.sh` → Desktop stay the default.
+- Two blind spots in the suite: see VERIFICATION.md / INSTALL.md step 4.

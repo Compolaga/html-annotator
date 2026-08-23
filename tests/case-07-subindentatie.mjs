@@ -48,7 +48,7 @@ writeFileSync(bestand, `<!doctype html><meta charset="utf-8"><title>${slug}</tit
   </ul>
   <div class="la-sub" id="zstap" style="--la-stap: 12px">eigen stap</div>
 </section>
-${readFileSync(join(SKILL, 'annotator-snippet.html'), 'utf8')}`);
+${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`);
 
 let falen = 0;
 const zeg = (ok, tekst) => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  case-07: ${tekst}`); if (!ok) falen++; };

@@ -1,44 +1,40 @@
-# INSTALL — instructie voor de agent
+# INSTALL
 
-Lees dit als je Claude Code bent en gevraagd wordt deze repo te installeren.
-Doel: de skill gedraagt zich na afloop precies zoals op de machine waar hij vandaan
-komt — dus niet alleen de bestanden, maar ook de hooks en de
-opleverregel. Sla geen stap over; stap 2 en 3 zijn juist de stappen die het verschil
-maken tussen "de skill staat er" en "de skill werkt vanzelf".
+Install this skill so it behaves the same as on the machine it came
+from: files, hooks, and the deliver rule. Do not skip steps 2 and 3;
+those are what make "the skill is there" into "the skill works".
 
-## De snelle route
+## Fast path
 
 ```bash
-git clone https://github.com/kompolaga/html-annotator.git ~/repos/html-annotator
+git clone https://github.com/Compolaga/html-annotator.git ~/repos/html-annotator
 ~/repos/html-annotator/install.sh
 ```
 
-`install.sh` doet stap 1 t/m 3 hieronder en is idempotent. Draai daarna alsnog stap 4
-met de hand. Wil je het handmatig, of faalde het script
-(bijvoorbeeld geen `jq`), volg dan de stappen zelf.
+`install.sh` does steps 1–3 and is idempotent. Still do step 4 by hand.
+If the script fails (for example no `jq`), follow the steps yourself.
 
-Agent-regels staan in `SKILL.md` en `references/`. Er worden geen memories
-gekopieerd.
+Agent rules live in `SKILL.md` and `references/`. No memories are copied.
 
-## Stap 1 — skill op zijn plek
+## Step 1 — skill on disk
 
-De skill moet vindbaar zijn als `~/.claude/skills/html-annotator/`. Een symlink naar
-de clone is prima en de voorkeur: dan is een update één `git pull`.
+The skill must be reachable as `~/.claude/skills/html-annotator/`. A
+symlink to the clone is preferred: an update is one `git pull`.
 
 ```bash
 ln -s ~/repos/html-annotator ~/.claude/skills/html-annotator
 chmod +x ~/.claude/skills/html-annotator/bin/*.sh ~/.claude/skills/html-annotator/bin/*.py
 ```
 
-Bestaat er al iets op dat pad, overschrijf dat dan niet zonder te vragen.
+If something already sits on that path, do not overwrite it without asking.
 
-## Stap 2 — de twee hooks registreren
+## Step 2 — register the two hooks
 
-Deze zorgen dat de bridge praktisch altijd aanstaat. Zonder deze hooks moet de
-gebruiker of de agent `ensure-bridge.sh` handmatig draaien, en dan is het antwoord op
-"waarom slaat hij niets op" bijna altijd: de bridge stond uit.
+These keep the bridge up. Without them, someone has to run
+`ensure-bridge.sh` by hand, and "why did nothing save" is almost always
+"the bridge was down".
 
-In `~/.claude/settings.local.json`, onder `hooks`:
+In `~/.claude/settings.local.json`, under `hooks`:
 
 ```json
 {
@@ -73,93 +69,90 @@ In `~/.claude/settings.local.json`, onder `hooks`:
 }
 ```
 
-Vervang `<HOME>` door het echte home-pad; het hook-veld accepteert geen `~`. Staan er
-al andere hooks onder `PostToolUse` of `SessionStart`, voeg deze er dan bij in plaats
-van ze te vervangen.
+Replace `<HOME>` with the real home path; the hook field does not accept
+`~`. If other hooks already sit under `PostToolUse` or `SessionStart`,
+append these instead of replacing them.
 
-De SessionStart-hook met lege matcher draait bij élke Claude Code-sessie op de
-machine, ook sessies die niets met annotaties doen. Dat is bewust: het is één curl per
-sessie, en de PostToolUse-laag mist een agent die de HTML via Bash wegschrijft. Wil de
-gebruiker dat smaller, dan is dat zijn keuze — verklein het niet ongevraagd.
+The empty-matcher SessionStart hook runs on every agent session on the
+machine, including sessions that never touch annotations. That is
+intentional: one curl per session, and the PostToolUse layer misses an
+agent that writes HTML via Bash. If the owner wants it narrower, that
+is their choice — do not narrow it unasked.
 
-## Stap 3 — de opleverregel in CLAUDE.md
+## Step 3 — deliver rule in the global instructions
 
-De sterkste trigger zit niet in de skill maar in de globale instructies. Zet in
-`~/.claude/CLAUDE.md` een regel in deze geest, aangepast aan hoe de gebruiker het wil:
+The strongest trigger is not in the skill but in the global instructions.
+Put a rule like this in `~/.claude/CLAUDE.md`, adapted to how the owner
+wants it:
 
 ```markdown
-## Opleveren
+## Deliverables
 
-Mails, plannen, analyses en andere uitwerkingen lever je als HTML via de skill
-`html-annotator`, niet als tekst in de chat, zodat er inline en op selectie
-commentaar op gezet kan worden.
+Mails, plans, analyses and other write-ups ship as HTML via the
+`html-annotator` skill, not as chat text, so they can take inline and
+selection comments.
 ```
 
-Vraag dit even na bij de gebruiker in plaats van het er ongevraagd in te zetten —
-het raakt al zijn projecten.
+Ask before writing that — it touches every project.
 
-## Upgraden vanaf een oudere install
+## Upgrading from an older install
 
-Draai `./install.sh` opnieuw (of `./install.sh --copy` als de skill een
-kopie is, geen symlink). `--copy` ververst `$DOEL`. Zonder `--copy` wordt
-een bestaande map die niet deze clone is met rust gelaten, en registreert
-het script geen hook die het bestand niet kan zien.
+Re-run `./install.sh` (or `./install.sh --copy` if the skill is a copy,
+not a symlink). `--copy` refreshes `$DOEL`. Without `--copy`, an
+existing directory that is not this clone is left alone, and the script
+does not register a hook it cannot see.
 
-Oude installer zette memories. Die staan niet meer in deze skill. Als je ze
-nog hebt onder `~/.claude/projects/*/memory/`, zijn dat:
+The old installer placed memories. Those are no longer in this skill.
+If they still sit under `~/.claude/projects/*/memory/`, they are:
 
 - `annotator-bridge-autostart.md`
 - `html-annotator-standaard.md`
 
-Niet automatisch wissen — het zijn projectregels. Zelf weghalen als de
-handbook (`references/agent-handbook.md`) ze vervangt.
+Do not delete them automatically — they are project rules. Remove them
+by hand if `references/agent-handbook.md` replaces them.
 
-De hook moet wijzen naar `bin/hook-ensure-bridge.sh`, niet naar
-`hook-ensure-bridge.sh` in de skill-root.
+The hook must point at `bin/hook-ensure-bridge.sh`, not
+`hook-ensure-bridge.sh` in the skill root.
 
-## Stap 4 — verifiëren
+## Step 4 — verify
 
 ```bash
 ~/.claude/skills/html-annotator/bin/ensure-bridge.sh
 curl -s http://127.0.0.1:8791/ping
 ```
 
-Verwacht: `{"ok": true, "bridge": "luc-annotator", "version": 2, ...}`.
+Expected: `{"ok": true, "bridge": "luc-annotator", "version": 2, ...}`.
 
-De suite draaien (Node + Playwright; eenmalig zelf installeren):
+Run the suite (Node + Playwright; install once):
 
 ```bash
 (cd ~/.claude/skills/html-annotator/tests && npm i --no-save playwright-core)
 ~/.claude/skills/html-annotator/tests/run.sh
 ```
 
-Twee grenzen die je moet kennen voordat je op groen vertrouwt, en die ook in
-`references/acceptance.md` staan: de "verse agent"-case is nooit in de praktijk geverifieerd
-(hij meldt zich als BLOCKED, niet als pass), en de verborgen-paneel-variant emuleert
-`document.hidden` en toetst dus de branch-logica, niet Chrome's echte throttling.
+Two limits, also in `CRITERIA.md`: the fresh-agent case has never been
+verified in practice (it reports BLOCKED, not pass), and the hidden-panel
+variant emulates `document.hidden` so it tests branch logic, not Chrome
+throttling.
 
-Eindtest die telt: maak een HTML met het snippet erin, open hem via
-`http://127.0.0.1:8791/p/<pad-vanaf-home>`, sleep een rechthoek, typ een comment,
-Save. Er hoort nu een `annotations.json` plus een crop te staan onder
-`~/Desktop/annotaties/<slug>/ronde-01/`.
+The test that counts: make an HTML file with the snippet, open it via
+`http://127.0.0.1:8791/p/<path-from-home>`, drag a rectangle, type a
+comment, Save. There should now be an `annotations.json` plus a crop
+under `~/Desktop/annotaties/<slug>/ronde-01/`.
 
-## Systeemeisen
+## Requirements
 
-- **python3** (stdlib is genoeg) — de bridge draait hierop.
-- **Chrome** — voor de screenshot-crops (`--headless=new --screenshot`). Zonder Chrome
-  worden regio-annotaties opgeslagen zonder crop.
-- **Pillow** (optioneel) — snellere crops; zonder Pillow snijdt Chrome zelf via een
-  iframe-clip. Beide routes zijn getest.
-- **jq** (optioneel) — alleen voor het automatisch registreren van de hooks.
-- **Node** (optioneel) — alleen voor de testsuite.
-- Poort **8791** moet vrij zijn. Die is bewust gekozen: 8080 is vaak van Docker.
+- **python3** (stdlib is enough) — the bridge runs on it.
+- **Chrome** — for screenshot crops. Without Chrome, region annotations
+  store without a crop.
+- **Pillow** (optional) — faster crops.
+- **jq** (optional) — only for automatic hook registration.
+- **Node** (optional) — only for the test suite.
+- Port **8791** must be free. Chosen on purpose: 8080 is often Docker.
 
-## Wat deze repo bewust niet meelevert
+## What this repo deliberately does not ship
 
-- `~/Desktop/annotaties/` — dat is gebruikersdata, die ontstaat vanzelf.
-- De skills waar SKILL.md naar verwijst en die hier niet in zitten:
-  `task-spawnen` (deel 5, sessienaamgeving bij spawnen), `nieuwe-sessie`
-  (`POST /sessie`, de claude://-deeplink) en `bericht-sturen` (deel 6, de
-  verstuurregel bij conceptberichten). De annotator werkt zonder, maar die drie
-  verwijzingen lopen dan dood — meld dat aan de gebruiker in plaats van ze stil te
-  laten falen.
+- `~/Desktop/annotaties/` — user data, created on first save.
+- Skills that `SKILL.md` mentions but that are not in this repo:
+  `task-spawnen`, `nieuwe-sessie` (`POST /sessie`), `bericht-sturen`.
+  The annotator works without them; say so instead of failing silently.

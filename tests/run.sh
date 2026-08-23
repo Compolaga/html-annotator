@@ -10,7 +10,7 @@
 # - Een case die niet kón draaien (exit 2) is geen pass. Hij wordt als BLOKKED geteld
 #   en de suite eindigt rood, want een test die niets deed bewijst niets.
 # - Case-01 test agent-gedrag en is dus flaky. De drempel staat vooraf vast in
-#   acceptance.md B18: alle runs moeten slagen. k/n wordt altijd afgedrukt.
+#   CRITERIA.md B18: every run must pass. k/n is always printed.
 # - Wat de suite NIET dekt wordt afgedrukt, zodat groen niet als volledige dekking leest.
 
 set -uo pipefail
@@ -35,7 +35,7 @@ BRIDGE_BIJ_START=$(bridge_pid)
 FALEN=0
 BLOKKED=0
 echo "=== annotator-bridge suite · $(date '+%Y-%m-%d %H:%M:%S') ==="
-echo "snippet: $(shasum -a 256 ../annotator-snippet.html | cut -c1-12)  hook: $(shasum -a 256 ../bin/hook-ensure-bridge.sh | cut -c1-12)  ensure: $(shasum -a 256 ../bin/ensure-bridge.sh | cut -c1-12)"
+echo "snippet: $(shasum -a 256 ../references/annotator-snippet.html | cut -c1-12)  hook: $(shasum -a 256 ../bin/hook-ensure-bridge.sh | cut -c1-12)  ensure: $(shasum -a 256 ../bin/ensure-bridge.sh | cut -c1-12)"
 echo
 
 if wil 00 || wil record; then
@@ -176,7 +176,7 @@ fi
 
 echo "NIET GEAUTOMATISEERD — de echte Claude Desktop sideviewer. Case-02 draait in"
 echo "systeem-Chrome; Electron heeft eigen CSP en flags. Handmatig gemeten 18-08-2026"
-echo "(acceptance.md B17): als BESTAND openen werkt daar niet en herstelt niet; via"
+echo "(CRITERIA.md B17): opening as a FILE does not work there and does not self-heal; via"
 echo "http://127.0.0.1:8791/p/<pad> werkt alles, inclusief zelfherstel."
 echo "Opnieuw meten: tests/sideview-test.sh"
 echo

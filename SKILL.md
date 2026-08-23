@@ -1,110 +1,119 @@
 ---
 name: html-annotator
 description: >
-  Standaard feedback-component voor ELKE HTML-pagina die een agent oplevert
-  (prototypes, slides, vergelijkingspagina's, dashboards). Bouw het
-  annotatie-snippet standaard in bij elke nieuwe of substantieel herziene
-  HTML-oplevering, zonder erom te vragen. Trigger óók bij
-  feedbackverwerking: een kaal bericht "." (alleen een punt), of "verwerk mijn
-  feedback" / "check mijn bewaarde feedback" / een pad naar annotations.json of
-  een annotatieronde — dan beschrijft deze skill hoe je de rondes en
-  screenshot-crops uitleest en verwerkt.
+  Visual HTML annotation skill for fast iteration in agentic work.
+  Embed the annotation snippet in every HTML deliverable (prototypes,
+  slides, comparison pages, dashboards) without being asked. Also
+  trigger when processing feedback: a bare "." (period only),
+  "process my feedback", or a path to annotations.json / an annotation
+  round — then this skill describes how to read and process rounds and
+  screenshot crops.
 ---
 
-# HTML-annotator: standaardcomponent + feedbackverwerking
+# HTML annotator: embed + process feedback
 
-**Lees vóór uitvoering `references/agent-handbook.md`.** Daar staan bridge,
-rondes, verwerken (`.` / resolve / refs / locators / hunks), todolijst-spawn,
-conceptkaarten (`la-draft`) en `la-sub`. Dit bestand is alleen de poort:
-inbouwen, bridge starten, `/p/`-URL, plus de korte verwerk-trigger.
+**Read `references/agent-handbook.md` before you act.** It covers the
+bridge, rounds, processing (`.` / resolve / refs / locators / hunks),
+todo-list spawn, draft cards (`la-draft`) and `la-sub`. This file is
+only the port: embed, start the bridge, `/p/` URL, plus the short
+process trigger.
 
-De volledige freeze (wat niet mag veranderen) staat in `VERIFICATION.md`.
-Gedateerde keuzes: `decisions.md`. Installatie: `INSTALL.md`.
+The freeze (what must not change) is `VERIFICATION.md`. Dated choices: `docs/DECISIONS.md`. Install: `INSTALL.md`.
+Criteria: `CRITERIA.md`.
 
-## Deel 1: inbouwen (bij elke HTML-oplevering)
+## Part 1: embed (every HTML deliverable)
 
-Plak de volledige inhoud van `annotator-snippet.html` (in deze skill-map) onderaan
-elke HTML, vlak voor `</body>` of aan het einde van het bestand. Het blok loopt
-van `<!-- LUC-ANNOTATOR v2 -->` tot `<!-- /LUC-ANNOTATOR -->`.
+Paste the full contents of `references/annotator-snippet.html` at the
+bottom of every HTML file, just before `</body>` or at the end of the
+file. The block runs from `<!-- LUC-ANNOTATOR v2 -->` to
+`<!-- /LUC-ANNOTATOR -->`.
 
-Detectie bij een bestaande pagina:
-- staat `LUC-ANNOTATOR v2` er al: niets doen;
-- staat er een ouder blok (`LUC-ANNOTATOR v1`, zonder eindmarker): vervang alles
-  vanaf `<!-- LUC-ANNOTATOR` tot en met het bijbehorende `</script>` door het
-  nieuwe blok;
-- staat er niets: onderaan toevoegen.
+On an existing page:
+- `LUC-ANNOTATOR v2` already present: do nothing;
+- older block (`LUC-ANNOTATOR v1`, no end marker): replace everything
+  from `<!-- LUC-ANNOTATOR` through the matching `</script>` with the
+  new block;
+- nothing there: append at the bottom.
 
-Self-contained: geen libraries, geen CDN, geen externe fonts. Werkt op file://
-en localhost.
+Self-contained: no libraries, no CDN, no external fonts. Works on
+`file://` and localhost.
 
-**Start daarna altijd de bridge.** Eén commando, idempotent, dus blind aanroepen
-bij elke oplevering en elke update van een pagina met het snippet erin:
+**Always start the bridge afterwards.** One command, idempotent, so
+call it blindly on every deliverable and every update of a page that
+already has the snippet:
 
 ```bash
 ~/.claude/skills/html-annotator/bin/ensure-bridge.sh
 ```
 
-Draait hij al, dan doet het script niets. Draait hij niet, dan start het hem
-losgekoppeld van je shell (nohup), schrijft de pid naar `bridge.pid` en de
-output naar `bridge.log` in de skill-map, en wacht het tot hij antwoordt (max
-5 seconden). Sla dit nooit over: zonder bridge belandt feedback in localStorage
-en staat er niets op schijf.
+If it is already running, the script does nothing. If not, it starts
+the bridge detached from your shell (nohup), writes the pid to
+`bridge.pid` and output to `bridge.log` in the skill directory, and
+waits until it answers (max 5 seconds). Never skip this: without the
+bridge, feedback lands in localStorage and nothing is on disk.
 
-**Vangnet, twee lagen.** Beide draaien `bin/hook-ensure-bridge.sh` uit deze
-skill-map (log: `bridge-hook.log`), geregistreerd in
+**Safety net, two layers.** Both run `bin/hook-ensure-bridge.sh` from
+this skill (log: `bridge-hook.log`), registered in
 `~/.claude/settings.local.json`:
 
-- **SessionStart** — één aanroep per sessie, ongeacht hoe die sessie straks HTML
-  wegschrijft. Dit is de laag die telt: de PostToolUse-laag mist een agent die het
-  bestand via Bash wegschrijft, en in auto-mode is Bash juist de voorgeschreven route.
-- **PostToolUse op `Edit|Write`** — is het geschreven bestand een `.html`/`.htm` met de
-  marker `LUC-ANNOTATOR`, dan gaat de bridge omhoog.
+- **SessionStart** — one call per session, regardless of how that
+  session later writes HTML. This is the layer that counts: the
+  PostToolUse layer misses an agent that writes the file via Bash, and
+  in auto-mode Bash is the prescribed route.
+- **PostToolUse on `Edit|Write`** — if the written file is `.html`/`.htm`
+  with the `LUC-ANNOTATOR` marker, the bridge comes up.
 
-De matcher is niet verbreed naar `Bash`, want dat zou op élke Bash-call in élk project
-vuren. Wat de gekozen route wél doet: de SessionStart-registratie staat op user-niveau met
-een lege matcher, dus hij draait bij het starten van élke Claude Code-sessie op deze
-machine, ook sessies die niets met annotaties doen. Dat is één curl per sessie, en niets
-meer als de bridge al luistert. Die keuze staat in `decisions.md` (18-08-2026).
-Verklein dit niet zonder een nieuw besluit.
+The matcher is not widened to `Bash`, because that would fire on every
+Bash call in every project. What the chosen route does: the
+SessionStart registration is user-level with an empty matcher, so it
+runs at the start of every agent session on this machine, including
+sessions that never touch annotations. That is one curl per session,
+and nothing more if the bridge is already listening. The choice lives
+in `docs/DECISIONS.md` (2026-08-18). Do not narrow it without a new decision.
 
-**Zelfherstel in de pagina.** Het snippet controleert de bridge niet één keer bij het
-laden, maar blijft elke 3 seconden opnieuw proberen zolang hij niet antwoordt (plus bij
-`visibilitychange` en `focus`). Komt de bridge later omhoog — door de hook, of met de
-hand — dan slaat de statuspil vanzelf om en is er geen reload nodig.
+**Self-heal in the page.** The snippet does not check the bridge once
+on load; it retries every 3 seconds until it answers (plus on
+`visibilitychange` and `focus`). If the bridge comes up later — via
+the hook, or by hand — the status pill flips on its own and no reload
+is needed.
 
-Verificatie: `tests/run.sh`, criteria in `references/acceptance.md`, freeze in
-`VERIFICATION.md`. Twee bekende gaten: (1) verse-agent case is BLOKKED; (2) verborgen
-paneel emuleert `document.hidden`, niet Chrome-throttling.
+Verification: `tests/run.sh`, criteria in `CRITERIA.md`, freeze in
+`VERIFICATION.md`. Two known gaps: (1) the fresh-agent case is
+BLOCKED; (2) the hidden-panel variant emulates `document.hidden`, not
+Chrome throttling.
 
-**Open de pagina altijd via de bridge, nooit via `file://` of de preview-pane.**
-De bridge serveert lokale bestanden zelf op `GET /p/<pad-vanaf-home>`:
+**Always open the page through the bridge, never via `file://` or a
+preview pane.** The bridge serves local files on `GET /p/<path-from-home>`:
 
 ```
 ~/Desktop/todos.html
 → http://127.0.0.1:8791/p/Desktop/todos.html
 ```
 
-Bouwen: absoluut pad, home-map eraf, rest achter `http://127.0.0.1:8791/p/`.
-Paden buiten home → 403. Preview-pane als `data:` kan loopback nooit bereiken
-(Private Network Access). Via `/p/` is de pagina same-origin met de bridge.
+Build: absolute path, strip the home directory, put the rest after
+`http://127.0.0.1:8791/p/`. Paths outside home → 403. A preview pane
+as `data:` can never reach loopback (Private Network Access). Via
+`/p/` the page is same-origin with the bridge.
 
-Wat de reviewer kan (gedrag ongewijzigd; details in het handbook):
-- regio slepen, tekst selecteren, tekst koppelen (chips), Save;
-- statuspil `X saved` of `bridge off - localStorage only`;
-- weeslijst **"N likely processed"**;
-- geen download-knop, geen Remove-all in de UI.
+What the reviewer can do (behaviour unchanged; details in the handbook):
+- drag a region, select text, link text (chips), Save;
+- status pill `X saved` or `bridge off - localStorage only`;
+- orphan list **"N likely processed"**;
+- no download button, no Remove-all in the UI.
 
-Test/debug-API: `window.LucAnnotator.add({type:'region'|'text', rect, comment,
-selectedText})`, `.anns()`, `.bridge()`, `.session()`, `.resolve(annotatie)`.
+Test/debug API: `window.LucAnnotator.add({type:'region'|'text', rect,
+comment, selectedText})`, `.anns()`, `.bridge()`, `.session()`,
+`.resolve(annotation)`.
 
-## Verwerken (korte poort)
+## Processing (short port)
 
-Triggers — geen bevestiging vragen:
+Triggers — do not ask for confirmation:
 
-- kaal **`.`** (alleen een punt, whitespace eromheen mag);
-- "verwerk mijn feedback" / pad naar `annotations.json` of een ronde.
+- a bare **`.`** (period only, surrounding whitespace is fine);
+- "process my feedback" / a path to `annotations.json` or a round.
 
-Bij `.` zelf de open ronde zoeken (`bin/toon-annotaties.py --open` of de bridge).
-Eerst begrijpen, dan doorvoeren, dan `POST /resolve`. Lees
-`references/agent-handbook.md` (deel 4) voor refs, locators, hunks, crops.
-`bin/toon-annotaties.py` print de werkregel opnieuw als er iets openstaat.
+On `.`, find the open round yourself (`bin/show-annotations.py --open`
+or the bridge). Understand first, then apply, then `POST /resolve`.
+Read `references/agent-handbook.md` (part 4) for refs, locators, hunks,
+crops. `bin/show-annotations.py` reprints the work rule whenever
+something is still open.

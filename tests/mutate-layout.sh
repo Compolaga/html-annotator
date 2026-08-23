@@ -128,7 +128,7 @@ python3 - <<'PY' "$werk/repo/SKILL.md"
 import sys
 p = sys.argv[1]
 t = open(p).read()
-t = t.replace('een kaal bericht "." (alleen een punt)', "een bericht")
+t = t.replace('a bare "." (period only)', "a message")
 open(p, "w").write(t)
 PY
 if python3 ./test_layout.py >/tmp/ann-mut-layout-punt.txt 2>&1; then

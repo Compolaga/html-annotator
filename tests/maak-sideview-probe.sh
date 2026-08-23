@@ -1,7 +1,7 @@
 #!/bin/bash
 # Bouwt ~/Desktop/sideview-probe.html: een pagina met het gewone annotator-snippet plus
 # een diagnoseblok, om te meten wat de ECHTE Claude Desktop-sideviewer doet. Dat is het
-# ene oppervlak dat de suite niet kan toetsen (zie tests/criteria.md, AC-4).
+# surface the suite cannot cover (see CRITERIA.md B17).
 #
 #   ~/.claude/skills/html-annotator/tests/maak-sideview-probe.sh
 #
@@ -21,7 +21,7 @@ SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DOEL="$HOME/Desktop/sideview-probe.html"
 PORT="${LUC_ANNOTATOR_PORT:-8791}"
 
-[ -f "$SKILL_DIR/annotator-snippet.html" ] || { echo "FOUT: snippet niet gevonden" >&2; exit 1; }
+[ -f "$SKILL_DIR/references/annotator-snippet.html" ] || { echo "FOUT: snippet niet gevonden" >&2; exit 1; }
 
 {
 cat <<HTML
@@ -158,7 +158,7 @@ de statuspil rechtsonder groen is.</p>
 })();
 </script>
 HTML
-cat "$SKILL_DIR/annotator-snippet.html"
+cat "$SKILL_DIR/references/annotator-snippet.html"
 } > "$DOEL"
 
 echo "probe geschreven: $DOEL"
