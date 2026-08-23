@@ -60,3 +60,15 @@ location-relative. Agent-facing docs name no person;
 
 `CRITERIA.md` is the contract (criterion, expected behaviour, evidence).
 Dated lab notes live in `tests/red/`. Binding choices live in this file.
+
+## 2026-08-23 — English on ports, Dutch handbook until a dedicated pass
+
+Root ports a stranger opens first — `SKILL.md`, `README.md`,
+`INSTALL.md`, `CRITERIA.md`, `install.sh` — are English (A8).
+`references/agent-handbook.md` and the work-rule block printed by
+`bin/toon-annotaties.py` stay Dutch until a dedicated translation.
+CLI filenames (`toon-annotaties.py`, `vind-todolijst.sh`,
+`pas-hunk-toe.py`) stay: they are the same class of identifier as
+`LUC_ANNOTATOR_*`. `annotator/` stays an importable package;
+`install.sh` stays at root; `INSTALL.md` stays a port, not a file
+in `bin/`.

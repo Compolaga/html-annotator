@@ -35,6 +35,11 @@ BRIDGE_BIJ_START=$(bridge_pid)
 FALEN=0
 BLOKKED=0
 echo "=== annotator-bridge suite · $(date '+%Y-%m-%d %H:%M:%S') ==="
+if git -C .. rev-parse --short HEAD >/dev/null 2>&1; then
+  echo "commit: $(git -C .. rev-parse --short HEAD)  dirty: $(git -C .. status --porcelain | wc -l | tr -d ' ')"
+else
+  echo "commit: unknown  dirty: n/a"
+fi
 echo "snippet: $(shasum -a 256 ../references/annotator-snippet.html | cut -c1-12)  hook: $(shasum -a 256 ../bin/hook-ensure-bridge.sh | cut -c1-12)  ensure: $(shasum -a 256 ../bin/ensure-bridge.sh | cut -c1-12)"
 echo
 

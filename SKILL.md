@@ -110,8 +110,8 @@ Triggers — do not ask for confirmation:
 - a bare **`.`** (period only, surrounding whitespace is fine);
 - "process my feedback" / a path to `annotations.json` or a round.
 
-On `.`, find the open round yourself (`bin/show-annotations.py --open`
+On `.`, find the open round yourself (`bin/toon-annotaties.py --open`
 or the bridge). Understand first, then apply, then `POST /resolve`.
 Read `references/agent-handbook.md` (part 4) for refs, locators, hunks,
-crops. `bin/show-annotations.py` reprints the work rule whenever
+crops. `bin/toon-annotaties.py` reprints the work rule whenever
 something is still open.

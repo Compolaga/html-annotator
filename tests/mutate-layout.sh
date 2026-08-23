@@ -136,5 +136,29 @@ if python3 ./test_layout.py >/tmp/ann-mut-layout-punt.txt 2>&1; then
 else
   zeg 0 "A2 wordt rood als de punt-trigger uit SKILL.md is"
 fi
+rsync -a "$ORIG/SKILL.md" "$werk/repo/SKILL.md"
+
+python3 - <<'PY' "$werk/repo/SKILL.md"
+import sys
+p = sys.argv[1]
+t = open(p).read()
+oud = "bin/toon-annotaties.py"
+if oud not in t:
+    raise SystemExit("anker voor toon-annotaties ontbreekt")
+open(p, "w").write(t.replace(oud, "bin/show-annotations.py"))
+PY
+if python3 ./test_layout.py >/tmp/ann-mut-layout-binref.txt 2>&1; then
+  zeg 1 "A4 blijft groen met een verzonnen bin-naam"
+else
+  zeg 0 "A4 wordt rood als een bin-ref nergens ligt"
+fi
+rsync -a "$ORIG/SKILL.md" "$werk/repo/SKILL.md"
+
+printf '\nDit bestand wordt hieronder uitgelegd.\n' >> "$werk/repo/SKILL.md"
+if python3 ./test_layout.py >/tmp/ann-mut-layout-a8.txt 2>&1; then
+  zeg 1 "A8 blijft groen met een Nederlandse zin in SKILL.md"
+else
+  zeg 0 "A8 wordt rood door Nederlands in een poort"
+fi
 
 exit $falen

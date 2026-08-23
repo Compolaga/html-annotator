@@ -269,9 +269,9 @@ Gitignored runtime does not count.
 
 </details>
 
-<details><summary><strong>A4 — CLIs and hooks live in <code>bin/</code>; install/hooks point there.</strong></summary>
+<details><summary><strong>A4 — CLIs and hooks live in <code>bin/</code>; install/hooks point there; a <code>bin/&lt;name&gt;.(py|sh)</code> string in agent-facing docs names a file that exists.</strong></summary>
 
-*Evidence:* `tests/test_layout.py`.
+*Evidence:* `tests/test_layout.py` · `tests/mutate-layout.sh` (invented name).
 
 </details>
 
@@ -293,7 +293,20 @@ Gitignored runtime does not count.
 
 <details><summary><strong>A7 — B1–B15 plus B16/B21/B22 stay green.</strong></summary>
 
-*Evidence:* `tests/run.sh` (default: 00 02–09 11).
+*Evidence:* `tests/run.sh` (default: 00 02–09 11). The suite header
+prints `git rev-parse --short HEAD` and a dirty-tree count. Captures
+live in `tests/red/ronde-NN-*.txt`; never overwrite an existing ronde.
+
+</details>
+
+<details><summary><strong>A8 — Root ports are English.</strong></summary>
+
+*Expected behaviour:* `SKILL.md`, `README.md`, `INSTALL.md`,
+`CRITERIA.md`, and `install.sh` have no Dutch function-word leftovers.
+The handbook and the CLI work-rule stay Dutch until a dedicated pass
+(`docs/DECISIONS.md`, 2026-08-23).
+
+*Evidence:* `tests/test_layout.py` · `tests/mutate-layout.sh`.
 
 </details>
 

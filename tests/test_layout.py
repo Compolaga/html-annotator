@@ -42,10 +42,41 @@ OUD_PAD = re.compile(
     r"(?!bin/|annotator/)"
     r"(?:%s)" % "|".join(re.escape(n) for n in OUD_NAMEN)
 )
+BIN_REF = re.compile(r"\bbin/([A-Za-z0-9._-]+\.(?:py|sh))\b")
+# A8: ports only. Handbook and WERKREGEL stay Dutch (docs/DECISIONS.md).
+PORT_EN = (
+    "SKILL.md", "README.md", "INSTALL.md", "CRITERIA.md", "install.sh",
+)
+NL = re.compile(
+    r"\b(worden|wordt|bestand|draai|hieronder|wanneer|voordat|nadat|tenzij|volgende)\b",
+    re.I,
+)
 
 
 def heeft_oud_pad(tekst):
     return bool(OUD_PAD.search(tekst))
+
+
+def ontbrekende_bin_refs():
+    miss = []
+    for pad in agent_paden():
+        tekst = open(pad, encoding="utf-8").read()
+        for m in BIN_REF.finditer(tekst):
+            naam = m.group(1)
+            if not os.path.isfile(os.path.join(ROOT, "bin", naam)):
+                miss.append("%s → bin/%s" % (os.path.relpath(pad, ROOT), naam))
+    return miss
+
+
+def nederlandse_poorten():
+    hit = []
+    for rel in PORT_EN:
+        pad = os.path.join(ROOT, rel)
+        if not os.path.isfile(pad):
+            continue
+        if NL.search(open(pad, encoding="utf-8").read()):
+            hit.append(rel)
+    return hit
 
 
 def gitignore_rootnamen():
@@ -142,6 +173,10 @@ def main():
     n += check("A4 geen pre-bin paden", oud == [])
     if oud:
         print("      oude paden in: %s" % ", ".join(oud))
+    bin_miss = ontbrekende_bin_refs()
+    n += check("A4 bin-refs bestaan", bin_miss == [])
+    if bin_miss:
+        print("      ontbreekt: %s" % ", ".join(bin_miss))
 
     n += check("A5 geen hyphen-module in annotator/", not any(
         f.endswith(".py") and "-" in f
@@ -162,6 +197,10 @@ def main():
     n += check("A6 geen persoonsnaam in agent-facing docs", luc == [])
     if luc:
         print("      nog Luc/Luke in: %s" % ", ".join(luc))
+    nl = nederlandse_poorten()
+    n += check("A8 poorten Engels", nl == [])
+    if nl:
+        print("      Nederlands in: %s" % ", ".join(nl))
 
     import json
     import subprocess

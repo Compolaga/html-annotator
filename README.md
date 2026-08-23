@@ -58,5 +58,5 @@ The script links the skill and registers the hooks. Details:
 ## Limits
 
 - macOS is the tested environment.
-- `~/Desktop/annotaties` and `bin/find-todo-list.sh` → Desktop stay the default.
+- `~/Desktop/annotaties` and `bin/vind-todolijst.sh` → Desktop stay the default.
 - Two blind spots in the suite: see CRITERIA.md (B18, B19) / INSTALL.md step 4.
