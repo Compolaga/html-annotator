@@ -77,6 +77,41 @@ ANNOTATOR_BLOK = re.compile(
     r"<!--\s*LUC-ANNOTATOR.*?<!--\s*/LUC-ANNOTATOR\s*-->", re.S | re.I)
 
 
+def schoon_punt(p):
+    if not isinstance(p, dict) or not (p.get("path") or "").strip():
+        return None
+    uit = {"path": str(p.get("path") or "").strip(), "offset": int(p.get("offset") or 0)}
+    if p.get("node") is not None:
+        try:
+            uit["node"] = int(p["node"])
+        except (TypeError, ValueError):
+            pass
+    return uit
+
+
+def schoon_locator(loc):
+    if not isinstance(loc, dict):
+        return None
+    uit = {}
+    start, end = schoon_punt(loc.get("start")), schoon_punt(loc.get("end"))
+    if start:
+        uit["start"] = start
+    if end:
+        uit["end"] = end
+    path = (loc.get("path") or "").strip()
+    if path:
+        uit["path"] = path
+    label = (loc.get("label") or "").strip()
+    if label:
+        uit["label"] = label[:200]
+    if loc.get("nth") is not None:
+        try:
+            uit["nth"] = max(0, int(loc["nth"]))
+        except (TypeError, ValueError):
+            pass
+    return uit or None
+
+
 def content_hash(bestand, dom_hash):
     """Hash van de pagina-inhoud zonder het annotator-blok."""
     if bestand:
@@ -259,6 +294,7 @@ def h_session(payload):
             "comment": a.get("comment") or "",
             "target": a.get("target") or "",
             "selectedText": a.get("selectedText") or "",
+            "locator": a.get("locator") or None,
             "refs": a.get("refs") or [],
             "commentExpanded": a.get("commentExpanded") or expand_comment(
                 a.get("comment") or "", a.get("refs") or []),
@@ -386,11 +422,18 @@ def h_save(payload):
     }
     refs = ann.get("refs")
     if isinstance(refs, list) and refs:
-        rec["refs"] = [
-            {"id": (r.get("id") or "").strip(), "selectedText": (r.get("selectedText") or "").strip()}
-            for r in refs
-            if isinstance(r, dict) and (r.get("selectedText") or "").strip()
-        ]
+        rec["refs"] = []
+        for r in refs:
+            if not isinstance(r, dict) or not (r.get("selectedText") or "").strip():
+                continue
+            item = {"id": (r.get("id") or "").strip(), "selectedText": (r.get("selectedText") or "").strip()}
+            loc = schoon_locator(r.get("locator"))
+            if loc:
+                item["locator"] = loc
+            rec["refs"].append(item)
+    loc = schoon_locator(ann.get("locator"))
+    if loc:
+        rec["locator"] = loc
     rec["commentExpanded"] = expand_comment(rec["comment"], rec.get("refs"))
     missing, _ = validate_refs(rec["comment"], rec.get("refs"))
     if missing:

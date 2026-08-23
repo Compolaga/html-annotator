@@ -108,7 +108,12 @@ Wat Luc kan:
   annuleert.
 - **Tekstselectie**: gewoon tekst selecteren → er verschijnt een paars knopje
   "Annoteer selectie" → comment typen → Save. De geselecteerde tekst komt in de
-  JSON, er wordt geen screenshot gemaakt.
+  JSON, er wordt geen screenshot gemaakt. Elke tekstselectie krijgt een **locator**
+  (CSS-pad + offsets + welke-van-de-N als de tekst vaker voorkomt). Daardoor blijft
+  de markering op déze cel/rij staan, ook als dezelfde woorden eerder op de pagina
+  staan, en blijft een selectie over meerdere cellen terugvindbaar. Oude annotaties
+  zonder locator vallen terug op tekstzoeken. Geef rijen/kaarten in nieuwe HTML
+  een stabiele `id` als dat kan; de locator gebruikt die in het pad.
 - **Tekst koppelen**: in de commentbox staat een ketting-icoon. Klik dat, selecteer
   daarna tekst op de pagina → die komt als inline chip in je comment ("net zoals
   deze"). Meerdere keren kan; schrijf er gewoon omheen ("Maak ⟦r1⟧ hetzelfde als
@@ -231,9 +236,17 @@ Per annotatie:
   "comment": "...", "image": "screenshots/annotatie-01.png", "_rect": {...} }
 { "nr": 2, "type": "text", "target": "...", "comment": "Maak hetzelfde als ⟦r1⟧",
   "selectedText": "de exact geselecteerde tekst",
+  "locator": { "path": "#a", "start": { "path": "#a", "node": 0, "offset": 0 },
+               "end": { "path": "#a", "node": 0, "offset": 27 }, "nth": 0,
+               "label": "This is the first paragraph. Make me match the second one." },
   "refs": [{ "id": "r1", "selectedText": "andere tekst op de pagina" }] }
 ```
 
+- `locator` (bij `type: "text"`): de plek op de pagina, niet alleen de tekst. `path`
+  is het gemeenschappelijke element, `start`/`end` de exacte range, `nth` welk
+  voorkomen als dezelfde tekst vaker staat, `label` de context (rij/kaart). Gebruik
+  dit om te weten wélk "checken" of welke rij Luc bedoelde. Geen locator + tekst
+  die vaker voorkomt: vraag door, kies niet de eerste hit.
 - `refs` (optioneel): andere tekstfragmenten die Luc in de comment heeft gekoppeld.
   In `comment` staan ze als `⟦r1⟧`, `⟦r2⟧`, …; `refs` geeft per id de volledige
   `selectedText`. Gebruik dit voor "hetzelfde als …"-feedback.

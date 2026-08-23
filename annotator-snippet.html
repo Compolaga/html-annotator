@@ -237,7 +237,7 @@
       return {
         id: a.id, nr: a.nr, type: a.type || "region",
         rect: a.rect || null, comment: a.comment || "", target: a.target || "",
-        selectedText: a.selectedText || "", refs: a.refs || null,
+        selectedText: a.selectedText || "", locator: a.locator || null, refs: a.refs || null,
         commentExpanded: a.commentExpanded || "", refsIncomplete: a.refsIncomplete || null,
         img: null,
         veld: a.veld || "", origineel: a.origineel || "", nieuw: a.nieuw || "",
@@ -290,48 +290,205 @@
     '<button id="la-toggle">' + icoRegio + 'Annotate selection</button>';
   document.body.appendChild(bar);
 
-  /* ---- anker terugvinden na een pagina-wijziging ------------------ */
+  /* ---- locators + anker terugvinden ------------------------------ */
   function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
-  /* Zoekt de opgeslagen selectie terug in de huidige DOM en geeft de nieuwe
-     paginacoördinaten. Zo blijven tekstannotaties kloppen als er tekst boven is
-     bijgekomen of weggevallen. Niet gevonden? Dan is de annotatie een "wees". */
-  function zoekTekst(needle) {
-    var doel = (needle || "").replace(/\s+/g, " ").trim().slice(0, 300);
-    if (doel.length < 3) return null;
-
-    /* Alle zichtbare tekstnodes achter elkaar in één string, met een index terug
-       naar (node, offset). Dat is nodig om twee redenen:
-       - een selectie kan over meerdere nodes lopen zodra er opmaak in staat
-         (<b>, <a>, <code>), en per node zoeken vindt zo'n zin nooit;
-       - bij text-transform: uppercase levert de selectie HOOFDLETTERS op terwijl
-         de DOM de originele schrijfwijze bevat, dus matchen we hoofdletter-
-         ongevoelig. */
-    var nodes = [], stukken = [], lengte = 0, n;
-    var loper = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-      acceptNode: function (k) {
-        if (!k.nodeValue) return NodeFilter.FILTER_REJECT;
-        var p = k.parentElement;
-        if (!p || p.closest("#la-bar,#la-popup,#la-wees,#la-sesmeld,script,style,noscript")) {
-          return NodeFilter.FILTER_REJECT;
+  function laNorm(s) { return (s || "").replace(/\s+/g, " ").trim(); }
+  function laEscSel(s) {
+    s = String(s || "");
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return s.replace(/([\0-\x1f\x7f-\x9f!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1");
+  }
+  function laUiHost(el) {
+    return !!(el && el.closest && el.closest("#la-bar,#la-popup,#la-wees,#la-sesmeld,#la-selknop"));
+  }
+  function laBlokVan(el) {
+    while (el && el !== document.body) {
+      if (/^(DIV|P|TR|TD|TH|LI|H[1-6]|SECTION|ARTICLE|HEADER|DT|DD|BLOCKQUOTE|PRE|TABLE|THEAD|TBODY|TFOOT|DL|UL|OL)$/.test(el.tagName)) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return el;
+  }
+  function laNthOfType(el) {
+    var tag = el.tagName, n = 1, sib = el;
+    while ((sib = sib.previousElementSibling)) if (sib.tagName === tag) n += 1;
+    return n;
+  }
+  function laBouwPad(el) {
+    if (!el || el.nodeType !== 1) el = el && (el.nodeType === 1 ? el : el.parentElement);
+    if (!el || el === document.documentElement) return "body";
+    if (el === document.body) return "body";
+    if (el.id && !laUiHost(el)) {
+      try {
+        if (document.querySelectorAll("#" + laEscSel(el.id)).length === 1) return "#" + laEscSel(el.id);
+      } catch (e) {}
+    }
+    var stuk = el.tagName.toLowerCase();
+    var cls = (typeof el.className === "string" ? el.className : "").trim().split(/\s+/).filter(function (c) {
+      return c && c.indexOf("la-") !== 0;
+    })[0];
+    if (cls) stuk += "." + laEscSel(cls);
+    stuk += ":nth-of-type(" + laNthOfType(el) + ")";
+    var boven = laBouwPad(el.parentElement);
+    return boven === "body" ? stuk : boven + " > " + stuk;
+  }
+  function laTekstIndex(node) {
+    var el = node.parentElement, i = 0, k = el && el.firstChild;
+    while (k) {
+      if (k === node) return i;
+      if (k.nodeType === 3 && k.nodeValue) i += 1;
+      k = k.nextSibling;
+    }
+    return 0;
+  }
+  function laPuntVan(node, offset) {
+    var el = node && (node.nodeType === 1 ? node : node.parentElement);
+    if (!el) return null;
+    var punt = { path: laBouwPad(el), offset: offset || 0 };
+    if (node.nodeType === 3) punt.node = laTekstIndex(node);
+    return punt;
+  }
+  function laContextLabel(el) {
+    if (!el) return "";
+    var host = el.closest("tr, li, [id], section, article, .card, p, h1, h2, h3") || el;
+    return laNorm(host.innerText || "").slice(0, 140);
+  }
+  function laLocatorVanRange(range) {
+    if (!range) return null;
+    var start = laPuntVan(range.startContainer, range.startOffset);
+    var end = laPuntVan(range.endContainer, range.endOffset);
+    if (!start || !end) return null;
+    var aEl = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+    var bEl = range.endContainer.nodeType === 1 ? range.endContainer : range.endContainer.parentElement;
+    var gemeen = aEl;
+    while (gemeen && bEl && !gemeen.contains(bEl)) gemeen = gemeen.parentElement;
+    return {
+      start: start,
+      end: end,
+      path: (gemeen && laBouwPad(gemeen)) || start.path,
+      label: laContextLabel(gemeen || aEl),
+      nth: laNthVoorkomen(laNorm(range.toString()), range)
+    };
+  }
+  function laQueryPad(pad) {
+    if (!pad) return null;
+    try { return document.querySelector(pad); } catch (e) { return null; }
+  }
+  function laPuntNaarNode(punt) {
+    if (!punt || !punt.path) return null;
+    var host = laQueryPad(punt.path);
+    if (!host) return null;
+    if (punt.node == null) {
+      return { node: host, offset: Math.max(0, punt.offset || 0) };
+    }
+    var i = 0, k = host.firstChild;
+    while (k) {
+      if (k.nodeType === 3 && k.nodeValue) {
+        if (i === punt.node) {
+          return { node: k, offset: Math.min(Math.max(0, punt.offset || 0), k.nodeValue.length) };
         }
+        i += 1;
+      }
+      k = k.nextSibling;
+    }
+    return null;
+  }
+  function laRangeVanLocator(loc) {
+    if (!loc || !loc.start || !loc.end) return null;
+    var van = laPuntNaarNode(loc.start), tot = laPuntNaarNode(loc.end);
+    if (!van || !tot) return null;
+    try {
+      var r = document.createRange();
+      r.setStart(van.node, van.offset);
+      r.setEnd(tot.node, tot.offset);
+      if (r.collapsed) return null;
+      return r;
+    } catch (e) { return null; }
+  }
+  function laLocatorElement(loc) {
+    if (!loc) return null;
+    if (loc.start && loc.start.path) return laQueryPad(loc.start.path);
+    return laQueryPad(loc.path);
+  }
+  function laTekstNogDaar(range, oorspronkelijk) {
+    var nu = laNorm(range.toString()), oud = laNorm(oorspronkelijk);
+    if (!oud) return true;
+    if (nu === oud) return true;
+    var kort = Math.min(nu.length, oud.length), lang = Math.max(nu.length, oud.length);
+    if (kort < 3 || kort / lang < 0.55) return false;
+    return nu.indexOf(oud) !== -1 || oud.indexOf(nu) !== -1;
+  }
+  function laRectsVanRange(range) {
+    /* Alleen tekstregels, niet de box van td/div. range.getClientRects() geeft
+       bij een tabelselectie de hele cel terug — dat is precies de te grote halo. */
+    var root = range.commonAncestorContainer;
+    if (root.nodeType === 3) root = root.parentNode;
+    if (!root) return null;
+    var rects = [], n;
+    var loper = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (k) {
+        if (!k.nodeValue || !k.nodeValue.replace(/\s/g, "")) return NodeFilter.FILTER_REJECT;
+        if (laUiHost(k.parentElement)) return NodeFilter.FILTER_REJECT;
+        try {
+          if (range.intersectsNode && !range.intersectsNode(k)) return NodeFilter.FILTER_REJECT;
+        } catch (e) {}
         return NodeFilter.FILTER_ACCEPT;
       }
     });
     while ((n = loper.nextNode())) {
-      nodes.push({ node: n, start: lengte, lengte: n.nodeValue.length });
-      stukken.push(n.nodeValue);
-      lengte += n.nodeValue.length;
+      var van = 0, tot = n.nodeValue.length;
+      if (n === range.startContainer) van = range.startOffset;
+      if (n === range.endContainer) tot = range.endOffset;
+      if (van > tot) { var wissel = van; van = tot; tot = wissel; }
+      if (van >= tot) continue;
+      try {
+        var stuk = document.createRange();
+        stuk.setStart(n, van);
+        stuk.setEnd(n, tot);
+        var list = stuk.getClientRects();
+        for (var i = 0; i < list.length; i++) {
+          var c = list[i];
+          if (c.width < 2 || c.height < 2) continue;
+          rects.push({
+            x: Math.round(c.left + scrollX), y: Math.round(c.top + scrollY),
+            w: Math.round(c.width), h: Math.round(c.height)
+          });
+        }
+      } catch (e) {}
     }
-    if (!nodes.length) return null;
-    var hooi = stukken.join("");
-
-    var re;
-    try {
-      re = new RegExp(doel.split(/\s+/).map(escRe).join("\\s+"), "i");
-    } catch (e) { return null; }
-    var m = re.exec(hooi);
-    if (!m) return null;
-
+    if (!rects.length) return null;
+    var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    rects.forEach(function (c) {
+      x1 = Math.min(x1, c.x); y1 = Math.min(y1, c.y);
+      x2 = Math.max(x2, c.x + c.w); y2 = Math.max(y2, c.y + c.h);
+    });
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1, rects: rects };
+  }
+  /* Zichtbare tekstnodes, met een spatie tussen blokken (td/p/li) zodat een
+     selectie over meerdere cellen terug te vinden is. Binnen één zin (hel<b>lo</b>)
+     geen extra spatie. */
+  function laHooi(root) {
+    root = root || document.body;
+    var nodes = [], hooi = "", n;
+    var loper = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (k) {
+        if (!k.nodeValue) return NodeFilter.FILTER_REJECT;
+        var p = k.parentElement;
+        if (!p || laUiHost(p) || p.closest("script,style,noscript")) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var vorigeBlok = null;
+    while ((n = loper.nextNode())) {
+      var blok = laBlokVan(n.parentElement);
+      if (hooi.length && vorigeBlok && blok !== vorigeBlok && !/\s$/.test(hooi) && !/^\s/.test(n.nodeValue)) {
+        hooi += " ";
+      }
+      nodes.push({ node: n, start: hooi.length, lengte: n.nodeValue.length });
+      hooi += n.nodeValue;
+      vorigeBlok = blok;
+    }
     function plek(pos) {
       for (var i = 0; i < nodes.length; i++) {
         var e = nodes[i];
@@ -341,17 +498,87 @@
       }
       return null;
     }
-    var van = plek(m.index), tot = plek(m.index + m[0].length);
+    return { hooi: hooi, plek: plek };
+  }
+  function laNeedleRe(needle) {
+    var doel = laNorm(needle).slice(0, 300);
+    if (doel.length < 2) return null;
+    try { return new RegExp(doel.split(/\s+/).map(escRe).join("\\s+"), "i"); }
+    catch (e) { return null; }
+  }
+  function laMatches(hooi, re) {
+    var uit = [], m;
+    re.lastIndex = 0;
+    var flags = re.flags.indexOf("g") >= 0 ? re.flags : re.flags + "g";
+    var g = new RegExp(re.source, flags);
+    while ((m = g.exec(hooi))) {
+      uit.push(m);
+      if (!m[0].length) g.lastIndex += 1;
+    }
+    return uit;
+  }
+  function laRangeUitMatch(kaart, m) {
+    var van = kaart.plek(m.index), tot = kaart.plek(m.index + m[0].length);
     if (!van || !tot) return null;
     try {
       var r = document.createRange();
       r.setStart(van.node, van.offset);
       r.setEnd(tot.node, tot.offset);
-      var b = r.getBoundingClientRect();
-      if (!b.width && !b.height) return null;
-      return { x: Math.round(b.left + scrollX), y: Math.round(b.top + scrollY),
-               w: Math.round(b.width), h: Math.round(b.height) };
+      return r.collapsed ? null : r;
     } catch (e) { return null; }
+  }
+  function laNthVoorkomen(needle, range) {
+    var re = laNeedleRe(needle);
+    if (!re || !range) return 0;
+    var kaart = laHooi(document.body);
+    var hits = laMatches(kaart.hooi, re);
+    for (var i = 0; i < hits.length; i++) {
+      var r = laRangeUitMatch(kaart, hits[i]);
+      if (!r) continue;
+      try {
+        if (r.compareBoundaryPoints(Range.START_TO_START, range) <= 0 &&
+            r.compareBoundaryPoints(Range.END_TO_END, range) >= 0) return i;
+      } catch (e) {}
+    }
+    return 0;
+  }
+  function zoekTekst(needle, nth) {
+    var re = laNeedleRe(needle);
+    if (!re) return null;
+    var kaart = laHooi(document.body);
+    if (!kaart.hooi) return null;
+    var hits = laMatches(kaart.hooi, re);
+    if (!hits.length) return null;
+    var idx = (typeof nth === "number" && nth >= 0 && nth < hits.length) ? nth : 0;
+    var r = laRangeUitMatch(kaart, hits[idx]);
+    return r ? laRectsVanRange(r) : null;
+  }
+  function zoekIn(root, needle) {
+    var re = laNeedleRe(needle);
+    if (!re || !root) return null;
+    var kaart = laHooi(root);
+    var hits = laMatches(kaart.hooi, re);
+    if (!hits.length) return null;
+    var r = laRangeUitMatch(kaart, hits[0]);
+    return r ? laRectsVanRange(r) : null;
+  }
+  /* Locator eerst: exact die plek, niet de eerste teksthit op de pagina.
+     Element er nog, tekst weg → wees (waarschijnlijk verwerkt).
+     Element zelf weg → val terug op nth-voorkomen van de tekst. */
+  function zoekAnker(a) {
+    var loc = a.locator;
+    if (loc && (loc.start || loc.path)) {
+      var range = laRangeVanLocator(loc);
+      if (range && laTekstNogDaar(range, a.selectedText)) return laRectsVanRange(range);
+      var host = laLocatorElement(loc) || laQueryPad(loc.path);
+      if (host && a.selectedText) {
+        var scoped = zoekIn(host, a.selectedText);
+        if (scoped) return scoped;
+        return null;
+      }
+    }
+    if (a.selectedText) return zoekTekst(a.selectedText, loc && loc.nth);
+    return null;
   }
 
   /* ---- tekenen --------------------------------------------------- */
@@ -454,22 +681,27 @@
          nergens op slaan, en zonder rechthoek zouden ze in de weeslijst belanden en
          daar als "waarschijnlijk verwerkt" gaan staan terwijl er niets aan de hand is. */
       if (a.type === "edit") { return; }
-      /* tekstannotaties: anker opnieuw opzoeken op basis van de selectie zelf */
-      if (a.type === "text" && a.selectedText) {
-        var nieuw = zoekTekst(a.selectedText);
+      /* tekstannotaties: locator eerst, daarna pas tekst (+ nth). Zo blijft
+         een niet-unieke of over-cellen-selectie op dezelfde plek staan. */
+      if (a.type === "text" && (a.selectedText || a.locator)) {
+        var nieuw = zoekAnker(a);
         if (nieuw) { a.rect = rect = nieuw; }
         else { wezen.push(a); return; }
       } else if (a.stale) {
         /* regio-annotatie van een oudere paginaversie: coördinaten zijn verdacht */
         wezen.push(a); return;
       }
-      if (!rect || (!rect.w && !rect.h)) { wezen.push(a); return; }
+      if (!rect || (!rect.w && !rect.h && !(rect.rects && rect.rects.length))) { wezen.push(a); return; }
       var tekst = a.type === "text";
-      var r = el("div"); r.className = "la-rect" + (tekst ? " la-tekst" : "");
-      r.style.left = rect.x + "px"; r.style.top = rect.y + "px";
-      r.style.width = rect.w + "px"; r.style.height = rect.h + "px";
+      var stukken = (rect.rects && rect.rects.length) ? rect.rects : [rect];
+      stukken.forEach(function (stuk) {
+        var r = el("div"); r.className = "la-rect" + (tekst ? " la-tekst" : "");
+        r.style.left = stuk.x + "px"; r.style.top = stuk.y + "px";
+        r.style.width = stuk.w + "px"; r.style.height = stuk.h + "px";
+      });
+      var last = stukken[stukken.length - 1];
       var b = el("div"); b.className = "la-badge" + (tekst ? " la-tekst" : ""); b.textContent = a.nr;
-      b.style.left = (rect.x + rect.w - 8) + "px"; b.style.top = (rect.y - 12) + "px";
+      b.style.left = (last.x + last.w - 8) + "px"; b.style.top = (last.y - 12) + "px";
       b.title = a.comment || "";
       b.addEventListener("click", function (ev) { ev.stopPropagation(); openPopup(a); });
     });
@@ -501,13 +733,16 @@
     });
     return m;
   }
-  function laMaakRefChip(id, tekst) {
+  function laMaakRefChip(id, tekst, locator) {
     var chip = document.createElement("span");
     chip.className = "la-ref";
     chip.contentEditable = "false";
     chip.dataset.refId = id;
     chip.dataset.refText = tekst;
-    chip.title = tekst;
+    if (locator) {
+      try { chip.dataset.refLocator = JSON.stringify(locator); } catch (e) {}
+    }
+    chip.title = (locator && locator.label) ? locator.label : tekst;
     var lbl = document.createElement("span");
     lbl.className = "la-ref-t";
     lbl.textContent = laRefLabel(tekst);
@@ -539,7 +774,9 @@
         comment += "\u27e6" + id + "\u27e7";
         if (id && !seen[id]) {
           seen[id] = true;
-          refs.push({ id: id, selectedText: tekst });
+          var loc = null;
+          try { loc = el.dataset.refLocator ? JSON.parse(el.dataset.refLocator) : null; } catch (e) {}
+          refs.push({ id: id, selectedText: tekst, locator: loc || undefined });
         }
         return;
       }
@@ -566,7 +803,7 @@
     while ((m = re.exec(txt))) {
       if (m.index > last) ed.appendChild(document.createTextNode(txt.slice(last, m.index)));
       var ref = byId[m[1]];
-      if (ref && ref.selectedText) ed.appendChild(laMaakRefChip(m[1], ref.selectedText));
+      if (ref && ref.selectedText) ed.appendChild(laMaakRefChip(m[1], ref.selectedText, ref.locator));
       else ed.appendChild(document.createTextNode(m[0]));
       last = m.index + m[0].length;
     }
@@ -625,7 +862,7 @@
     if (host && host.closest && host.closest("#la-popup,#la-bar,#la-selknop")) return null;
     var r = sel.getRangeAt(0).getBoundingClientRect();
     if (!r.width && !r.height) return null;
-    return { tekst: tekst };
+    return { tekst: tekst, locator: laLocatorVanRange(sel.getRangeAt(0)) };
   }
   function openPopup(a) {
     /* alleen de popup sluiten, niet de zojuist vastgezette selectie opruimen */
@@ -676,8 +913,11 @@
       linkBtn.classList.toggle("la-aan", aan);
       refPickEl.classList.toggle("la-aan", aan);
     }
-    refPickInsert = function (tekst) {
-      laInsertAtRefCursor(ed, laMaakRefChip(volgendeRefId(), tekst));
+    refPickInsert = function (s) {
+      var tekst = typeof s === "string" ? s : (s && s.tekst);
+      var loc = typeof s === "string" ? null : (s && s.locator);
+      if (!tekst) return;
+      laInsertAtRefCursor(ed, laMaakRefChip(volgendeRefId(), tekst, loc));
       zetRefPick(false);
       try { window.getSelection().removeAllRanges(); } catch (e) {}
       ed.focus();
@@ -766,7 +1006,8 @@
     return post("/save", Object.assign(basis(), {
       annotation: {
         id: a.id, type: a.type, rect: a.rect, comment: a.comment, target: a.target,
-        selectedText: a.selectedText || null, refs: a.refs || null, img: a.img || null, createdAt: a.createdAt,
+        selectedText: a.selectedText || null, locator: a.locator || null,
+        refs: a.refs || null, img: a.img || null, createdAt: a.createdAt,
         /* bewerkingen op een conceptbericht; leeg voor de andere types */
         veld: a.veld || null, origineel: a.origineel || null, nieuw: a.nieuw || null,
         diff: a.diff || null, hunks: a.hunks || null
@@ -878,8 +1119,10 @@
     if (host && host.closest && host.closest("#la-popup,#la-bar")) return null;
     var r = sel.getRangeAt(0).getBoundingClientRect();
     if (!r.width && !r.height) return null;
+    var range = sel.getRangeAt(0);
     return {
       tekst: tekst,
+      locator: laLocatorVanRange(range),
       rect: { x: Math.round(r.left + scrollX), y: Math.round(r.top + scrollY),
               w: Math.round(r.width), h: Math.round(r.height) }
     };
@@ -888,7 +1131,7 @@
     setTimeout(function () {
       if (refPickMode && popup && refPickInsert) {
         var s = paginaSelectie();
-        if (s) refPickInsert(s.tekst);
+        if (s) refPickInsert(s);
         return;
       }
       if (overlay || popup) return;
@@ -907,7 +1150,9 @@
         teller += 1;
         openPopup({
           id: Date.now() + "-" + teller, nr: teller, type: "text", rect: s.rect,
-          selectedText: s.tekst, target: s.tekst.slice(0, 120), comment: "", img: null,
+          selectedText: s.tekst, locator: s.locator || null,
+          target: (s.locator && s.locator.label) || s.tekst.slice(0, 120),
+          comment: "", img: null,
           createdAt: new Date().toISOString()
         });
       });

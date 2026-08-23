@@ -115,6 +115,13 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
             print("      op     : %s" % doel[:100])
         if a.get("selectedText"):
             print("      select : %s" % a["selectedText"][:120])
+        loc = a.get("locator") or {}
+        if loc.get("path") or loc.get("start"):
+            pad = loc.get("path") or (loc.get("start") or {}).get("path") or ""
+            print("      locatie: %s%s" % (pad[:100],
+                  ("  [nth %s]" % loc["nth"]) if loc.get("nth") else ""))
+            if loc.get("label") and loc.get("label") != a.get("selectedText"):
+                print("      context: %s" % loc["label"][:120])
         if a.get("type") == "edit":
             # Luc heeft de tekst zelf herschreven. De diff is het antwoord op "wat moet er
             # anders": - is eruit, + is erin. De volledige nieuwe tekst staat eronder,
