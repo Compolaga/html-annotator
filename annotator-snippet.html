@@ -1,10 +1,20 @@
 <!-- LUC-ANNOTATOR v2 · standaard feedback-component; plak dit blok onderaan elke HTML (voor </body> of aan het einde). Self-contained, geen dependencies. Schrijft via de lokale bridge (annotator-bridge.py, 127.0.0.1:8791) naar ~/Desktop/annotaties/<slug>/ronde-NN/. -->
 <style>
-  #la-bar { position: fixed; right: 14px; bottom: 12px; z-index: 99999; display: flex; align-items: center; gap: 6px; font-family: -apple-system, "Segoe UI", Arial, sans-serif; }
-  #la-bar button { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid #c8ccd3; background: #fff; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
-  #la-bar button.la-aan { background: #16181d; color: #fff; border-color: #16181d; }
-  #la-status { font-size: 11px; padding: 5px 9px; border-radius: 999px; border: 1px solid #cfe2cf; background: #eef7ee; color: #256029; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
-  #la-status.la-uit { border-color: #e6c9a8; background: #fdf3e6; color: #8a4b08; cursor: help; }
+  #la-bar { position: fixed; right: 14px; bottom: 12px; z-index: 99999; display: flex; align-items: center; gap: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  #la-bar button { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 450;
+    letter-spacing: -0.01em; padding: 5px 9px; border-radius: 6px; border: 1px solid rgba(0,0,0,.08);
+    background: rgba(255,255,255,.92); color: #3a3a3a; cursor: pointer;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    transition: background .12s ease, border-color .12s ease, color .12s ease; }
+  #la-bar button:hover { background: #fff; border-color: rgba(0,0,0,.14); color: #111; }
+  #la-bar button.la-aan { background: #1a1a1a; color: #f2f2f2; border-color: #1a1a1a; }
+  #la-bar button.la-aan:hover { background: #111; color: #fff; }
+  #la-bar .la-ico { width: 14px; height: 14px; flex: none; display: block; }
+  #la-status { font-size: 11px; font-weight: 450; letter-spacing: -0.01em; padding: 5px 8px;
+    border-radius: 6px; border: 1px solid rgba(0,0,0,.06); background: rgba(255,255,255,.72);
+    color: #6a6a6a; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  #la-status.la-uit { border-color: rgba(180,120,40,.25); background: rgba(253,243,230,.9); color: #8a4b08; cursor: help; }
   #la-overlay { position: fixed; inset: 0; z-index: 99998; cursor: crosshair; background: rgba(20,25,35,.06); }
   .la-ghost { position: absolute; border: 1.5px dashed #2f6bec; background: rgba(47,107,236,.12); z-index: 99998; pointer-events: none; }
   .la-ghost-vast { border-style: solid; border-width: 2px; background: rgba(47,107,236,.16); box-shadow: 0 0 0 9999px rgba(15,20,30,.10); border-radius: 2px; }
@@ -12,30 +22,88 @@
   .la-badge.la-tekst { background: #7a4bd6; }
   .la-rect { position: absolute; border: 1.5px solid rgba(47,107,236,.55); background: rgba(47,107,236,.07); z-index: 99996; pointer-events: none; border-radius: 2px; }
   .la-rect.la-tekst { border-color: rgba(122,75,214,.5); background: rgba(122,75,214,.10); }
-  /* Kaartje "waarschijnlijk verwerkt": standaard dicht, zodat het nooit het halve
-     scherm afdekt. De open/dicht-stand staat in localStorage. */
-  #la-wees { position: fixed; left: 14px; bottom: 12px; z-index: 99997; width: 300px; max-width: min(300px, calc(100vw - 380px)); background: #fff; border: 1px solid #e6c9a8; border-radius: 10px; padding: 6px 8px; box-shadow: 0 2px 10px rgba(0,0,0,.14); font: 12px/1.4 -apple-system, "Segoe UI", Arial, sans-serif; color: #8a4b08; }
-  #la-wees .la-wees-kop { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: none; border: 0; padding: 2px 0; font: 600 12px/1.35 -apple-system, "Segoe UI", Arial, sans-serif; color: #8a4b08; cursor: pointer; }
-  #la-wees .la-chev { transition: transform .12s ease; display: inline-block; }
+  /* Orphan list ("likely processed"): collapsed by default. Same quiet chrome
+     as the toolbar/popup — no amber alert styling, no shadow. */
+  #la-wees { position: fixed; left: 14px; bottom: 12px; z-index: 99997; width: 300px;
+    max-width: min(300px, calc(100vw - 380px)); background: rgba(255,255,255,.96);
+    border: 1px solid rgba(0,0,0,.1); border-radius: 8px; padding: 6px 8px;
+    font: 450 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    letter-spacing: -0.01em; color: #3a3a3a;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  #la-wees .la-wees-kop { display: flex; align-items: center; gap: 6px; width: 100%;
+    text-align: left; background: none; border: 0; padding: 3px 2px;
+    font: 450 12px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    letter-spacing: -0.01em; color: #3a3a3a; cursor: pointer; }
+  #la-wees .la-wees-kop:hover { color: #111; }
+  #la-wees .la-chev { display: inline-flex; width: 12px; height: 12px; color: #8a8a8a;
+    transition: transform .12s ease; flex: none; }
+  #la-wees .la-chev svg { width: 12px; height: 12px; display: block; }
   #la-wees.la-open .la-chev { transform: rotate(90deg); }
-  #la-wees .la-wees-lijst { display: none; margin-top: 4px; max-height: 42vh; overflow: auto; }
+  #la-wees .la-wees-lijst { display: none; margin-top: 2px; max-height: 42vh; overflow: auto; }
   #la-wees.la-open .la-wees-lijst { display: block; }
-  #la-wees .la-wees-rij { display: flex; align-items: flex-start; gap: 4px; border-top: 1px solid #f2e3cd; }
-  #la-wees .la-wees-tekst { flex: 1; text-align: left; font: 12px/1.35 -apple-system, Arial, sans-serif; background: none; border: 0; padding: 4px 0; color: #4a4f59; cursor: pointer; }
-  #la-wees .la-wees-ok { flex: none; background: none; border: 0; padding: 4px 2px; color: #256029; cursor: pointer; font-size: 13px; }
-  #la-wees .la-wees-ok:hover { color: #0f3d16; }
-  #la-wees .la-wees-uitleg { font-size: 11px; color: #a9793d; margin: 2px 0 0; }
-  #la-selknop { position: absolute; z-index: 100000; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid #7a4bd6; background: #7a4bd6; color: #fff; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); font-family: -apple-system, "Segoe UI", Arial, sans-serif; }
-  #la-popup { position: absolute; z-index: 100000; width: 340px; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.25); padding: 12px; font-family: -apple-system, "Segoe UI", Arial, sans-serif; }
-  #la-popup textarea { width: 100%; min-height: 70px; border: 1px solid #d9dce2; border-radius: 8px; padding: 8px; font: 13px/1.4 -apple-system, Arial, sans-serif; resize: vertical; box-sizing: border-box; }
-  #la-popup .la-quote { font-size: 12px; color: #4a4f59; background: #f4f2fb; border-left: 3px solid #7a4bd6; padding: 6px 8px; border-radius: 4px; margin-bottom: 8px; max-height: 70px; overflow: auto; }
-  #la-popup .la-img { max-width: 100%; max-height: 120px; display: block; margin-top: 6px; border-radius: 6px; border: 1px solid #e2e5ea; }
-  #la-popup .la-rij { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  #la-wees .la-wees-rij { display: flex; align-items: flex-start; gap: 4px;
+    border-top: 1px solid rgba(0,0,0,.06); }
+  #la-wees .la-wees-tekst { flex: 1; text-align: left; font: inherit; background: none;
+    border: 0; padding: 6px 2px; color: #3a3a3a; cursor: pointer; }
+  #la-wees .la-wees-tekst:hover { color: #111; }
+  #la-wees .la-wees-ok { flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; margin-top: 3px; padding: 0; border-radius: 5px;
+    border: 1px solid rgba(0,0,0,.1); background: #fff; color: #6a6a6a; cursor: pointer; }
+  #la-wees .la-wees-ok:hover { border-color: rgba(0,0,0,.2); color: #111; background: #f7f7f7; }
+  #la-wees .la-wees-ok svg { width: 12px; height: 12px; display: block; }
+  #la-selknop { position: absolute; z-index: 100000; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 450; letter-spacing: -0.01em; padding: 5px 9px; border-radius: 6px;
+    border: 1px solid rgba(0,0,0,.1); background: rgba(255,255,255,.96); color: #3a3a3a; cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  #la-selknop .la-ico { width: 14px; height: 14px; flex: none; display: block; }
+  #la-popup { position: absolute; z-index: 100000; width: 320px; background: #fff;
+    border: 1px solid rgba(0,0,0,.1); border-radius: 8px; padding: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: #1a1a1a; }
+  #la-popup .la-comment-ed { width: 100%; min-height: 68px; max-height: 160px; overflow: auto;
+    border: 1px solid rgba(0,0,0,.1); border-radius: 6px; padding: 8px 9px;
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: #1a1a1a; background: #fff; box-sizing: border-box; outline: none; white-space: pre-wrap;
+    word-break: break-word; }
+  #la-popup .la-comment-ed:focus { border-color: rgba(0,0,0,.28); }
+  #la-popup .la-comment-ed:empty::before { content: attr(data-placeholder); color: #9a9a9a; pointer-events: none; }
+  #la-popup .la-ref { display: inline; vertical-align: baseline; margin: 0 1px; padding: 1px 5px 1px 6px;
+    border-radius: 4px; border: 1px solid rgba(122,75,214,.28); background: rgba(122,75,214,.1);
+    color: #5a3a9a; font-size: 12px; line-height: 1.35; white-space: nowrap; cursor: default; }
+  #la-popup .la-ref-t { max-width: 140px; display: inline-block; overflow: hidden;
+    text-overflow: ellipsis; vertical-align: bottom; }
+  #la-popup .la-ref-x { display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; margin: 0 0 0 2px; padding: 0; border: 0; border-radius: 3px;
+    background: none; color: #8a7aaa; font: 600 11px/1 -apple-system, Arial, sans-serif; cursor: pointer; }
+  #la-popup .la-ref-x:hover { background: rgba(122,75,214,.18); color: #4a2a8a; }
+  #la-popup .la-ref-pick { display: none; font-size: 11px; color: #5a3a9a; margin: 0 0 6px; letter-spacing: -0.01em; }
+  #la-popup .la-ref-pick.la-aan { display: block; }
+  #la-popup .la-quote { font-size: 12px; line-height: 1.4; color: #6a6a6a; background: #f5f5f5;
+    border-left: 2px solid #c8c8c8; padding: 6px 8px; border-radius: 4px; margin-bottom: 8px;
+    max-height: 70px; overflow: auto; }
+  #la-popup .la-img { max-width: 100%; max-height: 120px; display: block; margin-top: 6px;
+    border-radius: 4px; border: 1px solid rgba(0,0,0,.08); }
+  #la-popup .la-rij { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
   #la-popup .la-rij .la-spacer { flex: 1; }
-  #la-popup button { font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid #c8ccd3; background: #fff; cursor: pointer; }
-  #la-popup button.la-save { background: #16181d; color: #fff; border-color: #16181d; }
-  #la-popup .la-hint { font-size: 11px; color: #8a8f99; margin-top: 6px; }
+  #la-popup button { font-size: 12px; font-weight: 450; letter-spacing: -0.01em;
+    padding: 5px 9px; border-radius: 6px; border: 1px solid rgba(0,0,0,.1);
+    background: #fff; color: #3a3a3a; cursor: pointer; }
+  #la-popup button:hover { border-color: rgba(0,0,0,.18); color: #111; }
+  #la-popup button.la-del,
+  #la-popup button.la-attach,
+  #la-popup button.la-link,
+  #la-popup button.la-done { display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; padding: 0; color: #6a6a6a; }
+  #la-popup button.la-del svg,
+  #la-popup button.la-attach svg,
+  #la-popup button.la-link svg,
+  #la-popup button.la-done svg { width: 13px; height: 13px; display: block; }
+  #la-popup button.la-link.la-aan { background: rgba(122,75,214,.12); border-color: rgba(122,75,214,.35); color: #5a3a9a; }
+  #la-popup button.la-save { background: #1a1a1a; color: #f2f2f2; border-color: #1a1a1a; }
+  #la-popup button.la-save:hover { background: #111; color: #fff; }
+  #la-popup .la-hint { font-size: 11px; color: #9a9a9a; margin-top: 6px; letter-spacing: -0.01em; }
   #la-popup .la-hint.la-waarschuwing { color: #8a4b08; }
+  #la-popup .la-hint:empty { display: none; }
 
   /* Concept-berichtkaart: een nog niet verstuurd bericht, zo weergegeven dat Luc
      er per zin op kan annoteren. Zie SKILL.md deel 5. Vlakke la-draft-*-namen,
@@ -47,15 +115,15 @@
   .la-draft-txt { font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; white-space: pre-wrap; }
   /* Knop die een verse Claude Code-sessie opent met de context van dit punt.
      Zie de skill nieuwe-sessie. */
-  .la-sessie { display: inline-block; margin-top: 2px; font-size: 13px; text-decoration: none;
-    padding: 5px 11px; border-radius: 999px; border: 1px solid #c8ccd3; background: #fff;
-    color: #16181d; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .la-sessie:hover { background: #16181d; color: #fff; border-color: #16181d; }
+  .la-sessie { display: inline-block; margin-top: 2px; font-size: 12px; text-decoration: none;
+    padding: 4px 9px; border-radius: 6px; border: 1px solid rgba(0,0,0,.1); background: #fff;
+    color: #3a3a3a; }
+  .la-sessie:hover { background: #1a1a1a; color: #f2f2f2; border-color: #1a1a1a; }
   .la-sessie::before { content: "\2197\00a0"; }
   .la-sesmeld { position: fixed; left: 14px; bottom: 56px; z-index: 100001; max-width: 340px;
-    background: #16181d; color: #fff; border-radius: 10px; padding: 10px 12px;
-    font: 12px/1.45 -apple-system, "Segoe UI", Arial, sans-serif;
-    box-shadow: 0 3px 14px rgba(0,0,0,.28); }
+    background: #1a1a1a; color: #f2f2f2; border-radius: 8px; padding: 9px 11px;
+    font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    border: 1px solid rgba(255,255,255,.08); }
   .la-sesmeld.la-fout { background: #7a3b06; }
   /* Tracked changes op een conceptbericht: Luc herschrijft de tekst zelf en het
      verschil met de oorspronkelijke versie wordt de annotatie. */
@@ -66,10 +134,10 @@
     background: #fffdf6; }
   .la-draft-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px;
     font: 12px/1.4 -apple-system, "Segoe UI", Arial, sans-serif; }
-  .la-draft-bar button { font: inherit; padding: 4px 11px; border-radius: 999px;
-    border: 1px solid #c8ccd3; background: #fff; color: #16181d; cursor: pointer; }
-  .la-draft-bar button:hover { border-color: #16181d; }
-  .la-draft-bar button.la-actief { background: #16181d; color: #fff; border-color: #16181d; }
+  .la-draft-bar button { font: inherit; padding: 4px 9px; border-radius: 6px;
+    border: 1px solid rgba(0,0,0,.1); background: #fff; color: #3a3a3a; cursor: pointer; }
+  .la-draft-bar button:hover { border-color: rgba(0,0,0,.18); color: #111; }
+  .la-draft-bar button.la-actief { background: #1a1a1a; color: #f2f2f2; border-color: #1a1a1a; }
   .la-draft-bar .la-draft-meld { color: #6b6b66; }
   .la-draft-txt .la-hunk-nr { font-size: 10px; font-weight: 700; color: #7a5cff;
     vertical-align: super; padding: 0 2px; user-select: none; }
@@ -169,7 +237,9 @@
       return {
         id: a.id, nr: a.nr, type: a.type || "region",
         rect: a.rect || null, comment: a.comment || "", target: a.target || "",
-        selectedText: a.selectedText || "", img: null,
+        selectedText: a.selectedText || "", refs: a.refs || null,
+        commentExpanded: a.commentExpanded || "", refsIncomplete: a.refsIncomplete || null,
+        img: null,
         veld: a.veld || "", origineel: a.origineel || "", nieuw: a.nieuw || "",
         diff: a.diff || [], hunks: a.hunks || [],
         createdAt: a.createdAt, stale: !!a.stale
@@ -194,20 +264,30 @@
       try { localStorage.setItem(KEY + ":ronde", JSON.stringify(j.round)); } catch (e) {}
       uitBridge(j);
       brug.ok = true; brug.jsonPath = j.jsonPath; brug.count = j.count; brug.round = j.round;
-      zetStatus(true, j.count + " annotaties opgeslagen", j.jsonPath);
+      zetStatus(true, j.count + " saved", j.jsonPath);
       return j;
     }).catch(function () {
       brug.ok = false; brug.jsonPath = null;
-      zetStatus(false, "bridge uit - alleen localStorage",
-        "Start de bridge: python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
+      zetStatus(false, "bridge off - localStorage only",
+        "Start the bridge: python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
       return null;
     });
   }
 
   /* ---- knoppenbalk ---------------------------------------------- */
+  /* Region = macOS Screenshot dashed frame. Text = I-beam + selection chunk. */
+  var icoRegio = '<svg class="la-ico" viewBox="0 0 16 16" aria-hidden="true">' +
+    '<rect x="2.2" y="2.2" width="11.6" height="11.6" rx="1.6" ry="1.6" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.35" stroke-linecap="butt" ' +
+      'stroke-dasharray="2.35 1.65"/></svg>';
+  var icoTekst = '<svg class="la-ico" viewBox="0 0 16 16" aria-hidden="true">' +
+    '<path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" ' +
+      'd="M2.75 2.5h4.5M5 2.5v11M2.75 13.5h4.5"/>' +
+    '<rect x="9" y="4.75" width="5" height="2.4" rx="0.4" fill="currentColor" opacity=".32"/>' +
+    '<rect x="9" y="8.35" width="3.7" height="2.4" rx="0.4" fill="currentColor" opacity=".18"/></svg>';
   var bar = document.createElement("div"); bar.id = "la-bar";
-  bar.innerHTML = '<span id="la-status">bridge checken...</span>' +
-    '<button id="la-toggle">&#9998; Annotate selection</button>';
+  bar.innerHTML = '<span id="la-status">checking bridge...</span>' +
+    '<button id="la-toggle">' + icoRegio + 'Annotate selection</button>';
   document.body.appendChild(bar);
 
   /* ---- anker terugvinden na een pagina-wijziging ------------------ */
@@ -290,10 +370,14 @@
     if (weesOpen()) box.classList.add("la-open");
     var kop = document.createElement("button");
     kop.className = "la-wees-kop";
-    kop.innerHTML = '<span class="la-chev">&#9656;</span><span class="la-wees-tel"></span>';
+    kop.innerHTML =
+      '<span class="la-chev" aria-hidden="true">' +
+        '<svg viewBox="0 0 12 12"><path fill="none" stroke="currentColor" stroke-width="1.4" ' +
+          'stroke-linecap="round" stroke-linejoin="round" d="M4 2.5L8 6l-4 3.5"/></svg>' +
+      '</span><span class="la-wees-tel"></span>';
     kop.querySelector(".la-wees-tel").textContent =
-      lijst.length + " annotatie" + (lijst.length > 1 ? "s" : "") + " waarschijnlijk verwerkt";
-    kop.title = "Anker niet meer gevonden op de pagina. Klik om te bekijken en af te vinken.";
+      lijst.length + " likely processed";
+    kop.title = "Anchor no longer found on the page. Click to review and check off.";
     kop.addEventListener("click", function (ev) {
       ev.stopPropagation();
       var nu = !box.classList.contains("la-open");
@@ -302,16 +386,16 @@
     });
     box.appendChild(kop);
     var lijstEl = document.createElement("div"); lijstEl.className = "la-wees-lijst";
-    var uitleg = document.createElement("p"); uitleg.className = "la-wees-uitleg";
-    uitleg.textContent = "Anker weg na een paginawijziging. Vink af (✓) wat verwerkt is.";
-    lijstEl.appendChild(uitleg);
+    var icoCheck = '<svg viewBox="0 0 12 12" aria-hidden="true">' +
+      '<path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" ' +
+        'stroke-linejoin="round" d="M2.5 6.2L5 8.7l4.5-5.2"/></svg>';
     lijst.forEach(function (a) {
       var rij = document.createElement("div"); rij.className = "la-wees-rij";
       var b = document.createElement("button"); b.className = "la-wees-tekst";
-      b.textContent = "#" + a.nr + " · " + ((a.comment || a.selectedText || a.target || "").slice(0, 70) || "(geen tekst)");
+      b.textContent = "#" + a.nr + " · " + ((a.comment || a.selectedText || a.target || "").slice(0, 70) || "(no text)");
       b.addEventListener("click", function (ev) { ev.stopPropagation(); openPopup(a); });
       var ok = document.createElement("button"); ok.className = "la-wees-ok";
-      ok.innerHTML = "&#10003;"; ok.title = "Markeer als verwerkt (blijft in de historie staan)";
+      ok.innerHTML = icoCheck; ok.title = "Mark as done (kept in history)";
       ok.addEventListener("click", function (ev) { ev.stopPropagation(); markeerVerwerkt(a); });
       rij.appendChild(b); rij.appendChild(ok);
       lijstEl.appendChild(rij);
@@ -392,10 +476,157 @@
     toonWezen(wezen);
   }
 
-  /* ---- popup ----------------------------------------------------- */
-  var popup = null, hangendeGhost = null;
+  /* ---- popup + tekst-referenties --------------------------------- */
+  var popup = null, hangendeGhost = null, refPickMode = false, refPickInsert = null;
+  var refInsertRange = null, refSelListener = null;
   function ruimGhostOp() { if (hangendeGhost) { hangendeGhost.remove(); hangendeGhost = null; } }
-  function sluitPopup() { if (popup) { popup.remove(); popup = null; } ruimGhostOp(); }
+  function sluitPopup() {
+    refPickMode = false; refPickInsert = null; refInsertRange = null;
+    if (refSelListener) {
+      document.removeEventListener("selectionchange", refSelListener);
+      refSelListener = null;
+    }
+    if (popup) { popup.remove(); popup = null; }
+    ruimGhostOp();
+  }
+  function laRefLabel(t) {
+    t = (t || "").replace(/\s+/g, " ").trim();
+    return t.length > 36 ? t.slice(0, 34) + "\u2026" : t;
+  }
+  function laRefTeller(refs) {
+    var m = 0;
+    (refs || []).forEach(function (r) {
+      var n = parseInt(String(r.id || "").replace(/^r/, ""), 10);
+      if (!isNaN(n)) m = Math.max(m, n);
+    });
+    return m;
+  }
+  function laMaakRefChip(id, tekst) {
+    var chip = document.createElement("span");
+    chip.className = "la-ref";
+    chip.contentEditable = "false";
+    chip.dataset.refId = id;
+    chip.dataset.refText = tekst;
+    chip.title = tekst;
+    var lbl = document.createElement("span");
+    lbl.className = "la-ref-t";
+    lbl.textContent = laRefLabel(tekst);
+    chip.appendChild(lbl);
+    var x = document.createElement("button");
+    x.type = "button";
+    x.className = "la-ref-x";
+    x.textContent = "\u00d7";
+    x.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+    x.addEventListener("click", function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      chip.remove();
+    });
+    chip.appendChild(x);
+    return chip;
+  }
+  function laCommentLees(ed) {
+    var comment = "", refs = [], seen = {};
+    function walk(node, blockBreak) {
+      if (node.nodeType === 3) {
+        comment += node.textContent.replace(/\u200B/g, "");
+        return;
+      }
+      if (node.nodeType !== 1) return;
+      var el = node;
+      if (el.classList && el.classList.contains("la-ref")) {
+        var id = el.dataset.refId || "";
+        var tekst = el.dataset.refText || el.title || "";
+        comment += "\u27e6" + id + "\u27e7";
+        if (id && !seen[id]) {
+          seen[id] = true;
+          refs.push({ id: id, selectedText: tekst });
+        }
+        return;
+      }
+      if (el.tagName === "BR") { comment += "\n"; return; }
+      var kids = el.childNodes;
+      for (var i = 0; i < kids.length; i++) walk(kids[i], false);
+      if (blockBreak && el !== ed && (el.tagName === "DIV" || el.tagName === "P")) comment += "\n";
+    }
+    var nodes = ed.childNodes;
+    for (var j = 0; j < nodes.length; j++) {
+      walk(nodes[j], true);
+      if (nodes[j].nodeType === 1 && (nodes[j].tagName === "DIV" || nodes[j].tagName === "P") && j < nodes.length - 1) {
+        comment += "\n";
+      }
+    }
+    return { comment: comment.replace(/\n+$/, "").trim(), refs: refs };
+  }
+  function laCommentZet(ed, comment, refs) {
+    ed.innerHTML = "";
+    refs = refs || [];
+    var byId = {};
+    refs.forEach(function (r) { if (r.id) byId[r.id] = r; });
+    var txt = comment || "", re = /\u27e6([^\u27e7]+)\u27e7/g, last = 0, m;
+    while ((m = re.exec(txt))) {
+      if (m.index > last) ed.appendChild(document.createTextNode(txt.slice(last, m.index)));
+      var ref = byId[m[1]];
+      if (ref && ref.selectedText) ed.appendChild(laMaakRefChip(m[1], ref.selectedText));
+      else ed.appendChild(document.createTextNode(m[0]));
+      last = m.index + m[0].length;
+    }
+    if (last < txt.length) ed.appendChild(document.createTextNode(txt.slice(last)));
+  }
+  function laRefCursorBewaar(ed) {
+    var sel = window.getSelection();
+    if (sel.rangeCount && ed.contains(sel.anchorNode)) {
+      refInsertRange = sel.getRangeAt(0).cloneRange();
+      return;
+    }
+    if (!refInsertRange || !ed.contains(refInsertRange.startContainer)) {
+      refInsertRange = document.createRange();
+      refInsertRange.selectNodeContents(ed);
+      refInsertRange.collapse(false);
+    }
+  }
+  function laInsertAtRefCursor(ed, node) {
+    var range;
+    if (refInsertRange && ed.contains(refInsertRange.startContainer)) {
+      range = refInsertRange.cloneRange();
+    } else {
+      range = document.createRange();
+      range.selectNodeContents(ed);
+      range.collapse(false);
+    }
+    range.deleteContents();
+    range.insertNode(node);
+    var sp = document.createTextNode("\u200B");
+    range.setStartAfter(node);
+    range.insertNode(sp);
+    range.setStart(sp, 1);
+    range.collapse(true);
+    refInsertRange = range.cloneRange();
+    ed.focus();
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  function laValideerRefs(parsed) {
+    var ids = {}, re = /\u27e6([^\u27e7]+)\u27e7/g, m;
+    while ((m = re.exec(parsed.comment || ""))) ids[m[1]] = true;
+    var refIds = {};
+    (parsed.refs || []).forEach(function (r) { if (r.id) refIds[r.id] = true; });
+    var miss = [];
+    Object.keys(ids).forEach(function (id) { if (!refIds[id]) miss.push(id); });
+    return miss;
+  }
+  function paginaSelectie() {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    var tekst = sel.toString().replace(/\s+/g, " ").trim();
+    if (tekst.length < 2) return null;
+    var node = sel.anchorNode;
+    var host = node && (node.nodeType === 1 ? node : node.parentElement);
+    if (host && host.closest && host.closest("#la-popup,#la-bar,#la-selknop")) return null;
+    var r = sel.getRangeAt(0).getBoundingClientRect();
+    if (!r.width && !r.height) return null;
+    return { tekst: tekst };
+  }
   function openPopup(a) {
     /* alleen de popup sluiten, niet de zojuist vastgezette selectie opruimen */
     if (popup) { popup.remove(); popup = null; }
@@ -405,14 +636,20 @@
       : { x: scrollX + 20, y: scrollY + 60, w: 0, h: 0 };
     popup.style.left = Math.max(8, Math.min(pr.x, document.documentElement.scrollWidth - 360)) + "px";
     popup.style.top = (pr.y + pr.h + 10) + "px";
+    var icoDel = '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" d="M2.5 3.5h9M5.5 3.5V2.5h3v1M4 3.5l.5 8h5l.5-8M6 5.5v4M8 5.5v4"/></svg>';
+    var icoAtt = '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" d="M8.6 3.8l-3.7 3.7a1.8 1.8 0 002.5 2.5l4-4a2.7 2.7 0 00-3.8-3.8L3.5 6.3a3.5 3.5 0 004.9 4.9l3.2-3.2"/></svg>';
+    var icoLink = '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" d="M5.8 8.2l2.4-2.4a2.2 2.2 0 013.1 3.1L8.9 10.3M8.2 5.8L5.8 8.2a2.2 2.2 0 01-3.1-3.1L4.7 2.7"/></svg>';
+    var icoOk = '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 7.2l2.8 2.8L11 4.2"/></svg>';
     popup.innerHTML =
       (a.type === "text" ? '<div class="la-quote"></div>' : "") +
-      '<textarea placeholder="Schrijf je comment... (⌘↵ opslaan, afbeelding plakken mag ook)"></textarea>' +
+      '<div class="la-ref-pick">Select text on the page to link it here</div>' +
+      '<div class="la-comment-ed" contenteditable="true" data-placeholder="Write a comment\u2026 (link text with the chain icon)"></div>' +
       '<div class="la-imgwrap"></div>' +
       '<div class="la-rij">' +
-      '<button class="la-del" title="Verwijder">&#128465;</button>' +
-      '<button class="la-attach" title="Afbeelding toevoegen">&#128206;</button>' +
-      '<button class="la-done" title="Markeer als verwerkt (blijft in de historie)">&#10003;</button>' +
+      '<button class="la-del" title="Delete">' + icoDel + '</button>' +
+      '<button class="la-attach" title="Attach image">' + icoAtt + '</button>' +
+      '<button class="la-link" title="Link text from page">' + icoLink + '</button>' +
+      '<button class="la-done" title="Mark as done (kept in history)">' + icoOk + '</button>' +
       '<span class="la-spacer"></span>' +
       '<button class="la-cancel">Cancel</button>' +
       '<button class="la-save">Save</button></div>' +
@@ -420,25 +657,62 @@
     document.body.appendChild(popup);
     if (a.type === "text") popup.querySelector(".la-quote").textContent = a.selectedText || "";
     var hint = popup.querySelector(".la-hint");
-    if (brug.ok) {
-      hint.textContent = a.type === "text"
-        ? "Wordt direct opgeslagen in ronde " + brug.round + " (tekst, geen screenshot)."
-        : "Wordt direct opgeslagen in ronde " + brug.round + " met screenshot-crop.";
-    } else {
+    if (!brug.ok) {
       hint.className = "la-hint la-waarschuwing";
-      hint.textContent = "Bridge draait niet: alleen localStorage, nog niets op schijf.";
+      hint.textContent = "Bridge is off: localStorage only, nothing on disk yet.";
+    } else if (a.refsIncomplete && a.refsIncomplete.length) {
+      hint.className = "la-hint la-waarschuwing";
+      hint.textContent = "Missing linked text for: " + a.refsIncomplete.join(", ") +
+        ". Re-link or remove those chips before saving.";
     }
-    var ta = popup.querySelector("textarea"); ta.value = a.comment || "";
+    var ed = popup.querySelector(".la-comment-ed");
+    laCommentZet(ed, a.comment || "", a.refs || []);
+    var refSeq = laRefTeller(a.refs);
+    function volgendeRefId() { return "r" + (++refSeq); }
+    var refPickEl = popup.querySelector(".la-ref-pick");
+    var linkBtn = popup.querySelector(".la-link");
+    function zetRefPick(aan) {
+      refPickMode = aan;
+      linkBtn.classList.toggle("la-aan", aan);
+      refPickEl.classList.toggle("la-aan", aan);
+    }
+    refPickInsert = function (tekst) {
+      laInsertAtRefCursor(ed, laMaakRefChip(volgendeRefId(), tekst));
+      zetRefPick(false);
+      try { window.getSelection().removeAllRanges(); } catch (e) {}
+      ed.focus();
+    };
     var wrap = popup.querySelector(".la-imgwrap");
     function toonImg() { wrap.innerHTML = a.img ? '<img class="la-img" src="' + a.img + '">' : ""; }
     toonImg();
-    ta.addEventListener("paste", function (ev) {
+    function bewaarRefCursor() { laRefCursorBewaar(ed); }
+    ed.addEventListener("keyup", bewaarRefCursor);
+    ed.addEventListener("mouseup", bewaarRefCursor);
+    ed.addEventListener("input", bewaarRefCursor);
+    refSelListener = function () {
+      if (!popup || !ed) return;
+      var sel = window.getSelection();
+      if (sel.rangeCount && ed.contains(sel.anchorNode)) laRefCursorBewaar(ed);
+    };
+    document.addEventListener("selectionchange", refSelListener);
+    laRefCursorBewaar(ed);
+    ed.addEventListener("paste", function (ev) {
       var items = (ev.clipboardData || {}).items || [];
       for (var i = 0; i < items.length; i++) if (items[i].type.indexOf("image") === 0) {
         var fr = new FileReader();
         fr.onload = function () { a.img = fr.result; toonImg(); };
-        fr.readAsDataURL(items[i].getAsFile()); ev.preventDefault();
+        fr.readAsDataURL(items[i].getAsFile()); ev.preventDefault(); return;
       }
+      ev.preventDefault();
+      var plak = (ev.clipboardData || {}).getData("text/plain") || "";
+      if (plak) document.execCommand("insertText", false, plak);
+    });
+    linkBtn.addEventListener("mousedown", function (ev) {
+      ev.preventDefault();
+      laRefCursorBewaar(ed);
+    });
+    linkBtn.addEventListener("click", function () {
+      zetRefPick(!refPickMode);
     });
     popup.querySelector(".la-attach").addEventListener("click", function () {
       var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
@@ -458,19 +732,31 @@
     });
     popup.querySelector(".la-cancel").addEventListener("click", function () { render(); sluitPopup(); });
     function opslaan() {
-      a.comment = ta.value.trim();
+      var parsed = laCommentLees(ed);
+      var miss = laValideerRefs(parsed);
+      if (miss.length) {
+        hint.className = "la-hint la-waarschuwing";
+        hint.textContent = "Link markers without text: " + miss.join(", ") +
+          ". Use the chain icon to re-link, or delete the broken chips.";
+        ed.focus();
+        return;
+      }
+      a.comment = parsed.comment;
+      a.refs = parsed.refs.length ? parsed.refs : null;
       bewaarAnnotatie(a); sluitPopup();
     }
     popup.querySelector(".la-save").addEventListener("click", opslaan);
-    /* Cmd+Enter (of Ctrl+Enter) slaat op, Escape annuleert */
-    ta.addEventListener("keydown", function (ev) {
+    /* Cmd+Enter (of Ctrl+Enter) slaat op, Escape annuleert (of stopt link-modus) */
+    ed.addEventListener("keydown", function (ev) {
       if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {
         ev.preventDefault(); ev.stopPropagation(); opslaan();
       } else if (ev.key === "Escape") {
-        ev.preventDefault(); ev.stopPropagation(); render(); sluitPopup();
+        ev.preventDefault(); ev.stopPropagation();
+        if (refPickMode) { zetRefPick(false); return; }
+        render(); sluitPopup();
       }
     });
-    ta.focus();
+    ed.focus();
   }
 
   /* ---- opslaan / verwijderen ------------------------------------- */
@@ -480,7 +766,7 @@
     return post("/save", Object.assign(basis(), {
       annotation: {
         id: a.id, type: a.type, rect: a.rect, comment: a.comment, target: a.target,
-        selectedText: a.selectedText || null, img: a.img || null, createdAt: a.createdAt,
+        selectedText: a.selectedText || null, refs: a.refs || null, img: a.img || null, createdAt: a.createdAt,
         /* bewerkingen op een conceptbericht; leeg voor de andere types */
         veld: a.veld || null, origineel: a.origineel || null, nieuw: a.nieuw || null,
         diff: a.diff || null, hunks: a.hunks || null
@@ -488,16 +774,15 @@
     })).then(function (j) {
       brug.ok = true; brug.jsonPath = j.jsonPath; brug.count = j.count; brug.round = j.round;
       a.nr = j.nr; bewaarLokaal(); render();
-      zetStatus(true, j.count + " annotaties opgeslagen", j.jsonPath);
+      zetStatus(true, j.count + " saved", j.jsonPath);
       return j;
     }).catch(function (e) {
       brug.ok = false;
-      zetStatus(false, "bridge uit - alleen localStorage",
-        "Start de bridge: python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
-      alert("Let op: de bridge draait niet, dus er staat niets op schijf.\n" +
-        "Je annotatie zit alleen in localStorage. Start de bridge met:\n" +
-        "python3 ~/.claude/skills/html-annotator/annotator-bridge.py\n" +
-        "of gebruik 'Bewaar feedback' voor een download.");
+      zetStatus(false, "bridge off - localStorage only",
+        "Start the bridge: python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
+      alert("The bridge is not running, so nothing was written to disk.\n" +
+        "Your annotation is only in localStorage. Start the bridge with:\n" +
+        "python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
       throw e;
     });
   }
@@ -507,7 +792,7 @@
     bewaarLokaal(); render();
     return post("/delete", Object.assign(basis(), { id: a.id })).then(function (j) {
       brug.count = j.count;
-      zetStatus(true, j.count + " annotaties opgeslagen", j.jsonPath);
+      zetStatus(true, j.count + " saved", j.jsonPath);
     }).catch(function () { /* offline: localStorage is al bijgewerkt */ });
   }
 
@@ -515,8 +800,8 @@
      annotatie verdwijnt van de pagina, de historie blijft op schijf staan. */
   function markeerVerwerkt(a) {
     if (!brug.ok) {
-      alert("De bridge draait niet, dus afvinken kan niet worden weggeschreven.\n" +
-        "Start hem met: ~/.claude/skills/html-annotator/ensure-bridge.sh");
+      alert("The bridge is not running, so check-off cannot be written.\n" +
+        "Start it with: ~/.claude/skills/html-annotator/ensure-bridge.sh");
       return Promise.resolve(null);
     }
     return post("/resolve", Object.assign(basis(), { ids: [a.id], nrs: [a.nr] }))
@@ -524,10 +809,10 @@
         anns = anns.filter(function (x) { return x.id !== a.id; });
         bewaarLokaal(); render();
         brug.count = j.open;
-        zetStatus(true, j.open + " annotaties opgeslagen", j.jsonPath);
+        zetStatus(true, j.open + " saved", j.jsonPath);
         return j;
       }).catch(function (e) {
-        alert("Afvinken mislukt: " + (e && e.message ? e.message : e));
+        alert("Check-off failed: " + (e && e.message ? e.message : e));
         throw e;
       });
   }
@@ -601,12 +886,18 @@
   }
   document.addEventListener("mouseup", function () {
     setTimeout(function () {
+      if (refPickMode && popup && refPickInsert) {
+        var s = paginaSelectie();
+        if (s) refPickInsert(s.tekst);
+        return;
+      }
       if (overlay || popup) return;
       var s = huidigeSelectie();
       verbergSelKnop();
       if (!s) return;
       selKnop = document.createElement("button");
-      selKnop.id = "la-selknop"; selKnop.textContent = "✎ Annoteer selectie";
+      selKnop.id = "la-selknop";
+      selKnop.innerHTML = icoTekst + " Annotate selection";
       selKnop.style.left = s.rect.x + "px";
       selKnop.style.top = (s.rect.y + s.rect.h + 6) + "px";
       document.body.appendChild(selKnop);
@@ -819,11 +1110,11 @@
       var bar = document.createElement("div");
       bar.className = "la-draft-bar";
       var bHerstel = document.createElement("button");
-      bHerstel.textContent = "↺ Herstel origineel";
+      bHerstel.textContent = "↺ Restore original";
       bHerstel.style.display = "none";
       var meld = document.createElement("span");
       meld.className = "la-draft-meld";
-      meld.textContent = "klik in de tekst om te bewerken";
+      meld.textContent = "click the text to edit";
       bar.appendChild(bHerstel); bar.appendChild(meld);
       box.parentNode.insertBefore(bar, box.nextSibling);
       box.__bar = { herstel: bHerstel, meld: meld };
@@ -839,8 +1130,8 @@
         else { box.textContent = box.__nieuw; box.__markup = false; }
         bHerstel.style.display = gewijzigd ? "" : "none";
         meld.textContent = gewijzigd
-          ? (box.__nr ? "opgeslagen als annotatie " + box.__nr : "wijziging nog niet opgeslagen")
-          : "klik in de tekst om te bewerken";
+          ? (box.__nr ? "saved as annotation " + box.__nr : "edit not saved yet")
+          : "click the text to edit";
         return ops;
       }
       box.__toonMarkup = toonMarkup;
@@ -880,9 +1171,9 @@
       var timer = null;
       box.addEventListener("input", function () {
         clearTimeout(timer);
-        meld.textContent = "aan het typen…";
+        meld.textContent = "typing…";
         timer = setTimeout(function () { bewaarNu(); meld.textContent =
-          box.__nr ? "opgeslagen als annotatie " + box.__nr : "opgeslagen"; }, 900);
+          box.__nr ? "saved as annotation " + box.__nr : "saved"; }, 900);
       });
 
       box.addEventListener("blur", function () {
@@ -902,7 +1193,7 @@
         box.textContent = box.__origineel;
         laVerwijderBewerking(box);
         bHerstel.style.display = "none";
-        meld.textContent = "origineel hersteld";
+        meld.textContent = "original restored";
       });
     });
   }
@@ -938,10 +1229,10 @@
     box.__annId = a.id;
     return bewaarAnnotatie(a).then(function () {
       box.__nr = a.nr;
-      box.__bar.meld.textContent = "opgeslagen als annotatie " + a.nr;
+      box.__bar.meld.textContent = "saved as annotation " + a.nr;
       return a;
     }).catch(function () {
-      box.__bar.meld.textContent = "niet opgeslagen — bridge onbereikbaar";
+      box.__bar.meld.textContent = "not saved — bridge unreachable";
     });
   }
 
@@ -981,7 +1272,7 @@
         /* Oudere bewerking zonder blokken: alleen terugzetten als de tekst nog exact
            is zoals hij was, anders zou Lucs oude versie over de nieuwe heen komen. */
         if (a.origineel && a.origineel !== box.__origineel) {
-          box.__bar.meld.textContent = "let op: de concepttekst is gewijzigd sinds annotatie " + a.nr;
+          box.__bar.meld.textContent = "note: draft text changed since annotation " + a.nr;
           return;
         }
         box.__annId = a.id; box.__nr = a.nr; box.__nieuw = a.nieuw || box.__origineel;
@@ -996,14 +1287,14 @@
       });
       if (!geplaatst) {
         box.__bar.meld.textContent =
-          "annotatie " + a.nr + ": de tekst is te veel veranderd om de wijziging te tonen";
+          "annotation " + a.nr + ": text changed too much to show the edit";
         return;
       }
       box.__annId = a.id; box.__nr = a.nr; box.__nieuw = tekst;
       box.__toonMarkup();
       if (kwijt.length) {
-        box.__bar.meld.textContent = "annotatie " + a.nr + ": blok " + kwijt.join(", ") +
-          " niet meer terug te vinden in de tekst";
+        box.__bar.meld.textContent = "annotation " + a.nr + ": hunk " + kwijt.join(", ") +
+          " no longer found in the text";
       }
     });
   }
@@ -1046,11 +1337,11 @@
   }
   function naarKlembord(url) {
     var klaar = function () {
-      meldSessie("Deze weergave opent geen Claude-links. De link staat op je klembord, plak hem in Spotlight (cmd+spatie).", true);
+      meldSessie("This view cannot open Claude links. The link is on your clipboard — paste it in Spotlight (⌘Space).", true);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(klaar, function () {
-        meldSessie("Kon de sessie niet openen. Start de bridge, of open deze pagina in je eigen browser.", true);
+        meldSessie("Could not open the session. Start the bridge, or open this page in your own browser.", true);
       });
       return;
     }
@@ -1058,7 +1349,7 @@
     t.value = url; t.style.cssText = "position:fixed;opacity:0";
     document.body.appendChild(t); t.select();
     try { document.execCommand("copy"); klaar(); } catch (e) {
-      meldSessie("Kon de sessie niet openen. Start de bridge, of open deze pagina in je eigen browser.", true);
+      meldSessie("Could not open the session. Start the bridge, or open this page in your own browser.", true);
     }
     t.remove();
   }
@@ -1071,7 +1362,7 @@
     /* Eerst de bridge: die draait buiten de browser en kan het scheme wel
        openen. Lukt dat niet, dan pas navigeren en anders het klembord. */
     post("/sessie", { url: url }).then(function () {
-      meldSessie("Nieuwe Claude-sessie geopend.");
+      meldSessie("Opened a new Claude session.");
     }).catch(function () {
       var vertrokken = false;
       function weg() { vertrokken = true; }

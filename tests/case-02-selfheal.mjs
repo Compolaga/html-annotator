@@ -157,9 +157,9 @@ for (const origin of ORIGINS) {
   await page.goto(urlVoor[origin](), { waitUntil: 'load' });
   await page.waitForSelector('#la-status', { timeout: 5000 });
 
-  // 1. met de bridge omlaag hoort de pil "bridge uit" te melden
+  // 1. with the bridge down the pill should say "bridge off"
   await page.waitForFunction(
-    () => /bridge uit/.test(document.getElementById('la-status')?.textContent || ''),
+    () => /bridge off/.test(document.getElementById('la-status')?.textContent || ''),
     null, { timeout: 5000 },
   ).catch(() => {});
   const pilVoor = await page.textContent('#la-status');
@@ -194,7 +194,7 @@ for (const origin of ORIGINS) {
     }
     await sleep(6000);
     const tussenpil = await page.textContent('#la-status');
-    if (/annotaties opgeslagen/.test(tussenpil || '')) {
+    if (/\d+ saved/.test(tussenpil || '')) {
       console.log(`  FAIL  ${label}: herstelde al terwijl de pagina verborgen was ("${tussenpil}") — deze variant toetst de listener dan niet`);
       falen++;
       await page.close();
@@ -210,7 +210,7 @@ for (const origin of ORIGINS) {
   // 3. de pil moet vanzelf omslaan — geen reload, geen klik
   let hersteld = true;
   await page.waitForFunction(
-    () => /annotaties opgeslagen/.test(document.getElementById('la-status')?.textContent || ''),
+    () => /\d+ saved/.test(document.getElementById('la-status')?.textContent || ''),
     null, { timeout: VERBORGEN ? 3000 : PILL_TIMEOUT_MS },
   ).catch(() => { hersteld = false; });
   const pilNa = await page.textContent('#la-status');

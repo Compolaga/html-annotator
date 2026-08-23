@@ -20,10 +20,18 @@ import sys
 
 ROOT = os.path.expanduser("~/Desktop/annotaties")
 
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+from annotator_refs import expand_comment, validate_refs
+
 # Komt mee zodra er open annotaties zijn. Staat hier en niet alleen in SKILL.md,
 # zodat het altijd in de context terechtkomt van wie deze feedback verwerkt.
 WERKREGEL = """
 ╭─ Voor Claude: eerst begrijpen, dan pas verwerken ─────────────────
+│ Luc triggert dit ook met een kaal bericht "." — dat is "verwerk mijn
+│ annotaties", geen typo. Geen bevestiging vragen; gewoon deze flow.
+│
 │ Neem deze annotaties niet klakkeloos over. Luc dicteert ze vaak,
 │ dus zinnen lopen soms dood, en context die bij hem vanzelfsprekend
 │ is staat er niet altijd bij.
@@ -146,8 +154,21 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
             pad = os.path.join(map_, a["image"])
             print("      crop   : %s%s" % (pad if paden else a["image"],
                                            "" if os.path.isfile(pad) else "  (ONTBREEKT)"))
-        for i, regel in enumerate(str(a.get("comment", "")).split("\n")):
+        for i, regel in enumerate(expand_comment(a.get("comment", ""), a.get("refs")).split("\n")):
             print("      %s %s" % ("zegt   :" if i == 0 else "        ", regel))
+        refs = a.get("refs") or []
+        missing, unused = validate_refs(a.get("comment", ""), refs)
+        if missing:
+            print("      refs   : ONTBREEKT in JSON: %s" % ", ".join(missing))
+        if unused:
+            print("      refs   : niet in comment: %s" % ", ".join(unused))
+        if refs:
+            for r in refs:
+                rid = r.get("id") or "?"
+                tekst = (r.get("selectedText") or "").replace("\n", " ")
+                print("      ref %s: %s" % (rid, tekst[:120]))
+        elif a.get("comment") and "\u27e6" in a.get("comment", ""):
+            print("      refs   : markers in comment maar geen refs-array \u2014 vraag Luc opnieuw te saven")
 
 
 def main():

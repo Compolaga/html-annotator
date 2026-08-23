@@ -18,5 +18,6 @@ steeds maatwerk (2026-08-07).
 **How to apply:** snippet uit `annotator-snippet.html` onderaan de HTML plakken
 (check op de marker `LUC-ANNOTATOR`). Opslaan gaat via de bridge naar
 `~/Desktop/annotaties/<slug>/ronde-NN/`, met de crops er al uitgesneden. Volg SKILL.md;
-zie [[annotator-bridge-autostart]] voor de bridge zelf. Dit component is voor
+zie [[annotator-bridge-autostart]] voor de bridge zelf. Verwerken triggert Luc
+vaak met een kaal `.` — zie [[punt-verwerk-annotaties]]. Dit component is voor
 HTML-deliverables; zie [[reviews-via-plannotator]] voor de md/docx-reviewflow.

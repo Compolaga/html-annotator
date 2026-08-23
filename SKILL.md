@@ -1,6 +1,14 @@
 ---
 name: html-annotator
-description: Standaard feedback-component voor ELKE HTML-pagina die voor Luc wordt gemaakt (prototypes, slides, vergelijkingspagina's, dashboards). Bouw het annotatie-snippet standaard in bij elke nieuwe of substantieel herziene HTML-oplevering, zonder dat Luc erom hoeft te vragen. Trigger ook wanneer Luc zegt "verwerk mijn feedback", "check mijn bewaarde feedback" of naar een annotations.json / annotatieronde verwijst; dan beschrijft deze skill hoe je de rondes en screenshot-crops uitleest en verwerkt.
+description: >
+  Standaard feedback-component voor ELKE HTML-pagina die voor Luc wordt gemaakt
+  (prototypes, slides, vergelijkingspagina's, dashboards). Bouw het
+  annotatie-snippet standaard in bij elke nieuwe of substantieel herziene
+  HTML-oplevering, zonder dat Luc erom hoeft te vragen. Trigger óók bij
+  feedbackverwerking: een kaal bericht "." (alleen een punt), of "verwerk mijn
+  feedback" / "check mijn bewaarde feedback" / een pad naar annotations.json of
+  een annotatieronde — dan beschrijft deze skill hoe je de rondes en
+  screenshot-crops uitleest en verwerkt.
 ---
 
 # HTML-annotator: standaardcomponent + feedbackverwerking
@@ -101,11 +109,16 @@ Wat Luc kan:
 - **Tekstselectie**: gewoon tekst selecteren → er verschijnt een paars knopje
   "Annoteer selectie" → comment typen → Save. De geselecteerde tekst komt in de
   JSON, er wordt geen screenshot gemaakt.
+- **Tekst koppelen**: in de commentbox staat een ketting-icoon. Klik dat, selecteer
+  daarna tekst op de pagina → die komt als inline chip in je comment ("net zoals
+  deze"). Meerdere keren kan; schrijf er gewoon omheen ("Maak ⟦r1⟧ hetzelfde als
+  ⟦r2⟧"). Chips zijn verwijderbaar met ×. Escape stopt link-modus; nogmaals Escape
+  annuleert de hele popup.
 - Er is geen download-knop: de bridge is de enige opslagroute.
 - Badges: blauw = regio, paars = tekstselectie. Klik erop om te bekijken,
   bewerken of verwijderen.
-- Statuspil links van de knoppen: `X annotaties opgeslagen` (X = het aantal
-  **openstaande** annotaties op schijf), of "bridge uit - alleen localStorage".
+- Statuspil links van de knoppen: `X saved` (X = het aantal **openstaande**
+  annotaties op schijf), of "bridge off - localStorage only".
 - **Afvinken in de UI**: elk kaartje in de weeslijst heeft een ✓, en de popup van
   elke badge ook. Dat zet `resolved` via de bridge; de annotatie verdwijnt van de
   pagina en blijft in de JSON staan.
@@ -116,7 +129,7 @@ openstaande (niet-resolved) annotaties van de lopende ronde op en tekent alleen
 die. Zonder bridge blijft localStorage het vangnet.
 
 Kan een anker niet meer geplaatst worden na een pagina-wijziging, dan verschijnt
-er linksonder een klein kaartje **"N annotaties waarschijnlijk verwerkt"**. Dat
+er linksonder een klein kaartje **"N likely processed"**. Dat
 is bewust geen foutmelding: een anker verdwijnt meestal juist doordat de tekst is
 aangepast, dus het is een opruimlijst. Het kaartje is standaard **ingeklapt**
 (alleen de kopregel met chevron), onthoudt zijn open/dicht-stand in localStorage
@@ -145,8 +158,8 @@ python3 ~/.claude/skills/html-annotator/annotator-bridge.py
 
 Draait hij? `curl -s http://127.0.0.1:8791/ping` geeft
 `{"ok": true, "bridge": "luc-annotator", "version": 2, ...}`. In de pagina zelf
-is het te zien aan de groene statuspil ("X annotaties opgeslagen"). Staat die pil
-oranje op "bridge uit - alleen localStorage", dan is er niets weggeschreven;
+is het te zien aan de groene statuspil ("X saved"). Staat die pil
+oranje op "bridge off - localStorage only", dan is er niets weggeschreven;
 de pagina valt dan terug op localStorage en zegt dat ook bij elke Save.
 
 Croppen doet de bridge met headless Chrome (`--headless=new --screenshot
@@ -196,7 +209,19 @@ paginaversie die feedback hoorde, plus `lastContentHash` op rondeniveau.
 
 ## Deel 4: feedback verwerken
 
-Luc plakt een berichtje in de trant van "Kijk, hier staan de annotaties:
+**Triggers.** Lees en verwerk openstaande annotaties zodra Luc een van deze
+berichten stuurt (geen extra bevestiging vragen of hij het meent):
+
+- een kaal **`.`** (alleen een punt, eventueel met whitespace eromheen) — dat is
+  zijn verkorte "verwerk mijn annotaties";
+- "verwerk mijn feedback", "check mijn bewaarde feedback", of een pad naar
+  `annotations.json` / een annotatieronde.
+
+Bij een kaal `.` zoek je zelf de lopende open ronde (via
+`toon-annotaties.py --open` of de bridge), in plaats van te wachten op een
+expliciet pad.
+
+Luc plakt soms ook een berichtje in de trant van "Kijk, hier staan de annotaties:
 `<pad>/ronde-NN/annotations.json`. Het zijn er X." Lees dat bestand.
 
 Per annotatie:
@@ -204,9 +229,21 @@ Per annotatie:
 ```json
 { "nr": 1, "type": "region", "target": "kop van de kaart",
   "comment": "...", "image": "screenshots/annotatie-01.png", "_rect": {...} }
-{ "nr": 2, "type": "text", "target": "...", "comment": "...",
-  "selectedText": "de exact geselecteerde tekst" }
+{ "nr": 2, "type": "text", "target": "...", "comment": "Maak hetzelfde als ⟦r1⟧",
+  "selectedText": "de exact geselecteerde tekst",
+  "refs": [{ "id": "r1", "selectedText": "andere tekst op de pagina" }] }
 ```
+
+- `refs` (optioneel): andere tekstfragmenten die Luc in de comment heeft gekoppeld.
+  In `comment` staan ze als `⟦r1⟧`, `⟦r2⟧`, …; `refs` geeft per id de volledige
+  `selectedText`. Gebruik dit voor "hetzelfde als …"-feedback.
+- Bij verwerken: lees **`commentExpanded`** (refs ingevuld als `"tekst"`) of
+  `toon-annotaties.py` — die expandeert markers en waarschuwt als `refs` ontbreekt.
+  Staat er `refsIncomplete`, vraag Luc opnieuw te saven; gok niet welke tekst r1/r2 was.
+- Veelvoorkomende bedoelingen: **"Maak ⟦r1⟧ hetzelfde als ⟦r2⟧"** → pas de tekst
+  van r1 (of de geannoteerde `selectedText`) aan naar r2; **"veranderen naar"** =
+  vervangen door de ref-tekst. `selectedText` is het primaire anker; refs zijn
+  vergelijkingstekst elders op de pagina.
 
 - `type: "region"` → open `image` (pad is relatief aan de rondemap) met de
   Read-tool en lees de crop naast de comment. Zelf croppen hoeft niet meer, dat
@@ -255,7 +292,7 @@ feedback hoorde.
 
 Dit is de stap die het vaakst vergeten wordt, en precies daar loopt het mis: een
 verwerkte annotatie waarvan je de vlag niet zet, verliest zijn anker (je hebt de
-tekst immers aangepast), belandt in de lijst "waarschijnlijk verwerkt" en komt
+tekst immers aangepast), belandt in de lijst "likely processed" en komt
 elke ronde terug. Verwerken zonder afvinken is dus **niet af**.
 
 Heb je een annotatie verwerkt in de pagina, meld hem dan direct af bij de bridge.
@@ -284,7 +321,7 @@ en hoeveel er nog openstaan.
 Positionering na een pagina-wijziging: tekstannotaties zoekt het snippet
 opnieuw op via hun `selectedText`, dus die schuiven vanzelf mee. Regio-annotaties
 van een oudere paginaversie worden niet op mogelijk verkeerde coördinaten
-getekend, maar verschijnen in het kaartje "waarschijnlijk verwerkt" linksonder. Verwerk je
+getekend, maar verschijnen in het kaartje "likely processed" linksonder. Verwerk je
 zo'n annotatie, dan verdwijnt hij daaruit zodra je hem resolved zet; Luc kan hem
 daar ook zelf afvinken met het ✓.
 

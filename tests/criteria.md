@@ -32,7 +32,7 @@ tussenstanden van dezelfde groene suite.
 
 **Gegeven** een pagina met het snippet die al open staat terwijl de bridge niet draait,
 **wanneer** de bridge daarna omhoog komt,
-**dan** slaat de statuspil binnen 10 seconden om naar `X annotaties opgeslagen`
+**dan** slaat de statuspil binnen 10 seconden om naar `X saved`
 zonder dat de pagina herladen wordt, **en** landt een annotatie die daarna wordt
 opgeslagen daadwerkelijk in `annotations.json` op schijf.
 
@@ -57,7 +57,7 @@ zegt wélk deel van het zelfherstel dragend is:
 
 Verborgen-paneel-variant (`CASE02_VERBORGEN=1`, `red/ronde-8-verborgen-paneel.txt`), omdat
 Luc's paneel er staat terwijl hij in de chat typt en de timer een verborgen pagina bewust
-overslaat: pagina blijft correct op "bridge uit" zolang hij verborgen is, en komt bij
+overslaat: pagina blijft correct op "bridge off" zolang hij verborgen is, en komt bij
 zodra hij weer bekeken wordt. `geen-poller` wordt daar betrapt. Wat deze variant **niet**
 doet: de timer en de listeners van elkaar scheiden — zodra de pagina weer zichtbaar is
 mag de timer ook vuren, en met de listeners eruit herstelde hij alsnog. De variant bewijst
@@ -67,7 +67,7 @@ achtergrondtab; Chrome's throttling van timers in echte achtergrondtabs blijft d
 ongetoetst.
 
 Bijkomende meting, niet voorzien toen dit criterium geschreven werd: op `file://` landde
-de annotatie al op schijf terwijl de pil "bridge uit" meldde. De pil loog daar dus, en
+de annotatie al op schijf terwijl de pil "bridge off" meldde. De pil loog daar dus, en
 het snippet waarschuwde Luc onterecht dat er niets bewaard was. Met de poller lopen pil
 en werkelijkheid weer gelijk.
 
@@ -169,7 +169,7 @@ openen werkt volledig, inclusief zelfherstel. Dat maakt de regel "open altijd vi
 gemeten op het echte oppervlak in plaats van afgeleid.
 
 Wat blijft staan: als een pagina tóch als bestand in de sideviewer belandt, meldt de
-statuspil "bridge uit - alleen localStorage". Dat leest als "de bridge moet even
+statuspil "bridge off - localStorage only". Dat leest als "de bridge moet even
 aangezwengeld worden" terwijl er niets aan te zwengelen valt — die misleiding startte dit
 onderzoek, en is een openstaand verbeterpunt voor het snippet.
 

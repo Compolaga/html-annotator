@@ -28,6 +28,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("LUC_ANNOTATOR_PORT", "8791"))
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+from annotator_refs import expand_comment, validate_refs
 ROOT = os.path.expanduser(os.environ.get("LUC_ANNOTATOR_ROOT", "~/Desktop/annotaties"))
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 CACHE = os.path.join(tempfile.gettempdir(), "luc-annotator-shots")
@@ -255,6 +259,10 @@ def h_session(payload):
             "comment": a.get("comment") or "",
             "target": a.get("target") or "",
             "selectedText": a.get("selectedText") or "",
+            "refs": a.get("refs") or [],
+            "commentExpanded": a.get("commentExpanded") or expand_comment(
+                a.get("comment") or "", a.get("refs") or []),
+            "refsIncomplete": a.get("refsIncomplete") or [],
             "veld": a.get("veld") or "",
             "origineel": a.get("origineel") or "",
             "nieuw": a.get("nieuw") or "",
@@ -376,6 +384,17 @@ def h_save(payload):
         # paginaversie waarop deze annotatie is gezet (context + stale-detectie)
         "contentHash": h,
     }
+    refs = ann.get("refs")
+    if isinstance(refs, list) and refs:
+        rec["refs"] = [
+            {"id": (r.get("id") or "").strip(), "selectedText": (r.get("selectedText") or "").strip()}
+            for r in refs
+            if isinstance(r, dict) and (r.get("selectedText") or "").strip()
+        ]
+    rec["commentExpanded"] = expand_comment(rec["comment"], rec.get("refs"))
+    missing, _ = validate_refs(rec["comment"], rec.get("refs"))
+    if missing:
+        rec["refsIncomplete"] = missing
     if bestaande and bestaande.get("resolved"):
         rec["resolved"] = True
         rec["resolvedAt"] = bestaande.get("resolvedAt")
