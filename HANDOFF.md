@@ -1,10 +1,10 @@
 # Agentpoort
 
 Begin hier als je deze repo installeert of uitrolt. Wijzig geen hooks en geen
-poort zonder Luc.
+poort zonder persoonlijke setup.
 
 1. Lees `INSTALL.md` en draai `./install.sh` (of `--copy`).
-2. Start de bridge: `~/.claude/skills/html-annotator/ensure-bridge.sh`.
+2. Start de bridge: `~/.claude/skills/html-annotator/bin/ensure-bridge.sh`.
 3. Check: `curl -s http://127.0.0.1:8791/ping`.
 4. Open pagina's alleen via `http://127.0.0.1:8791/p/<pad-vanaf-home>`.
 5. Agent-gedrag: `SKILL.md` (poort) + verplicht `references/agent-handbook.md`.

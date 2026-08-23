@@ -1,6 +1,6 @@
 # html-annotator
 
-Skill die van elke HTML die een agent voor Luc maakt een annoteerbare pagina
+Skill die van elke HTML die een agent voor de reviewer maakt een annoteerbare pagina
 maakt. Feedback landt als JSON plus crops op schijf.
 
 Geen libraries, geen CDN. Eén plakbaar snippet en een lokale Python-bridge
@@ -21,7 +21,7 @@ Geen libraries, geen CDN. Eén plakbaar snippet en een lokale Python-bridge
 HTML-pagina  ──►  annotator-snippet.html
                      fetch 127.0.0.1:8791
                           ▼
-                  annotator-bridge.py
+                  bin/annotator-bridge.py
                           ▼
         ~/Desktop/annotaties/<pagina>/ronde-NN/annotations.json
 ```
@@ -36,25 +36,22 @@ git clone https://github.com/kompolaga/html-annotator.git ~/repos/html-annotator
 ~/repos/html-annotator/install.sh
 ```
 
-Het script linkt de skill, zet **drie** annotator-memories en registreert de
-hooks. Details en handmatige reststappen: [INSTALL.md](INSTALL.md).
+Het script linkt de skill en registreert de hooks. Details:
+[INSTALL.md](INSTALL.md).
 
 ## Wat er in zit
 
 | pad | rol |
 |---|---|
 | `SKILL.md` | agent-poort (inbouwen, `/p/`, `.`) |
-| `references/` | handbook + annotation-record |
+| `references/` | handbook, record, acceptatiecriteria |
 | `annotator-snippet.html` | het blok onderaan elke HTML |
-| `annotator-bridge.py` | `127.0.0.1:8791` |
-| `ensure-bridge.sh` / `hook-ensure-bridge.sh` | start + hooks (blijven in de root) |
-| `toon-annotaties.py` / `pas-hunk-toe.py` | agent-leesbaarheid / hunks |
-| `memories/` | drie annotator-memories |
-| `extras/luc-memories/` | Luc-workflow, niet geïnstalleerd |
-| `tests/` | suite + `criteria.md` (subset van de freeze) |
+| `annotator/` | Python-bibliotheek (config, record, refs) |
+| `bin/` | bridge, ensure/hook, toon, hunks, todolijst |
+| `tests/` | suite |
 
 ## Grenzen
 
 - macOS is de geteste omgeving.
-- `~/Desktop/annotaties` en `vind-todolijst.sh` → Desktop blijven de default.
-- Twee blinde vlekken in de suite: zie VERIFICATION.md / INSTALL.md stap 5.
+- `~/Desktop/annotaties` en `bin/vind-todolijst.sh` → Desktop blijven de default.
+- Twee blinde vlekken in de suite: zie VERIFICATION.md / INSTALL.md stap 4.

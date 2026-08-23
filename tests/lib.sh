@@ -15,17 +15,17 @@ bridge_pid() { lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1; }
 # Bridge hard omlaag, en pas terugkomen als de poort echt vrij is.
 bridge_down() {
   local pids
-  pids=$(lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null)
-  [ -n "$pids" ] && kill $pids 2>/dev/null
   for _ in $(seq 1 30); do
-    [ -z "$(bridge_pid)" ] && [ -z "$(ping_bridge)" ] && return 0
+    pids=$(lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null)
+    [ -z "$pids" ] && [ -z "$(ping_bridge)" ] && return 0
+    [ -n "$pids" ] && kill $pids 2>/dev/null
     sleep 0.2
   done
   echo "bridge_down: poort $PORT blijft bezet door pid(s) $(bridge_pid)" >&2
   return 1
 }
 
-bridge_up() { "$SKILL_DIR/ensure-bridge.sh" >/dev/null 2>&1; [ -n "$(ping_bridge)" ]; }
+bridge_up() { "$SKILL_DIR/bin/ensure-bridge.sh" >/dev/null 2>&1; [ -n "$(ping_bridge)" ]; }
 
 # Wacht tot de bridge antwoordt. $1 = seconden (default 5).
 wait_for_bridge() {

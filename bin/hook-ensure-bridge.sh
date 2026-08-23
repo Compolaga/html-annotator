@@ -10,7 +10,8 @@
 
 set -u
 
-DIR="$HOME/.claude/skills/html-annotator"
+BIN="$(cd "$(dirname "$0")" && pwd)"
+DIR="$(cd "$BIN/.." && pwd)"
 
 gelezen=$(/usr/bin/python3 -c '
 import json, sys
@@ -31,7 +32,7 @@ file=${gelezen#*$'\t'}
 # agent die het bestand via Bash wegschrijft — in auto-mode juist de voorgeschreven
 # route. Zie tests/case-04.
 if [ "$event" = "SessionStart" ]; then
-  "$DIR/ensure-bridge.sh" >>"$DIR/bridge-hook.log" 2>&1
+  "$BIN/ensure-bridge.sh" >>"$DIR/bridge-hook.log" 2>&1
   exit 0
 fi
 
@@ -45,6 +46,6 @@ esac
 [ -f "$file" ] || exit 0
 grep -q "LUC-ANNOTATOR" "$file" 2>/dev/null || exit 0
 
-"$DIR/ensure-bridge.sh" >>"$DIR/bridge-hook.log" 2>&1
+"$BIN/ensure-bridge.sh" >>"$DIR/bridge-hook.log" 2>&1
 
 exit 0

@@ -35,6 +35,23 @@ geen gesplitst runtime-JS zolang de output niet byte-identiek is.
 
 ## 2026-08-23 — Skill-install zonder persoonlijke memories
 
-`install.sh` zet alleen de drie annotator-memories. Vijf Luc-workflow-memories
-staan in `extras/luc-memories/` en worden niet gekopieerd. Bestaande
-project-`MEMORY.md`-regels worden niet verwijderd.
+`install.sh` zet geen memories. Agent-regels staan in `SKILL.md` en
+`references/`. Bestaande project-`MEMORY.md`-regels worden niet verwijderd.
+`extras/luc-memories/` is verwijderd (plan zei: verplaatsen). Bron: deze
+opruimronde, "het mag drastisch veranderen". Inhoud alleen nog in git op
+`472cf63`.
+
+## 2026-08-23 — Locator volgt de rij, niet de eerste herhaalde span
+
+`zoekAnker` behandelt “start-span bestaat nog” niet meer als verwerkt.
+Label komt van de start-rij; `zoekHostViaLabel` / `laHostPast` houden
+herhaalde celtekst op die rij. Bron: Luc, Reconi-owners 14:47. Geen
+Reconi-pagina in de suite — case-08 is de gereduceerde vorm.
+
+## 2026-08-23 — Root is poort, CLI's in bin/
+
+CLIs en hooks leven in `bin/`. Python-bibliotheek in `annotator/` (snake_case).
+`ensure-bridge.sh` en `hook-ensure-bridge.sh` zijn locatie-relatief, niet
+hardcoded naar `~/.claude/skills/...`. Agent-facing docs noemen geen
+persoonsnaam; `window.LucAnnotator` en de marker `LUC-ANNOTATOR` blijven
+(publieke API).

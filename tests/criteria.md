@@ -1,5 +1,8 @@
 # Acceptatiecriteria: bridge draait, annotaties landen op schijf
 
+Historisch AC-1…AC-7-mapping. Actuele bron van waarheid is
+`references/acceptance.md` (B1–B20, A1–A7).
+
 Dit bestand is de **suite-narratie** (wat de cases meten en waarom). De
 volledige freeze — inclusief untested MUSTS — staat in
 [`VERIFICATION.md`](../VERIFICATION.md). Een groene suite is nodig, niet

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Geeft het pad van Lucs actuele HTML-todolijst. Gebruik dit in plaats van een pad te
+# Geeft het pad van de actuele HTML-todolijst. Gebruik dit in plaats van een pad te
 # onthouden of te hardcoden: de lijst verhuist en wordt hernoemd.
 #
-#   ~/.claude/skills/html-annotator/vind-todolijst.sh          # alleen het pad
-#   ~/.claude/skills/html-annotator/vind-todolijst.sh -v       # met uitleg van de keuze
+#   bin/vind-todolijst.sh          # alleen het pad
+#   bin/vind-todolijst.sh -v       # met uitleg van de keuze
 #
 # Hoe hij kiest: een HTML op het bureaublad (of één map diep) die genummerde punten heeft
 # (`<span class="num">`) én zich als todolijst laat herkennen — een prioriteitsband
@@ -11,7 +11,7 @@
 # alleen komt ook voor in analysepagina's met genummerde bevindingen. Bij meerdere
 # kandidaten wint de meest recent gewijzigde.
 #
-# Exit 1 als er geen kandidaat is. Dan niet zelf een lijst verzinnen: vraag het Luc.
+# Exit 1 als er geen kandidaat is. Dan niet zelf een lijst verzinnen: vraag het.
 
 set -uo pipefail
 UITLEG=0

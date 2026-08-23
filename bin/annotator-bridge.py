@@ -8,7 +8,7 @@ screenshot-crops in ronde-NN/screenshots/.
 Alleen stdlib nodig. Pillow wordt gebruikt als het toevallig beschikbaar is;
 anders knipt headless Chrome de crop zelf uit via een iframe-clip.
 
-Starten:  python3 ~/.claude/skills/html-annotator/annotator-bridge.py
+Starten:  python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py
 Checken:  curl -s http://127.0.0.1:8791/ping
 """
 
@@ -26,12 +26,12 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if _SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPT_DIR)
-from annotator_config import HOST, PORT, ROOT
-from annotator_refs import expand_comment
-from annotator_record import schoon_locator, zet_ref_velden
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+from annotator.config import HOST, PORT, ROOT
+from annotator.refs import expand_comment
+from annotator.record import schoon_locator, zet_ref_velden
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 CACHE = os.path.join(tempfile.gettempdir(), "luc-annotator-shots")
 MARGE = 12
@@ -163,10 +163,17 @@ def bepaal_ronde(payload, maak=False):
 def schrijf(json_pad, data):
     os.makedirs(os.path.dirname(json_pad), exist_ok=True)
     tmp = json_pad + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    os.replace(tmp, json_pad)
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        os.replace(tmp, json_pad)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 # ------------------------------------------------------------ screenshots
@@ -395,7 +402,7 @@ def h_save(payload):
     if rec["type"] == "text":
         rec["selectedText"] = ann.get("selectedText") or ""
     elif rec["type"] == "edit":
-        # Luc heeft de tekst van een conceptbericht zelf herschreven. Bewaren als
+        # De tekst van een conceptbericht is zelf herschreven. Bewaren als
         # voor/na plus de losse wijzigingen, zodat een agent ziet wat er moet
         # veranderen zonder de twee versies te hoeven vergelijken. Geen crop: het
         # bewijs is de tekst zelf.
@@ -422,7 +429,7 @@ def h_save(payload):
         rect = ann.get("rect") or {}
         rel = "screenshots/annotatie-%02d.png" % nummer
         rec["_rect"] = rect
-        # Bewerkt Luc een annotatie die bij een oudere paginaversie hoort, dan zou
+        # Bewerkt iemand een annotatie die bij een oudere paginaversie hoort, dan zou
         # opnieuw croppen de goede oude crop overschrijven met het verkeerde gebied.
         # In dat geval de bestaande crop en hash laten staan.
         hergebruik = (bestaande and bestaande.get("image")
@@ -539,7 +546,7 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         # Origin/Referer meeloggen: dat is de enige manier om vast te stellen vanaf welke
         # origin een ingebedde weergave (preview-pane, sideviewer) de bridge aanroept.
-        # Zonder die waarde blijft elke uitspraak daarover een aanname. Zie tests/criteria.md, AC-4.
+        # Zonder die waarde blijft elke uitspraak daarover een aanname. Zie acceptance.md B17.
         try:
             herkomst = self.headers.get("Origin") or self.headers.get("Referer") or ""
         except Exception:

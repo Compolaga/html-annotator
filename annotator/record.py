@@ -4,7 +4,7 @@ Geen nieuwe velden, geen strengere validatie. Eén interface voor locator,
 refs en commentExpanded — dezelfde output als de oude inline code in de bridge.
 """
 
-from annotator_refs import expand_comment, validate_refs
+from annotator.refs import expand_comment, validate_refs
 
 
 def schoon_punt(p):

@@ -51,7 +51,7 @@ async function bridgeDown() {
   return false;
 }
 function bridgeUp() {
-  try { execFileSync(join(SKILL, 'ensure-bridge.sh'), { stdio: 'ignore' }); } catch {}
+  try { execFileSync(join(SKILL, 'bin/ensure-bridge.sh'), { stdio: 'ignore' }); } catch {}
   return !!bridgePid();
 }
 
@@ -160,11 +160,16 @@ for (const origin of ORIGINS) {
   await page.waitForSelector('#la-status', { timeout: 5000 });
 
   // 1. with the bridge down the pill should say "bridge off"
+  let zagOff = true;
   await page.waitForFunction(
     () => /bridge off/.test(document.getElementById('la-status')?.textContent || ''),
     null, { timeout: 5000 },
-  ).catch(() => {});
+  ).catch(() => { zagOff = false; });
   const pilVoor = await page.textContent('#la-status');
+  if (!GEBLOKKEERD[origin] && (!zagOff || !/bridge off/.test(pilVoor || ''))) {
+    console.log(`  FAIL  ${label}: pil toonde geen bridge-off vóór herstel ("${pilVoor}")`);
+    falen++; await page.close(); continue;
+  }
 
   /* 1b. Verborgen-paneel-variant (CASE02_VERBORGEN=1). Dit staat dichter bij Luc's
      werkelijkheid dan een pagina op de voorgrond: het sideview-paneel staat er terwijl

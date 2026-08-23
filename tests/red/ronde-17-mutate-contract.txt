@@ -1,0 +1,15 @@
+=== mutate-contract 2026-08-23 17:12:46 ===
+snippet: d36179523050  hook: c3018173a5e0  ensure: cb86fe471c57
+  PASS  mutate: ongemutileerd B1–B7 groen
+  PASS  mutate: B2 wordt rood als /p/ buiten home wordt doorgelaten
+  PASS  mutate: B5 wordt rood als contentHash het blok meetelt
+  PASS  mutate: B4 wordt rood als remove-all geen nieuwe ronde opent
+  PASS  mutate: B3 wordt rood als resolve de JSON niet wijzigt
+  PASS  mutate: ongemutileerd B8–B9 groen
+  PASS  mutate: B8 wordt rood als de werkregel weg is
+  PASS  mutate: B6 wordt rood als crop-falen de annotatie laat vallen
+  PASS  mutate: ongemutileerd case-08 groen
+  PASS  mutate: B16 wordt rood als het label van de gemeenschappelijke voorouder komt
+  PASS  mutate: B16 wordt rood als een bestaande start-span wees maakt
+  PASS  mutate: B16 wordt rood als het label de herhaalde tekst niet redt
+  PASS  mutate: bridge-origin wordt rood als het snippet de /p/-poort negeert
