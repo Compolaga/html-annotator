@@ -38,7 +38,7 @@ wait_for_bridge() {
 }
 
 # Het snippet, om in een testpagina te plakken.
-snippet() { cat "$SKILL_DIR/annotator-snippet.html"; }
+snippet() { cat "$SKILL_DIR/references/annotator-snippet.html"; }
 
 # Pad naar de rondemap van een slug, of leeg als die niet bestaat.
 laatste_ronde_json() {

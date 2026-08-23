@@ -54,7 +54,7 @@ writeFileSync(bestand, `<!doctype html><meta charset="utf-8"><title>${slug}</tit
   <div class="la-draft-hdr"><b>Aan:</b> Laurens &nbsp;·&nbsp; <b>Onderwerp:</b> Coverage</div>
   <div class="la-draft-txt">${ORIGINEEL}</div>
 </div>
-${readFileSync(join(SKILL, 'annotator-snippet.html'), 'utf8')}`);
+${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`);
 
 let falen = 0;
 const zeg = (ok, tekst) => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  case-06: ${tekst}`); if (!ok) falen++; };
@@ -137,7 +137,7 @@ writeFileSync(bestand, `<!doctype html><meta charset="utf-8"><title>${slug}</tit
   <div class="la-draft-hdr"><b>Aan:</b> Laurens &nbsp;·&nbsp; <b>Onderwerp:</b> Coverage</div>
   <div class="la-draft-txt">${ORIGINEEL.replace('donderdag', 'vrijdag')}</div>
 </div>
-${readFileSync(join(SKILL, 'annotator-snippet.html'), 'utf8')}`);
+${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`);
 
 const browser2 = await chromium.launch({ channel: 'chrome', headless: true });
 const page2 = await browser2.newPage();

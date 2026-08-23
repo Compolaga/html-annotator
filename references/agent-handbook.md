@@ -74,14 +74,14 @@ paginaversie die feedback hoorde, plus `lastContentHash` op rondeniveau.
 **Triggers.** Lees en verwerk openstaande annotaties zodra de reviewer een van deze
 berichten stuurt (geen extra bevestiging vragen of hij het meent):
 
-- een kaal **`.`** (alleen een punt, eventueel met whitespace eromheen) — dat is
-  zijn verkorte "verwerk mijn annotaties";
-- "verwerk mijn feedback", "check mijn bewaarde feedback", of een pad naar
-  `annotations.json` / een annotatieronde.
+- a bare **`.`** (period only, surrounding whitespace is fine) — that is
+  the short "process my annotations";
+- "process my feedback", "check my saved feedback", or a path to
+  `annotations.json` / an annotation round.
 
-Bij een kaal `.` zoek je zelf de lopende open ronde (via
-`bin/toon-annotaties.py --open` of de bridge), in plaats van te wachten op een
-expliciet pad.
+On a bare `.` find the open round yourself (via
+`bin/toon-annotaties.py --open` or the bridge), instead of waiting for an
+explicit path.
 
 de reviewer plakt soms ook een berichtje in de trant van "Kijk, hier staan de annotaties:
 `<pad>/ronde-NN/annotations.json`. Het zijn er X." Lees dat bestand.
@@ -230,7 +230,7 @@ Een conceptbericht (mail, Teams, WhatsApp) dat nog niet verstuurd is, hoort niet
 als platte tekst in de chat maar als kaart in de HTML. Dan kan de reviewer de tekst zien
 zoals de ontvanger hem krijgt, en er met de annotator per zin op reageren.
 
-De CSS zit in `annotator-snippet.html`, dus elke pagina met het snippet kan het
+De CSS zit in `references/annotator-snippet.html`, dus elke pagina met het snippet kan het
 component gebruiken zonder eigen opmaak. Klassen hebben de `la-`-prefix, net als
 de rest van de annotator, en zijn vlak (`la-draft-hdr` in plaats van
 `.la-draft .hdr`) zodat een pagina-eigen `.hdr`, `.txt` of `.na` er niet mee
@@ -292,7 +292,7 @@ Heeft een punt subtaken, dan wil de reviewer die visueel onder hun ouder zien ha
 dieper genest, hoe verder ingesprongen. Een platte lijst waarin de hiërarchie
 alleen uit de tekst blijkt kost hem leeswerk dat de opmaak gratis kan doen.
 
-De CSS zit in `annotator-snippet.html`, dus elke pagina met het snippet heeft het
+De CSS zit in `references/annotator-snippet.html`, dus elke pagina met het snippet heeft het
 al. Zet de klasse op het blok zelf, naast wat de pagina er verder aan geeft:
 
 ```html

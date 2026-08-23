@@ -7,18 +7,17 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# A1: poorten + de drie root-docs die de skill al had (HANDOFF, VERIFICATION, decisions).
+# A1: ports. Snippet and handbook live in references/. Decisions in docs/.
 ROOT_OK = {
-    "README.md", "SKILL.md", "INSTALL.md", "HANDOFF.md", "VERIFICATION.md",
-    "decisions.md", "install.sh", "annotator-snippet.html", ".gitignore",
+    "README.md", "SKILL.md", "INSTALL.md", "VERIFICATION.md",
+    "CRITERIA.md", "install.sh", ".gitignore",
 }
 ROOT_DIRS_OK = {"annotator", "bin", "references", "tests", "docs", ".git"}
 
-# Agent-facing: wat een vreemde agent of installer leest. Geen tests/, geen
-# docs/-geschiedenis, geen decisions.md / VERIFICATION.md (gedateerde freeze).
+# Agent-facing: what a stranger or installer reads. No tests/, no docs/
+# history, no VERIFICATION.md (dated freeze).
 AGENT_FILES = (
-    "SKILL.md", "README.md", "INSTALL.md", "HANDOFF.md", "install.sh",
-    "annotator-snippet.html",
+    "SKILL.md", "README.md", "INSTALL.md", "CRITERIA.md", "install.sh",
 )
 # Identifiers die gedrag dragen: B1 assert luc-annotator; contentHash stript
 # LUC-ANNOTATOR; window.LucAnnotator is de publieke API; env LUC_ANNOTATOR_*;
@@ -69,7 +68,7 @@ def agent_paden():
     ref = os.path.join(ROOT, "references")
     if os.path.isdir(ref):
         for naam in sorted(os.listdir(ref)):
-            if naam.endswith(".md"):
+            if naam.endswith((".md", ".html")):
                 paden.append(os.path.join(ref, naam))
     bindir = os.path.join(ROOT, "bin")
     if os.path.isdir(bindir):
@@ -109,6 +108,8 @@ def main():
     n += check("A1 root alleen poorten", los == [])
     if los:
         print("      nog in root: %s" % ", ".join(los))
+    n += check("A1 snippet in references/",
+               os.path.isfile(os.path.join(ROOT, "references", "annotator-snippet.html")))
     n += check("A1 .gitignore bestaat", os.path.isfile(os.path.join(ROOT, ".gitignore")))
     n += check("A1 gitignore-runtime is subset", gitignore_rootnamen() <= RUNTIME)
     n += check("A1 runtime staat in gitignore", RUNTIME <= gitignore_rootnamen())
@@ -117,9 +118,9 @@ def main():
     hb = open(handbook, encoding="utf-8").read() if os.path.isfile(handbook) else ""
     n += check("A2 geen memories/", "memories" not in namen)
     skill_md = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
-    n += check("A2 agent-regels in references/",
-               os.path.isfile(handbook) and "/p/" in hb and "alleen een punt" in hb)
-    n += check("A2 SKILL-punt-trigger", 'kaal bericht "."' in skill_md)
+    n += check("A2 agent rules in references/",
+               os.path.isfile(handbook) and "/p/" in hb and "bare" in hb)
+    n += check("A2 SKILL period trigger", 'a bare "."' in skill_md)
     n += check("A3 geen extras/", "extras" not in namen)
     n += check("A4 bin/ bestaat", os.path.isdir(os.path.join(ROOT, "bin")))
     n += check("A4 annotator-pakket", os.path.isfile(os.path.join(ROOT, "annotator", "__init__.py")))
@@ -207,7 +208,7 @@ def main():
                    uit2.returncode == 0 and os.path.isfile(hook2))
     else:
         n += check("A4 install zegt jq ontbreekt",
-                   "jq niet gevonden" in (uit.stdout + uit.stderr))
+                   "jq not found" in (uit.stdout + uit.stderr))
     return n
 
 

@@ -16,7 +16,7 @@ SKILL="$werk/repo"
 cd "$SKILL/tests"
 BRIDGE="$SKILL/bin/annotator-bridge.py"
 TOON="$SKILL/bin/toon-annotaties.py"
-SNIP="$SKILL/annotator-snippet.html"
+SNIP="$SKILL/references/annotator-snippet.html"
 
 falen=0
 zeg() {
@@ -240,7 +240,7 @@ PY
     case08 /tmp/ann-mut-b16-a.txt \
       "B16 blijft groen als het label van tbody komt" \
       "B16 wordt rood als het label van de gemeenschappelijke voorouder komt"
-    rsync -a "$ORIG/annotator-snippet.html" "$SNIP"
+    rsync -a "$ORIG/references/annotator-snippet.html" "$SNIP"
 
     # Mutant B: start-range bestaat → wees, geen fallback.
     python3 - <<'PY' "$SNIP"
@@ -264,7 +264,7 @@ PY
     case08 /tmp/ann-mut-b16-b.txt \
       "B16 blijft groen met de oude wees-te-vroeg-logica" \
       "B16 wordt rood als een bestaande start-span wees maakt"
-    rsync -a "$ORIG/annotator-snippet.html" "$SNIP"
+    rsync -a "$ORIG/references/annotator-snippet.html" "$SNIP"
 
     python3 - <<'PY' "$SNIP"
 import sys
@@ -284,7 +284,7 @@ PY
     case08 /tmp/ann-mut-b16-c.txt \
       "B16 blijft groen zonder zoekHostViaLabel" \
       "B16 wordt rood als het label de herhaalde tekst niet redt"
-    rsync -a "$ORIG/annotator-snippet.html" "$SNIP"
+    rsync -a "$ORIG/references/annotator-snippet.html" "$SNIP"
 
     python3 - <<'PY' "$SNIP"
 import sys
@@ -299,7 +299,7 @@ PY
     case08 /tmp/ann-mut-bridge.txt \
       "B16 blijft groen als BRIDGE hard 8791 is" \
       "bridge-origin wordt rood als het snippet de /p/-poort negeert"
-    rsync -a "$ORIG/annotator-snippet.html" "$SNIP"
+    rsync -a "$ORIG/references/annotator-snippet.html" "$SNIP"
     kill "$bpid" 2>/dev/null || true
     wait "$bpid" 2>/dev/null || true
   fi

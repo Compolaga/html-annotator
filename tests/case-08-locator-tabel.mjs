@@ -42,7 +42,7 @@ writeFileSync(bestand, `<!doctype html><meta charset="utf-8"><title>${slug}</tit
 </tbody>
 </table>
 </div>
-${readFileSync(join(SKILL, 'annotator-snippet.html'), 'utf8')}`);
+${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`);
 
 let falen = 0;
 let code = 0;

@@ -546,7 +546,7 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         # Origin/Referer meeloggen: dat is de enige manier om vast te stellen vanaf welke
         # origin een ingebedde weergave (preview-pane, sideviewer) de bridge aanroept.
-        # Zonder die waarde blijft elke uitspraak daarover een aanname. Zie acceptance.md B17.
+        # Without that value every claim about it is an assumption. See CRITERIA.md B17.
         try:
             herkomst = self.headers.get("Origin") or self.headers.get("Referer") or ""
         except Exception:

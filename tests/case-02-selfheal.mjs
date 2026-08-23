@@ -99,7 +99,7 @@ const MUTATIES = {
    De mutatie 'geen-poller' dekt af dat het blok als geheel dragend is, ook hier. */
 
 const MUTATIE = process.env.CASE02_MUTATIE || '';
-let snippet = readFileSync(join(SKILL, 'annotator-snippet.html'), 'utf8');
+let snippet = readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8');
 if (MUTATIE) {
   const m = MUTATIES[MUTATIE];
   if (!m) { console.log(`  FAIL  onbekende mutatie "${MUTATIE}"`); process.exit(2); }

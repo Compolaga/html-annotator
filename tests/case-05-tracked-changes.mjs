@@ -38,7 +38,7 @@ const pagina = `<!doctype html><meta charset="utf-8"><title>${slug}</title>
   <div class="la-draft-txt">${ORIGINEEL}</div>
   <div class="la-draft-na">Nog niet verstuurd.</div>
 </div>
-${readFileSync(join(SKILL, 'annotator-snippet.html'), 'utf8')}`;
+${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`;
 writeFileSync(bestand, pagina);
 
 const url = `http://127.0.0.1:${PORT}/p/Desktop/${slug}.html`;
