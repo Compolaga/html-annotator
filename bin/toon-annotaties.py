@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Toont Lucs annotaties, zodat je daar geen ad-hoc script meer voor schrijft.
+"""Toont open annotaties, zodat je daar geen ad-hoc script meer voor schrijft.
 
 Gebruik:
   toon-annotaties.py                    laatste ronde van de enige/laatste pagina
@@ -18,40 +18,39 @@ import os
 import re
 import sys
 
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if _SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPT_DIR)
-from annotator_config import ROOT
-from annotator_refs import expand_comment, validate_refs
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+from annotator.config import ROOT
+from annotator.refs import expand_comment, validate_refs
 
 # Komt mee zodra er open annotaties zijn. Staat hier en niet alleen in SKILL.md,
 # zodat het altijd in de context terechtkomt van wie deze feedback verwerkt.
 WERKREGEL = """
-╭─ Voor Claude: eerst begrijpen, dan pas verwerken ─────────────────
-│ Luc triggert dit ook met een kaal bericht "." — dat is "verwerk mijn
-│ annotaties", geen typo. Geen bevestiging vragen; gewoon deze flow.
+╭─ Voor de agent: eerst begrijpen, dan pas verwerken ───────────────
+│ Een kaal bericht "." is "verwerk mijn annotaties", geen typo.
+│ Geen bevestiging vragen; gewoon deze flow.
 │
-│ Neem deze annotaties niet klakkeloos over. Luc dicteert ze vaak,
-│ dus zinnen lopen soms dood, en context die bij hem vanzelfsprekend
-│ is staat er niet altijd bij.
+│ Neem deze annotaties niet klakkeloos over. Ze worden vaak gedicteerd,
+│ dus zinnen lopen soms dood, en vanzelfsprekende context ontbreekt.
 │
 │ Loop ze één voor één na en vraag jezelf per annotatie af:
-│   · Snap ik wat hij bedoelt, of vul ik het zelf in? Vul je in, vraag.
+│   · Snap ik wat er bedoeld wordt, of vul ik het zelf in? Vul je in, vraag.
 │   · Kan dit meer dan één kant op? Leg de lezingen voor, kies er niet
 │     zelf een.
-│   · Ben ik het er niet mee eens, of zie ik een gevolg dat hij niet
-│     noemt? Zeg dat, met je reden erbij.
+│   · Ben ik het er niet mee eens, of zie ik een gevolg dat niet
+│     genoemd wordt? Zeg dat, met je reden erbij.
 │   · Is het te vaag om op te handelen? Vraag door tot het scherp is.
-│   · Spreekt dit iets tegen dat hij eerder zei? Benoem het.
+│   · Spreekt dit iets tegen dat eerder gezegd is? Benoem het.
 │
 │ Zitten er keuzes in, stel je vragen dan klikbaar met AskUserQuestion.
-│ Twijfel je of je moet vragen: vragen. Verkeerd raden kost hem meer
-│ tijd dan een vraag.
+│ Twijfel je of je moet vragen: vragen. Verkeerd raden kost meer tijd
+│ dan een vraag.
 │
 │ Verwerk pas daarna, en vink af wat af is via POST /resolve.
 │
-│ Spawnt Luc hierna een taak? Die hangt aan zijn todolijst:
-│ vind-todolijst.sh geeft het pad, skill `task-spawnen` de titel.
+│ Wordt hierna een taak gespawnd? Die hangt aan de todolijst:
+│ bin/vind-todolijst.sh geeft het pad, skill `task-spawnen` de titel.
 ╰───────────────────────────────────────────────────────────────────
 """
 
@@ -122,7 +121,7 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
             if loc.get("label") and loc.get("label") != a.get("selectedText"):
                 print("      context: %s" % loc["label"][:120])
         if a.get("type") == "edit":
-            # Luc heeft de tekst zelf herschreven. De diff is het antwoord op "wat moet er
+            # De tekst is zelf herschreven. De diff is het antwoord op "wat moet er
             # anders": - is eruit, + is erin. De volledige nieuwe tekst staat eronder,
             # zodat je hem kunt overnemen zonder de wijzigingen te hoeven toepassen.
             if (a.get("veld") or "") != (a.get("target") or ""):
@@ -174,7 +173,7 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
                 tekst = (r.get("selectedText") or "").replace("\n", " ")
                 print("      ref %s: %s" % (rid, tekst[:120]))
         elif a.get("comment") and "\u27e6" in a.get("comment", ""):
-            print("      refs   : markers in comment maar geen refs-array \u2014 vraag Luc opnieuw te saven")
+            print("      refs   : markers in comment maar geen refs-array \u2014 opnieuw saven")
 
 
 def main():

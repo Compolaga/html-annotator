@@ -107,7 +107,7 @@
   #la-popup .la-hint.la-waarschuwing { color: #8a4b08; }
   #la-popup .la-hint:empty { display: none; }
 
-  /* Concept-berichtkaart: een nog niet verstuurd bericht, zo weergegeven dat Luc
+  /* Concept-berichtkaart: een nog niet verstuurd bericht, zo weergegeven dat de reviewer
      er per zin op kan annoteren. Zie SKILL.md deel 5. Vlakke la-draft-*-namen,
      geen nesting, zodat pagina-eigen .hdr/.txt/.na niet botsen. Kleuren vallen
      terug op een default als de pagina --ink/--muted niet definieert. */
@@ -127,7 +127,7 @@
     font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     border: 1px solid rgba(255,255,255,.08); }
   .la-sesmeld.la-fout { background: #7a3b06; }
-  /* Tracked changes op een conceptbericht: Luc herschrijft de tekst zelf en het
+  /* Tracked changes op een conceptbericht: de reviewer herschrijft de tekst zelf en het
      verschil met de oorspronkelijke versie wordt de annotatie. */
   .la-draft-txt.la-bewerkbaar { border-radius: 4px; outline: 1px dashed transparent;
     outline-offset: 5px; transition: outline-color .12s ease; cursor: text; }
@@ -178,7 +178,9 @@
    regio-snip · tekstselectie · draft/hunks · LucAnnotator · sessie-links */
 (function () {
   "use strict";
-  var BRIDGE = "http://127.0.0.1:8791";
+  var BRIDGE = (location.protocol.indexOf("http") === 0 && location.pathname.indexOf("/p/") === 0)
+    ? (location.protocol + "//" + location.host)
+    : "http://127.0.0.1:8791";
   var KEY = "luc-annotaties:" + location.pathname;
   var anns = [];
   try { anns = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) {}
@@ -274,7 +276,7 @@
     }).catch(function () {
       brug.ok = false; brug.jsonPath = null;
       zetStatus(false, "bridge off - localStorage only",
-        "Start the bridge: python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
+        "Start the bridge: python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py");
       return null;
     });
   }
@@ -355,8 +357,11 @@
     return punt;
   }
   function laContextLabel(el) {
+    /* Start-rij/alinea, niet de gemeenschappelijke voorouder: bij een selectie
+       over twee table-rijen is die tbody, en dan wordt het label de eerste
+       140 tekens van de hele tabel. */
     if (!el) return "";
-    var host = el.closest("tr, li, [id], section, article, .card, p, h1, h2, h3") || el;
+    var host = el.closest("tr, li, p, h1, h2, h3, section, article, .card") || el;
     return laNorm(host.innerText || "").slice(0, 140);
   }
   function laLocatorVanRange(range) {
@@ -372,7 +377,7 @@
       start: start,
       end: end,
       path: (gemeen && laBouwPad(gemeen)) || start.path,
-      label: laContextLabel(gemeen || aEl),
+      label: laContextLabel(aEl),
       nth: laNthVoorkomen(laNorm(range.toString()), range)
     };
   }
@@ -411,18 +416,24 @@
       return r;
     } catch (e) { return null; }
   }
-  function laLocatorElement(loc) {
-    if (!loc) return null;
-    if (loc.start && loc.start.path) return laQueryPad(loc.start.path);
-    return laQueryPad(loc.path);
+  function laRegioTeWijd(el) {
+    return !el || /^(TABLE|THEAD|TBODY|TFOOT|BODY|HTML)$/.test(el.tagName);
   }
   function laTekstNogDaar(range, oorspronkelijk) {
-    var nu = laNorm(range.toString()), oud = laNorm(oorspronkelijk);
+    /* Selection.toString() zet bij tabelcellen spaties; Range.toString() niet.
+       Vergelijk daarom ook zonder whitespace en met dezelfde soepele regex
+       als het pagina-brede zoeken. */
+    var oud = laNorm(oorspronkelijk);
     if (!oud) return true;
+    var nu = laNorm(range.toString());
     if (nu === oud) return true;
-    var kort = Math.min(nu.length, oud.length), lang = Math.max(nu.length, oud.length);
+    var re = laNeedleRe(oud);
+    if (re && re.test(nu)) return true;
+    var a = nu.replace(/\s+/g, ""), b = oud.replace(/\s+/g, "");
+    if (a && a === b) return true;
+    var kort = Math.min(a.length, b.length), lang = Math.max(a.length, b.length);
     if (kort < 3 || kort / lang < 0.55) return false;
-    return nu.indexOf(oud) !== -1 || oud.indexOf(nu) !== -1;
+    return a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
   }
   function laRectsVanRange(range) {
     /* Alleen tekstregels, niet de box van td/div. range.getClientRects() geeft
@@ -567,22 +578,66 @@
     var r = laRangeUitMatch(kaart, hits[0]);
     return r ? laRectsVanRange(r) : null;
   }
-  /* Locator eerst: exact die plek, niet de eerste teksthit op de pagina.
-     Element er nog, tekst weg → wees (waarschijnlijk verwerkt).
-     Element zelf weg → val terug op nth-voorkomen van de tekst. */
+  function zoekHostViaLabel(label) {
+    var needle = laNorm(label);
+    if (needle.length < 8) return null;
+    var kop = needle.slice(0, 36);
+    var knopen = document.querySelectorAll("tr, li, p, h1, h2, h3, section, article");
+    var best = null, bestScore = 0;
+    for (var i = 0; i < knopen.length; i++) {
+      if (laUiHost(knopen[i])) continue;
+      var t = laNorm(knopen[i].innerText || "");
+      if (!t) continue;
+      var score = 0;
+      if (t.indexOf(kop) === 0) score = kop.length + 10;
+      else if (t.indexOf(kop) !== -1) score = kop.length;
+      if (score > bestScore) { best = knopen[i]; bestScore = score; }
+    }
+    return bestScore >= 24 ? best : null;
+  }
+  function laHostPast(el, label) {
+    if (!label) return true;
+    if (!el) return false;
+    var hier = laContextLabel(el);
+    if (!hier) return false;
+    var a = laNorm(hier).slice(0, 36);
+    var b = laNorm(label).slice(0, 36);
+    return a === b || hier.indexOf(b) === 0 || label.indexOf(a) === 0;
+  }
+  function laLabelPast(range, label) {
+    if (!label || !range) return true;
+    var el = range.startContainer.nodeType === 1
+      ? range.startContainer : range.startContainer.parentElement;
+    return laHostPast(el, label);
+  }
+  /* Locator eerst: exact die plek. Pad verschuift als er een rij boven komt;
+     dan label (start-rij) en pas daarna pagina-breed + nth. Wees alleen als
+     de tekst nergens meer staat — niet al omdat een start-span nog bestaat.
+     Een start-pad waarvan de rij-label niet meer klopt (herhaalde celtekst
+     op de rij ernaast) telt ook niet als hit. */
   function zoekAnker(a) {
     var loc = a.locator;
+    var tekst = a.selectedText;
     if (loc && (loc.start || loc.path)) {
       var range = laRangeVanLocator(loc);
-      if (range && laTekstNogDaar(range, a.selectedText)) return laRectsVanRange(range);
-      var host = laLocatorElement(loc) || laQueryPad(loc.path);
-      if (host && a.selectedText) {
-        var scoped = zoekIn(host, a.selectedText);
+      if (range && laTekstNogDaar(range, tekst) && laLabelPast(range, loc.label)) {
+        var rects = laRectsVanRange(range);
+        if (rects) return rects;
+      }
+      var regio = laQueryPad(loc.path);
+      if (regio && tekst && !laRegioTeWijd(regio) && laHostPast(regio, loc.label)) {
+        var scoped = zoekIn(regio, tekst);
         if (scoped) return scoped;
-        return null;
+      }
+      if (loc.label && tekst) {
+        var viaLabel = zoekHostViaLabel(loc.label);
+        if (viaLabel) {
+          var inLabel = zoekIn(viaLabel, tekst);
+          if (inLabel) return inLabel;
+        }
       }
     }
-    if (a.selectedText) return zoekTekst(a.selectedText, loc && loc.nth);
+    if (tekst) return zoekTekst(tekst, loc && loc.nth);
     return null;
   }
 
@@ -1025,10 +1080,10 @@
     }).catch(function (e) {
       brug.ok = false;
       zetStatus(false, "bridge off - localStorage only",
-        "Start the bridge: python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
+        "Start the bridge: python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py");
       alert("The bridge is not running, so nothing was written to disk.\n" +
         "Your annotation is only in localStorage. Start the bridge with:\n" +
-        "python3 ~/.claude/skills/html-annotator/annotator-bridge.py");
+        "python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py");
       throw e;
     });
   }
@@ -1047,7 +1102,7 @@
   function markeerVerwerkt(a) {
     if (!brug.ok) {
       alert("The bridge is not running, so check-off cannot be written.\n" +
-        "Start it with: ~/.claude/skills/html-annotator/ensure-bridge.sh");
+        "Start it with: ~/.claude/skills/html-annotator/bin/ensure-bridge.sh");
       return Promise.resolve(null);
     }
     return post("/resolve", Object.assign(basis(), { ids: [a.id], nrs: [a.nr] }))
@@ -1166,7 +1221,7 @@
   document.addEventListener("scroll", verbergSelKnop, true);
 
   /* ---- tracked changes op conceptberichten ------------------------
-     Een comment naast de tekst laat Luc uitleggen wat er anders moet; vaak is het
+     Een comment naast de tekst laat de reviewer uitleggen wat er anders moet; vaak is het
      sneller om het gewoon anders op te schrijven. Daarom is elke .la-draft-txt te
      bewerken, en wordt het verschil met de oorspronkelijke tekst zelf de annotatie:
      voor, na, en de losse wijzigingen. Zo hoeft er niets vertaald te worden van
@@ -1353,7 +1408,7 @@
       box.__veld = laVeld(box, index);
 
       /* Altijd bewerkbaar. Een knop om "de bewerkmodus aan te zetten" is een drempel
-         voor iets wat Luc gewoon wil kunnen doen: klikken waar hij wil en typen. */
+         voor iets wat de reviewer gewoon wil kunnen doen: klikken waar hij wil en typen. */
       box.setAttribute("contenteditable", "plaintext-only");
       box.classList.add("la-bewerkbaar");
 
@@ -1370,7 +1425,7 @@
       box.__bar = { herstel: bHerstel, meld: meld };
 
       /* De opgemaakte weergave (doorhaling + onderstreping) is alleen te zien als de
-         cursor er niet in staat. Zodra Luc erin klikt gaat hij terug naar kale tekst,
+         cursor er niet in staat. Zodra de reviewer erin klikt gaat hij terug naar kale tekst,
          anders zou hij in zijn eigen doorhalingen zitten typen. */
       function toonMarkup() {
         if (box.__actief) return null;
@@ -1520,7 +1575,7 @@
 
       if (!hunks.length) {
         /* Oudere bewerking zonder blokken: alleen terugzetten als de tekst nog exact
-           is zoals hij was, anders zou Lucs oude versie over de nieuwe heen komen. */
+           is zoals hij was, anders zou de oude versie over de nieuwe heen komen. */
         if (a.origineel && a.origineel !== box.__origineel) {
           box.__bar.meld.textContent = "note: draft text changed since annotation " + a.nr;
           return;
@@ -1557,6 +1612,15 @@
     save: bewaarAnnotatie,
     remove: verwijder,
     resolve: markeerVerwerkt,
+    /* Alleen case-08; geen publieke API. */
+    _test: {
+      zoekAnker: zoekAnker,
+      locatorVanRange: laLocatorVanRange,
+      laTekstNogDaar: laTekstNogDaar,
+      laRangeVanLocator: laRangeVanLocator,
+      laRectsVanRange: laRectsVanRange,
+      bridgeOrigin: BRIDGE,
+    },
     drafts: function () {
       return Array.prototype.map.call(document.querySelectorAll(".la-draft-txt"), function (b) {
         return { veld: b.__veld, origineel: b.__origineel, nieuw: b.__nieuw, nr: b.__nr || null };
@@ -1576,7 +1640,7 @@
   /* Een ingebedde browser (zoals de preview-pane) geeft custom schemes als
      claude:// niet door aan het OS: de klik doet dan stilzwijgend niets.
      We proberen te navigeren en merken aan het uitblijven van een blur dat het
-     mislukt is; dan kopiëren we de link, zodat Luc hem kan plakken. */
+     mislukt is; dan kopiëren we de link, zodat de reviewer hem kan plakken. */
   function meldSessie(tekst, fout) {
     var m = document.getElementById("la-sesmeld") || el("div");
     m.id = "la-sesmeld";

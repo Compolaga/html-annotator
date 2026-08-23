@@ -16,37 +16,49 @@ if ! bridge_down; then
   exit 2
 fi
 
-# Kale TCP-luisteraar op de poort: accepteert verbindingen, spreekt geen HTTP.
+# Kale TCP-luisteraar: sluit connecties meteen (geen HTTP). Zonder accept()
+# duurt elke curl --max-time 2 de volle 2s; ensure-bridge doet dat tot 26×
+# en de oude sleep(60)-bezetter was dan dood voor de assert.
 python3 - "$PORT" <<'PY' &
-import socket, sys, time
+import socket, sys
 s = socket.socket()
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(("127.0.0.1", int(sys.argv[1])))
 s.listen(5)
-time.sleep(60)
+while True:
+    c, _ = s.accept()
+    c.close()
 PY
 BEZETTER=$!
-trap 'kill $BEZETTER 2>/dev/null' EXIT
+trap 'kill $BEZETTER 2>/dev/null; wait $BEZETTER 2>/dev/null' EXIT
 
 for _ in $(seq 1 25); do
-  [ -n "$(bridge_pid)" ] && break
+  [ "$(bridge_pid)" = "$BEZETTER" ] && break
   sleep 0.2
 done
-if [ -z "$(bridge_pid)" ]; then
-  fail "kon de poort niet bezetten; test zegt niets"
+if [ "$(bridge_pid)" != "$BEZETTER" ]; then
+  fail "kon de poort niet bezetten met pid $BEZETTER (lsof: $(bridge_pid))"
   exit 2
 fi
 
-"$SKILL_DIR/ensure-bridge.sh" >/dev/null 2>&1
+"$SKILL_DIR/bin/ensure-bridge.sh" >/dev/null 2>&1
 EXIT_CODE=$?
 ANTWOORD=$(ping_bridge)
 
+if ! kill -0 "$BEZETTER" 2>/dev/null; then
+  fail "bezetter is dood voordat we assertten; scenario deed zich niet voor (lsof: $(bridge_pid))"
+  exit 2
+fi
+
 RC=0
-if [ "$EXIT_CODE" -eq 0 ] && [ -z "$ANTWOORD" ]; then
-  fail "ensure-bridge.sh meldde succes (exit 0) terwijl /ping niets teruggeeft"
+if echo "$ANTWOORD" | grep -q luc-annotator; then
+  fail "ensure-bridge startte een echte bridge terwijl de poort bezet hoorde (exit $EXIT_CODE, lsof: $(bridge_pid))"
+  RC=1
+elif [ "$EXIT_CODE" -eq 0 ]; then
+  fail "ensure-bridge.sh exit 0 op een niet-bridge-bezetter (ping: ${ANTWOORD:-leeg})"
   RC=1
 else
-  pass "exit $EXIT_CODE past bij de werkelijkheid (ping: ${ANTWOORD:-leeg})"
+  pass "exit $EXIT_CODE, bezetter leeft, ping is geen luc-annotator (lsof: $(bridge_pid))"
 fi
 
 exit $RC

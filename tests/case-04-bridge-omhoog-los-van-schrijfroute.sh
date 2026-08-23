@@ -33,15 +33,19 @@ for naam in ("settings.json", "settings.local.json"):
             for h in g.get("hooks", []):
                 c = h.get("command", "")
                 if "ensure-bridge" in c:
-                    treffers.append("%s:%s:%s" % (naam, ev, g.get("matcher", "")))
+                    vlag = "ok" if os.path.isfile(c) else "WEG"
+                    treffers.append("%s:%s:%s:%s" % (naam, ev, g.get("matcher", ""), vlag))
 print("\n".join(treffers))
 PY
 )
 
 # Een route die niet van de schrijfroute afhangt: SessionStart (eens per sessie), of een
 # PostToolUse-matcher die Bash meeneemt.
-if echo "$GEVONDEN" | grep -q "SessionStart"; then
-  pass "hook geregistreerd op SessionStart (onafhankelijk van de schrijfroute)"
+if echo "$GEVONDEN" | grep -q "WEG"; then
+  fail "hook wijst naar een bestand dat er niet is: ${GEVONDEN}"
+  RC=1
+elif echo "$GEVONDEN" | grep -q "SessionStart"; then
+  pass "hook geregistreerd op SessionStart (bestand bestaat)"
 elif echo "$GEVONDEN" | grep -qE "PostToolUse:.*Bash"; then
   pass "PostToolUse-matcher neemt Bash mee"
 else
@@ -62,8 +66,9 @@ for naam in ("settings.json", "settings.local.json"):
         continue
     for g in d.get("hooks", {}).get("SessionStart", []):
         for h in g.get("hooks", []):
-            if "ensure-bridge" in h.get("command", ""):
-                print(h["command"]); raise SystemExit
+            cmd = h.get("command", "")
+            if "ensure-bridge" in cmd and os.path.isfile(cmd):
+                print(cmd); raise SystemExit
 PY
 )
 
@@ -98,7 +103,7 @@ fi
 TIJDELIJK=$(mktemp "${TMPDIR:-/tmp}/annotator-case04.XXXXXX.html")
 printf '<p>test</p>\n<!-- LUC-ANNOTATOR v2 -->\n' >"$TIJDELIJK"
 printf '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TIJDELIJK" \
-  | "$SKILL_DIR/hook-ensure-bridge.sh" >/dev/null 2>&1
+  | "$SKILL_DIR/bin/hook-ensure-bridge.sh" >/dev/null 2>&1
 if wait_for_bridge 8; then
   pass "PostToolUse-tak (Write) brengt de bridge nog steeds omhoog"
 else

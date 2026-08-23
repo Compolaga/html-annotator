@@ -6,8 +6,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from annotator_record import schoon_locator, schoon_refs, zet_ref_velden
-from annotator_refs import expand_comment, validate_refs
+from annotator.record import schoon_locator, schoon_refs, zet_ref_velden
+from annotator.refs import expand_comment, validate_refs
 
 
 def check(naam, conditie):

@@ -9,13 +9,13 @@ Een browserpagina kan zelf niet naar schijf schrijven. `annotator-bridge.py`
 en niet 8080 want dat is van Docker), beheert de rondemappen, schrijft de JSON
 en snijdt de screenshot-crops uit.
 
-Starten gaat via `ensure-bridge.sh` (zie deel 1), niet handmatig. Dat script
+Starten gaat via `bin/ensure-bridge.sh` (zie deel 1), niet handmatig. Dat script
 checkt eerst of hij al luistert, start hem anders met nohup, schrijft de pid
 naar `bridge.pid` en de output naar `bridge.log` in de skill-map. Rechtstreeks
 starten kan ook, voor debuggen in de voorgrond:
 
 ```bash
-python3 ~/.claude/skills/html-annotator/annotator-bridge.py
+python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py
 ```
 
 Draait hij? `curl -s http://127.0.0.1:8791/ping` geeft
@@ -71,7 +71,7 @@ paginaversie die feedback hoorde, plus `lastContentHash` op rondeniveau.
 
 ## Deel 4: feedback verwerken
 
-**Triggers.** Lees en verwerk openstaande annotaties zodra Luc een van deze
+**Triggers.** Lees en verwerk openstaande annotaties zodra de reviewer een van deze
 berichten stuurt (geen extra bevestiging vragen of hij het meent):
 
 - een kaal **`.`** (alleen een punt, eventueel met whitespace eromheen) — dat is
@@ -80,10 +80,10 @@ berichten stuurt (geen extra bevestiging vragen of hij het meent):
   `annotations.json` / een annotatieronde.
 
 Bij een kaal `.` zoek je zelf de lopende open ronde (via
-`toon-annotaties.py --open` of de bridge), in plaats van te wachten op een
+`bin/toon-annotaties.py --open` of de bridge), in plaats van te wachten op een
 expliciet pad.
 
-Luc plakt soms ook een berichtje in de trant van "Kijk, hier staan de annotaties:
+de reviewer plakt soms ook een berichtje in de trant van "Kijk, hier staan de annotaties:
 `<pad>/ronde-NN/annotations.json`. Het zijn er X." Lees dat bestand.
 
 Per annotatie:
@@ -102,14 +102,14 @@ Per annotatie:
 - `locator` (bij `type: "text"`): de plek op de pagina, niet alleen de tekst. `path`
   is het gemeenschappelijke element, `start`/`end` de exacte range, `nth` welk
   voorkomen als dezelfde tekst vaker staat, `label` de context (rij/kaart). Gebruik
-  dit om te weten wélk "checken" of welke rij Luc bedoelde. Geen locator + tekst
+  dit om te weten wélk "checken" of welke rij de reviewer bedoelde. Geen locator + tekst
   die vaker voorkomt: vraag door, kies niet de eerste hit.
-- `refs` (optioneel): andere tekstfragmenten die Luc in de comment heeft gekoppeld.
+- `refs` (optioneel): andere tekstfragmenten die de reviewer in de comment heeft gekoppeld.
   In `comment` staan ze als `⟦r1⟧`, `⟦r2⟧`, …; `refs` geeft per id de volledige
   `selectedText`. Gebruik dit voor "hetzelfde als …"-feedback.
 - Bij verwerken: lees **`commentExpanded`** (refs ingevuld als `"tekst"`) of
-  `toon-annotaties.py` — die expandeert markers en waarschuwt als `refs` ontbreekt.
-  Staat er `refsIncomplete`, vraag Luc opnieuw te saven; gok niet welke tekst r1/r2 was.
+  `bin/toon-annotaties.py` — die expandeert markers en waarschuwt als `refs` ontbreekt.
+  Staat er `refsIncomplete`, vraag de reviewer opnieuw te saven; gok niet welke tekst r1/r2 was.
 - Veelvoorkomende bedoelingen: **"Maak ⟦r1⟧ hetzelfde als ⟦r2⟧"** → pas de tekst
   van r1 (of de geannoteerde `selectedText`) aan naar r2; **"veranderen naar"** =
   vervangen door de ref-tekst. `selectedText` is het primaire anker; refs zijn
@@ -119,14 +119,14 @@ Per annotatie:
   Read-tool en lees de crop naast de comment. Zelf croppen hoeft niet meer, dat
   is al gebeurd op het moment van opslaan. `_rect` is intern, negeer het.
 - `type: "text"` → gebruik `selectedText`; er is geen screenshot.
-- `type: "edit"` → Luc heeft de tekst van een conceptbericht zelf herschreven. `hunks`
+- `type: "edit"` → de reviewer heeft de tekst van een conceptbericht zelf herschreven. `hunks`
   geeft de wijzigingen als losse blokken, elk met de omringende tekst als anker
   (`voor`/`na`), het `alinea`-nummer om naar te verwijzen, en `verwijderd`/`toegevoegd`.
   `diff` is dezelfde informatie als platte reeks, `origineel` en `nieuw` de twee volledige
   versies. Blokken zijn los toe te passen en los af te vinken:
 
   ```bash
-  ~/.claude/skills/html-annotator/pas-hunk-toe.py <json> --nr 1 --hunks 2 --afvinken
+  ~/.claude/skills/html-annotator/bin/pas-hunk-toe.py <json> --nr 1 --hunks 2 --afvinken
   ```
 
   Het anker is de tekst, niet de positie — een blok blijft dus plaatsbaar als de pagina
@@ -134,11 +134,11 @@ Per annotatie:
   het en vraag. Neem `nieuw` over als de tekst van dat concept; er valt hier niets te
   interpreteren, hij heeft het al opgeschreven zoals hij het wil. Vraag alleen door als
   zijn herschrijving iets aanraakt dat elders in de pagina ook staat.
-  `toon-annotaties.py` drukt dit af als een leesbare diff.
-- `attachment` staat er als Luc zelf een afbeelding plakte of bijvoegde; ook
+  `bin/toon-annotaties.py` drukt dit af als een leesbare diff.
+- `attachment` staat er als de reviewer zelf een afbeelding plakte of bijvoegde; ook
   die met de Read-tool bekijken.
 
-**Eerst begrijpen, dan pas verwerken.** Dit is geen formaliteit: Luc dicteert
+**Eerst begrijpen, dan pas verwerken.** Dit is geen formaliteit: de reviewer dicteert
 zijn annotaties vaak, waardoor zinnen soms doodlopen en context die voor hem
 vanzelfsprekend is niet op papier staat. Loop ze één voor één na en leg voor wat
 je niet zeker weet, in plaats van het in te vullen. Vraag door als iets te vaag
@@ -148,7 +148,7 @@ zei. Zitten er keuzes in, stel de vraag dan klikbaar met `AskUserQuestion`.
 Twijfel je of je moet vragen: vragen. Verkeerd raden kost hem meer tijd dan een
 vraag.
 
-`toon-annotaties.py` drukt deze werkregel zelf af zodra er open annotaties zijn,
+`bin/toon-annotaties.py` drukt deze werkregel zelf af zodra er open annotaties zijn,
 zodat hij ook meekomt in een sessie die deze skill niet gelezen heeft.
 
 Bij veel annotaties mag je subagents inzetten (één per annotatie of per groepje)
@@ -167,7 +167,7 @@ elke ronde terug. Verwerken zonder afvinken is dus **niet af**.
 
 Heb je een annotatie verwerkt in de pagina, meld hem dan direct af bij de bridge.
 Hij blijft als historie in de JSON staan (met `"resolved": true` en
-`"resolvedAt"`), maar verdwijnt van de pagina, zodat Luc na een refresh alleen
+`"resolvedAt"`), maar verdwijnt van de pagina, zodat de reviewer na een refresh alleen
 nog ziet wat nog open staat. Doe dit per verwerkte batch, niet pas aan het eind:
 
 ```bash
@@ -181,7 +181,7 @@ Check `notFound` en `open`: dat is je eigen controle dat je de goede nummers had
 en hoeveel er nog openstaan.
 
 - `nrs` zijn de annotatienummers uit die ronde; `ids` mag ook.
-- `jsonPath` is het pad dat Luc je stuurde (`~` mag). Laat je het weg, dan pakt
+- `jsonPath` is het pad dat de reviewer je stuurde (`~` mag). Laat je het weg, dan pakt
   de bridge de lopende ronde van de pagina (`pageFile`/`page`/`slug`, net als de
   andere routes).
 - Terugdraaien kan met `"resolved": false`.
@@ -189,15 +189,16 @@ en hoeveel er nog openstaan.
   openstaat.
 
 Positionering na een pagina-wijziging: tekstannotaties zoekt het snippet
-opnieuw op via hun `selectedText`, dus die schuiven vanzelf mee. Regio-annotaties
-van een oudere paginaversie worden niet op mogelijk verkeerde coördinaten
-getekend, maar verschijnen in het kaartje "likely processed" linksonder. Verwerk je
-zo'n annotatie, dan verdwijnt hij daaruit zodra je hem resolved zet; Luc kan hem
-daar ook zelf afvinken met het ✓.
+opnieuw op via hun `locator` (pad, start-rij-label, daarna `selectedText` + nth).
+Alleen als die tekst nergens meer op de pagina staat, verschijnt de annotatie in
+het kaartje "likely processed" linksonder. Regio-annotaties van een oudere
+paginaversie worden niet op mogelijk verkeerde coördinaten getekend en komen
+in datzelfde kaartje. Verwerk je zo'n annotatie, dan verdwijnt hij daaruit
+zodra je hem resolved zet; de reviewer kan hem daar ook zelf afvinken met het ✓.
 
 ## Deel 5: taken spawnen vanaf de todolijst
 
-Vraagt Luc om een taak te spawnen (`spawn_task`), dan hangt die altijd aan een punt op
+Vraagt de reviewer om een taak te spawnen (`spawn_task`), dan hangt die altijd aan een punt op
 zijn HTML-todolijst, en het nummer van dat punt hoort in de sessietitel. De volledige
 conventie staat in de skill **`task-spawnen`** — lees die voordat je spawnt; hier staat
 alleen wat je moet weten om er te komen.
@@ -206,13 +207,13 @@ alleen wat je moet weten om er te komen.
 een pad uit je hoofd of uit een eerder gesprek:
 
 ```bash
-~/.claude/skills/html-annotator/vind-todolijst.sh        # pad
-~/.claude/skills/html-annotator/vind-todolijst.sh -v     # met hoogste nummer erbij
+~/.claude/skills/html-annotator/bin/vind-todolijst.sh        # pad
+~/.claude/skills/html-annotator/bin/vind-todolijst.sh -v     # met hoogste nummer erbij
 ```
 
 Het script kiest de meest recent gewijzigde HTML op het bureaublad die genummerde punten
 heeft (`<span class="num">`) én zich als todolijst laat herkennen. Vindt hij niets, dan
-verzin je er geen: vraag het Luc.
+verzin je er geen: vraag het de reviewer.
 
 Daarna, in het kort — de details en de reden erachter staan in `task-spawnen`:
 
@@ -226,7 +227,7 @@ Daarna, in het kort — de details en de reden erachter staan in `task-spawnen`:
 ## Deel 6: de concept-berichtkaart
 
 Een conceptbericht (mail, Teams, WhatsApp) dat nog niet verstuurd is, hoort niet
-als platte tekst in de chat maar als kaart in de HTML. Dan kan Luc de tekst zien
+als platte tekst in de chat maar als kaart in de HTML. Dan kan de reviewer de tekst zien
 zoals de ontvanger hem krijgt, en er met de annotator per zin op reageren.
 
 De CSS zit in `annotator-snippet.html`, dus elke pagina met het snippet kan het
@@ -247,12 +248,12 @@ fallback als dat niet zo is.
 Eerste alinea van het bericht.
 
 Groet,
-Luc</div>
+de reviewer</div>
   <div class="la-draft-na">Openstaand: welk issue heb je ingeschoten? Zodra je dat zegt maak ik de eerste zin concreet.</div>
 </div>
 ```
 
-**Tracked changes.** Elke `la-draft-txt` is direct bewerkbaar: Luc klikt in de tekst,
+**Tracked changes.** Elke `la-draft-txt` is direct bewerkbaar: de reviewer klikt in de tekst,
 de cursor staat waar hij klikte, en hij typt. Er is bewust geen knop om "de bewerkmodus
 aan te zetten" — dat was een drempel voor iets wat hij gewoon wil kunnen doen. Klikt hij
 eruit, dan verschijnt het verschil met de oorspronkelijke tekst als doorhaling en
@@ -261,7 +262,7 @@ sneller dan een comment: in plaats van uitleggen wat er anders moet, schrijft hi
 gewoon anders op. "↺ Herstel origineel" zet de kaart terug en verwijdert de bewerking.
 
 Meerdere wijzigingen in dezelfde kaart worden losse blokken, genummerd in de tekst (¹ ² ³)
-zodat Luc en jij hetzelfde blok bedoelen. Je kunt ze los doorvoeren en los afvinken; wat
+zodat de reviewer en jij hetzelfde blok bedoelen. Je kunt ze los doorvoeren en los afvinken; wat
 nog openstaat blijft na een reload zichtbaar, herplaatst op zijn anker in de tekst zoals
 die dan is.
 
@@ -272,7 +273,7 @@ want de doorgehaalde tekst verdwijnt bij het terugschakelen en de regel loopt da
 Een bewerking krijgt bewust géén badge en komt niet in de weeslijst: hij is al zichtbaar
 in de kaart zelf. Na een reload wordt hij teruggezet, gekoppeld op de kop van de kaart.
 Is de concepttekst zelf gewijzigd sinds de bewerking, dan zet het snippet niets terug —
-dat zou Lucs oude tekst over de nieuwe heen leggen — maar meldt het dat bij de kaart.
+dat zou de oude tekst over de nieuwe heen leggen — maar meldt het dat bij de kaart.
 
 Regels bij het gebruik:
 
@@ -287,7 +288,7 @@ Regels bij het gebruik:
 
 ## Deel 7: geneste subpunten (`la-sub`)
 
-Heeft een punt subtaken, dan wil Luc die visueel onder hun ouder zien hangen: hoe
+Heeft een punt subtaken, dan wil de reviewer die visueel onder hun ouder zien hangen: hoe
 dieper genest, hoe verder ingesprongen. Een platte lijst waarin de hiërarchie
 alleen uit de tekst blijkt kost hem leeswerk dat de opmaak gratis kan doen.
 

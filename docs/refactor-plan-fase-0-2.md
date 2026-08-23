@@ -1,5 +1,7 @@
 # Uitvoerplan: html-annotator schoner, 0 gedrag
 
+> Superseded 2026-08-23 door de `bin/` + `annotator/`-layout. Alleen geschiedenis.
+
 Randvoorwaarde: geen functionele wijziging, geen layout-wijziging, geen
 wijziging van UI-copy. Bestaande `tests/run.sh` moet groen blijven.
 HEAD bij start: `ded3ee5` (al op origin/main).

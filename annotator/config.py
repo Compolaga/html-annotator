@@ -9,4 +9,4 @@ import os
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("LUC_ANNOTATOR_PORT", "8791"))
 ROOT = os.path.expanduser(os.environ.get("LUC_ANNOTATOR_ROOT", "~/Desktop/annotaties"))
-SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

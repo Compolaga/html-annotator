@@ -98,7 +98,7 @@ zeg(opScherm.join(',') === hunks.map((h) => h.n).join(','),
 await browser.close();
 
 /* Nu het punt van de hele exercitie: alleen blok 2 toepassen, de rest laten staan. */
-const uit = execFileSync('python3', [join(SKILL, 'pas-hunk-toe.py'), jsonPath,
+const uit = execFileSync('python3', [join(SKILL, 'bin/pas-hunk-toe.py'), jsonPath,
   '--nr', String(ann.nr), '--hunks', '2', '--afvinken'], { encoding: 'utf8' });
 const naToepassen = readFileSync(bestand, 'utf8');
 const kaart = naToepassen.slice(naToepassen.indexOf('la-draft-txt'), naToepassen.indexOf('</div>\n</div>'));
@@ -120,7 +120,7 @@ writeFileSync(bestand, readFileSync(bestand, 'utf8')
   .replace('Hoi Laurens,', 'Hoi Laurens,\n\nEven vooraf: dit is een extra alinea.'));
 let uit3 = '';
 try {
-  uit3 = execFileSync('python3', [join(SKILL, 'pas-hunk-toe.py'), jsonPath,
+  uit3 = execFileSync('python3', [join(SKILL, 'bin/pas-hunk-toe.py'), jsonPath,
     '--nr', String(ann.nr), '--hunks', '3'], { encoding: 'utf8' });
 } catch (e) { uit3 = String(e.stdout || e.message); }
 const eind = readFileSync(bestand, 'utf8');

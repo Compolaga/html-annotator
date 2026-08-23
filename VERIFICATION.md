@@ -7,9 +7,9 @@ De suite (`tests/run.sh`) toetst een **subset**. Dit bestand is de freeze:
 refactor mag FUNC/LAYOUT/TECH hieronder niet wijzigen. Case die BLOKKED is
 telt nooit als groen.
 
-Mapping suite → cluster: AC-1 case-02 · AC-2a case-04 · AC-2b case-01 (BLOCKED) ·
-AC-3 case-03 · AC-4 sideview-test.sh (handmatig) · AC-5 case-05 · AC-6 case-06 ·
-AC-7 case-07.
+Mapping suite → B-rij: B10 case-02 · B11 case-04 · B18 case-01 (BLOCKED) ·
+B12 case-03 · B17 sideview-test.sh (handmatig) · B13 case-05 · B14 case-06 ·
+B15 case-07 · B16/B22 case-08.
 
 ## Non-goals
 
@@ -65,9 +65,10 @@ AC-7 case-07.
 
 ## Vrijgavepoort (na refactor)
 
-1. Python compile van alle `*.py` in de skill-root.
-2. Hook-bestanden staan nog in de skill-root (`ensure-bridge.sh`,
-   `hook-ensure-bridge.sh`).
-3. `install.sh` kopieert alleen de drie annotator-memories.
+1. `python3 -m compileall -q annotator bin`
+2. Hook-bestanden staan in `bin/` (`ensure-bridge.sh`,
+   `hook-ensure-bridge.sh`); `install.sh` registreert `bin/hook-ensure-bridge.sh`.
+3. `install.sh` kopieert geen memories; agent-regels staan in `references/`.
 4. Suite: `tests/run.sh` — rood als een case faalt of BLOKKED telt als pass.
-5. Geen diff op snippet-CSS of Engelse UI-strings (behalve comment-koppen).
+5. Geen diff op snippet-CSS of Engelse UI-strings, behalve paden naar
+   `bin/` en comment-koppen.
