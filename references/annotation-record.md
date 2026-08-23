@@ -1,7 +1,9 @@
 # Annotation-record
 
-Velden die `POST /save` (`h_save`) nu al schrijft. Geen extra verplichte
-velden. Dit is documentatie van de bestaande interface, geen nieuw schema.
+Velden die `POST /save` (`h_save`) nu al schrijft. Schoonmaak zit in
+`annotator_record.py` (`schoon_locator`, `schoon_refs`, `zet_ref_velden`).
+Geen extra verplichte velden. Dit is documentatie van de bestaande interface,
+geen nieuw schema.
 
 | veld | wanneer |
 |---|---|

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runner voor de annotator-bridge-suite.
 #
-#   tests/run.sh                # alles, case-01 met de vastgelegde drempel
+#   tests/run.sh                # alles incl. case-00 + case-01 drempel
 #   tests/run.sh 02 03          # alleen deze cases
 #   CASE01_RUNS=1 tests/run.sh  # goedkoper draaien tijdens ontwikkelen
 #
@@ -26,6 +26,13 @@ BLOKKED=0
 echo "=== annotator-bridge suite · $(date '+%Y-%m-%d %H:%M:%S') ==="
 echo "snippet: $(shasum -a 256 ../annotator-snippet.html | cut -c1-12)  hook: $(shasum -a 256 ../hook-ensure-bridge.sh | cut -c1-12)  ensure: $(shasum -a 256 ../ensure-bridge.sh | cut -c1-12)"
 echo
+
+if wil 00 || wil record; then
+  echo "case-00: annotation-record (geen browser)"
+  python3 ./test_record.py
+  [ $? -ne 0 ] && FALEN=$((FALEN + 1))
+  echo
+fi
 
 if wil 02; then
   if [ ! -d node_modules/playwright-core ]; then

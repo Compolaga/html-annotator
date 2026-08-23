@@ -30,7 +30,8 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 from annotator_config import HOST, PORT, ROOT
-from annotator_refs import expand_comment, validate_refs
+from annotator_refs import expand_comment
+from annotator_record import schoon_locator, zet_ref_velden
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 CACHE = os.path.join(tempfile.gettempdir(), "luc-annotator-shots")
 MARGE = 12
@@ -73,41 +74,6 @@ def pad_van_page(page, page_file):
 
 ANNOTATOR_BLOK = re.compile(
     r"<!--\s*LUC-ANNOTATOR.*?<!--\s*/LUC-ANNOTATOR\s*-->", re.S | re.I)
-
-
-def schoon_punt(p):
-    if not isinstance(p, dict) or not (p.get("path") or "").strip():
-        return None
-    uit = {"path": str(p.get("path") or "").strip(), "offset": int(p.get("offset") or 0)}
-    if p.get("node") is not None:
-        try:
-            uit["node"] = int(p["node"])
-        except (TypeError, ValueError):
-            pass
-    return uit
-
-
-def schoon_locator(loc):
-    if not isinstance(loc, dict):
-        return None
-    uit = {}
-    start, end = schoon_punt(loc.get("start")), schoon_punt(loc.get("end"))
-    if start:
-        uit["start"] = start
-    if end:
-        uit["end"] = end
-    path = (loc.get("path") or "").strip()
-    if path:
-        uit["path"] = path
-    label = (loc.get("label") or "").strip()
-    if label:
-        uit["label"] = label[:200]
-    if loc.get("nth") is not None:
-        try:
-            uit["nth"] = max(0, int(loc["nth"]))
-        except (TypeError, ValueError):
-            pass
-    return uit or None
 
 
 def content_hash(bestand, dom_hash):
@@ -418,24 +384,10 @@ def h_save(payload):
         # paginaversie waarop deze annotatie is gezet (context + stale-detectie)
         "contentHash": h,
     }
-    refs = ann.get("refs")
-    if isinstance(refs, list) and refs:
-        rec["refs"] = []
-        for r in refs:
-            if not isinstance(r, dict) or not (r.get("selectedText") or "").strip():
-                continue
-            item = {"id": (r.get("id") or "").strip(), "selectedText": (r.get("selectedText") or "").strip()}
-            loc = schoon_locator(r.get("locator"))
-            if loc:
-                item["locator"] = loc
-            rec["refs"].append(item)
+    zet_ref_velden(rec, ann.get("refs"))
     loc = schoon_locator(ann.get("locator"))
     if loc:
         rec["locator"] = loc
-    rec["commentExpanded"] = expand_comment(rec["comment"], rec.get("refs"))
-    missing, _ = validate_refs(rec["comment"], rec.get("refs"))
-    if missing:
-        rec["refsIncomplete"] = missing
     if bestaande and bestaande.get("resolved"):
         rec["resolved"] = True
         rec["resolvedAt"] = bestaande.get("resolvedAt")
