@@ -21,7 +21,7 @@ CASE01_RUNS="${CASE01_RUNS:-3}"
 GEVRAAGD=("$@")
 # Default = wat A7 van iedereen eist. case-01 (spend) en case-10 (mutatie,
 # bewust traag + eigen boom) alleen als je ze noemt.
-DEFAULT="00 02 03 04 05 06 07 08 09 11"
+DEFAULT="00 02 03 04 05 06 07 08 09 11 12 13"
 wil() {
   if [ ${#GEVRAAGD[@]} -eq 0 ]; then
     for g in $DEFAULT; do [ "$g" = "$1" ] && return 0; done
@@ -145,6 +145,20 @@ fi
 if wil 07; then
   echo "case-07: inspringing van geneste subpunten"
   node ./case-07-subindentatie.mjs
+  [ $? -ne 0 ] && FALEN=$((FALEN + 1))
+  echo
+fi
+
+if wil 13; then
+  echo "case-13: rijke concepten — opmaak naast tracked changes"
+  node ./case-13-rijke-concepten.mjs
+  [ $? -ne 0 ] && FALEN=$((FALEN + 1))
+  echo
+fi
+
+if wil 12; then
+  echo "case-12: boxes scrollen mee met de HTML"
+  node ./case-12-scroll-mee.mjs
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
   echo
 fi

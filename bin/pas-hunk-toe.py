@@ -104,6 +104,15 @@ def main():
 
     gelukt, mislukt = [], []
     for h in doel_hunks:
+        if h.get("soort") == "opmaak":
+            # Een opmaakwijziging staat niet in de tekst en is dus niet met zoek-en-
+            # vervang te plaatsen: de vorm van een regel zit in de HTML eromheen. Het
+            # script raakt hem daarom niet aan en zegt wat er moet gebeuren.
+            print("  blok %s  OVERGESLAGEN  opmaak: %s"
+                  % (h.get("n"), h.get("omschrijving") or "gewijzigd"))
+            print("            neem de opmaak over uit 'nieuwHtml' van annotatie %d" % a.nr)
+            mislukt.append(h.get("n"))
+            continue
         nieuw, manier = plaats(tekst, h)
         label = "%s -> %s" % (
             (h.get("verwijderd") or "(niets)").replace("\n", "\\n")[:45],

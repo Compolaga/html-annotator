@@ -1,0 +1,51 @@
+<!-- LA-CHECKLIST v1 · herbruikbaar checkbox-component voor de html-annotator.
+     Zet data-la-check="<unieke-key>" op een element; dit blok injecteert er een
+     checkbox in (in .la-check-slot of anders vóór het eerste kind) en bewaart
+     de status via de bridge (POST /state-save) in ~/Desktop/annotaties/<slug>/state.json,
+     zodat een agent de vinkjes kan uitlezen zoals annotaties. -->
+<style>
+  .la-check{appearance:none;-webkit-appearance:none;flex:none;width:16px;height:16px;
+    margin:0;border:1.5px solid #c9c8c5;border-radius:3px;background:#fff;cursor:pointer;
+    position:relative;transition:background .1s ease,border-color .1s ease}
+  .la-check:hover{border-color:#2383e2}
+  .la-check:checked{background:#2383e2;border-color:#2383e2}
+  .la-check:checked::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
+    border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .la-checked>summary .what,.la-checked .what{color:#9b9a97;text-decoration:line-through}
+</style>
+<script>
+(function(){
+  var BRIDGE="http://127.0.0.1:8791";
+  var items=[].slice.call(document.querySelectorAll("[data-la-check]"));
+  if(!items.length)return;
+  function post(pad,body){return fetch(BRIDGE+pad,{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .then(function(r){return r.json();});}
+  function label(el){
+    var w=el.querySelector(".what");
+    return (el.getAttribute("data-la-label")||(w?w.textContent:el.textContent)||"")
+      .replace(/\s+/g," ").trim().slice(0,140);}
+  items.forEach(function(el){
+    var key=el.getAttribute("data-la-check");
+    var cb=document.createElement("input");
+    cb.type="checkbox";cb.className="la-check";cb.setAttribute("aria-label","afvinken: "+label(el));
+    cb.addEventListener("click",function(e){e.stopPropagation();});
+    cb.addEventListener("change",function(){
+      el.classList.toggle("la-checked",cb.checked);
+      post("/state-save",{page:location.href,component:"checklist",key:key,
+        value:{checked:cb.checked,label:label(el)}}).catch(function(){});
+    });
+    var slot=el.querySelector(".la-check-slot")||el.querySelector("summary")||el;
+    slot.insertBefore(cb,slot.firstChild);
+  });
+  post("/state",{page:location.href}).then(function(res){
+    var comp=(res&&res.state&&res.state.components&&res.state.components.checklist)||{};
+    items.forEach(function(el){
+      var e=comp[el.getAttribute("data-la-check")];
+      if(e&&e.checked){var cb=el.querySelector(".la-check");
+        if(cb){cb.checked=true;el.classList.add("la-checked");}}
+    });
+  }).catch(function(){});
+})();
+</script>
+<!-- /LA-CHECKLIST -->

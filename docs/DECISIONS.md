@@ -72,3 +72,43 @@ CLI filenames (`toon-annotaties.py`, `vind-todolijst.sh`,
 `LUC_ANNOTATOR_*`. `annotator/` stays an importable package;
 `install.sh` stays at root; `INSTALL.md` stays a port, not a file
 in `bin/`.
+
+## 2026-08-28 — Draft cards are rich text; the diff stays on the plain-text projection
+
+`.la-draft-txt` renders as the recipient will see it: paragraphs, bulleted
+and numbered lists, bold, italic and links. The allowed set is exactly
+`p, ul, ol, li, b, i, a, br` — the intersection Outlook, Gmail and Teams
+render without interpreting anything of their own. Reading the card back
+into the block model *is* the sanitizer: anything else is flattened to
+text, and paste is always plain text.
+
+The tracked changes did **not** move to HTML. Two channels:
+
+- **text** — diffed word-level on the plain-text projection of the card:
+  the exact text a plain-text mail would carry, with no formatting
+  sigils (`- `, `**`) in it. Hunks keep their shape
+  (`voor/na/verwijderd/toegevoegd`), so anchoring, reload replay and
+  `pas-hunk-toe.py` keep working unchanged.
+- **formatting** — its own hunks, `soort: "opmaak"`, saying what happened
+  to a block ("alinea werd opsomming", `vet aan op "issue"`).
+
+Why not sigils in the projection: a reviewer types `- ` himself, so a
+sigil cannot be told apart from content, and it would push every
+formatting change through the word diff as noise. Why not diff the HTML:
+the anchors would stop being findable in the page source.
+
+Consequences accepted:
+
+- A text hunk's anchor is clamped to its own block, because in the source
+  a block boundary is a tag. An anchor that still runs through inline
+  markup (`<b>`, `<a>`) is reported as MISLUKT by `pas-hunk-toe.py`
+  rather than placed — never a silent wrong edit.
+- `pas-hunk-toe.py` does not apply formatting hunks; it names them and
+  points at `nieuwHtml`.
+- A block whose text *and* formatting changed reports only the text hunk.
+  `nieuwHtml` on the annotation is the complete new version and is the
+  ground truth in that case.
+- A card the agent wrote as plain text stays plain text (pre-wrap,
+  `plaintext-only`) until the reviewer uses a formatting button. Then the
+  whole card converts to blocks in one step — half-converting would
+  collapse the remaining hard line breaks.

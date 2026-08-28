@@ -147,8 +147,9 @@ exit — never exit 0 while `/ping` is empty. Stale pidfile is removed.
 <details><summary><strong>B13 — A draft edit lands as <code>type: edit</code>.</strong></summary>
 
 *Expected behaviour:* click-edit in a draft card stores `type: edit`
-with original, new, and a diff that points at the changed span, and
-survives reload. No badge, no orphan list.
+with original, new (both as plain-text projection), `origineelHtml` /
+`nieuwHtml`, and a diff that points at the changed span, and survives
+reload. No badge, no orphan list.
 
 *Evidence:* `tests/case-05` (draft edit).
 
@@ -244,6 +245,56 @@ posts to the port that served `/p/`.
 
 </details>
 
+<details><summary><strong>B24 — A draft card renders as the mail: lists, bold and links.</strong></summary>
+
+*Expected behaviour:* `.la-draft-txt` shows real `<ul>`/`<ol>` items,
+bold, italic and links, and the reviewer applies them from the card's own
+toolbar (⌘B/⌘I/⌘K too). The stored `nieuwHtml` uses only
+`p, ul, ol, li, b, i, a, br`, so it can go into a mail body as-is. A card
+the agent wrote as plain text stays plain until a format button is used.
+
+*Evidence:* `tests/case-13-rijke-concepten.mjs`.
+
+</details>
+
+<details><summary><strong>B25 — Formatting is its own hunk kind, and the text diff stays plain.</strong></summary>
+
+*Expected behaviour:* turning a line into a bullet or a word bold leaves
+the plain-text projection untouched and produces a hunk with
+`soort: "opmaak"` naming what changed and on which block. Text hunks keep
+plain-text anchors clamped to their own block, so `pas-hunk-toe.py` still
+places them in the HTML source; it refuses formatting hunks out loud
+instead of guessing. Both kinds come back on their anchor after a reload.
+
+*Evidence:* `tests/case-13-rijke-concepten.mjs`; decision in
+`docs/DECISIONS.md` (2026-08-28).
+
+</details>
+
+<details><summary><strong>B26 — Checklist state persists per page, outside the rounds.</strong></summary>
+
+*Expected behaviour:* `POST /state-save` with `{component, key, value}`
+merges the value over the existing entry, stamps `changedAt` on the entry
+and `updatedAt` on the whole, and writes `<slug>/state.json` next to the
+`ronde-NN` dirs — never inside one. `POST /state` reads it back; an unknown
+page yields empty `components`, a save with no `key` is a 400. Checked
+state is a lasting status, not a feedback round: `remove-all` does not
+touch it. Snippet: `references/checklist-snippet.html` (LA-CHECKLIST).
+
+*Evidence:* `tests/test_bridge_contract.py`.
+
+</details>
+
+<details><summary><strong>B23 — Region and text boxes scroll with the HTML they mark, including inside an <code>overflow:auto</code> scroller.</strong></summary>
+
+*Expected behaviour:* after the marked row moves in a nested scroller, the
+box and badge sit on that row — not at the same viewport coordinates.
+Window-scroll still follows too.
+
+*Evidence:* `tests/case-12-scroll-mee.mjs` (listener mutant included).
+
+</details>
+
 ## Architecture
 
 <details><summary><strong>A1 — Root holds only ports.</strong></summary>
@@ -291,9 +342,9 @@ Gitignored runtime does not count.
 
 </details>
 
-<details><summary><strong>A7 — B1–B15 plus B16/B21/B22 stay green.</strong></summary>
+<details><summary><strong>A7 — B1–B15 plus B16/B21/B22/B23/B24/B25/B26 stay green.</strong></summary>
 
-*Evidence:* `tests/run.sh` (default: 00 02–09 11). The suite header
+*Evidence:* `tests/run.sh` (default: 00 02–09 11–13). The suite header
 prints `git rev-parse --short HEAD` and a dirty-tree count. Captures
 live in `tests/red/ronde-NN-*.txt`; never overwrite an existing ronde.
 

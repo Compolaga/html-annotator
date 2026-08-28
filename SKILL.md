@@ -103,6 +103,26 @@ Test/debug API: `window.LucAnnotator.add({type:'region'|'text', rect,
 comment, selectedText})`, `.anns()`, `.bridge()`, `.session()`,
 `.resolve(annotation)`.
 
+### Checklist component (LA-CHECKLIST)
+
+Any HTML deliverable with checkable items or rows (todo lists,
+test-case tables, review queues) also gets the block from
+`references/checklist-snippet.html` (`<!-- LA-CHECKLIST v1` to
+`<!-- /LA-CHECKLIST -->`), pasted right before the LUC-ANNOTATOR
+block. Put `data-la-check="<unique-key>"` on each checkable element
+(optional `data-la-label` for an explicit label). The script injects a
+Notion-style checkbox, loads saved state on page load via `POST /state`
+and saves each change via `POST /state-save`; a checked element gets
+the class `la-checked` (title struck through, dimmed).
+
+Reading the checkmarks as an agent: per-page state lives in
+`~/Desktop/annotaties/<slug>/state.json` (or `POST /state` on the
+bridge) — persistent status, separate from the annotation rounds.
+Format: `{"components": {"checklist": {"<key>": {"checked": true,
+"label": "...", "changedAt": "..."}}}, "updatedAt": ...}`. Use
+`changedAt` to see what changed since your last read, analogous to
+reading `annotations.json`. Details: handbook part 8.
+
 ## Processing (short port)
 
 Triggers — do not ask for confirmation:

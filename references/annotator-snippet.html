@@ -146,6 +146,21 @@
   .la-draft-txt ins { background: #dcfce7; color: #14532d; text-decoration: underline;
     text-decoration-thickness: 1px; }
   .la-draft-txt del { background: #fee2e2; color: #7f1d1d; text-decoration: line-through; }
+  /* Rijke weergave: het concept ziet eruit zoals de ontvanger het krijgt. Alleen de
+     blokken die het mailformaat kent (alinea, opsomming) — de rest is inline-opmaak. */
+  .la-draft-txt.la-rijk { white-space: normal; }
+  .la-draft-txt.la-rijk > p { margin: 0 0 11px; }
+  .la-draft-txt.la-rijk > p:last-child { margin-bottom: 0; }
+  .la-draft-txt.la-rijk > ul, .la-draft-txt.la-rijk > ol { margin: 0 0 11px; padding-left: 24px; }
+  .la-draft-txt.la-rijk > ul:last-child, .la-draft-txt.la-rijk > ol:last-child { margin-bottom: 0; }
+  .la-draft-txt.la-rijk li { margin: 3px 0; }
+  .la-draft-txt a { color: #4b3fb3; }
+  /* Blok waarvan alleen de opmaak wijzigde: de tekst is gelijk, dus er valt niets door
+     te strepen. Een streep in de kantlijn wijst het blok aan, het nummer koppelt het
+     aan de hunk. */
+  .la-draft-txt .la-opmaak { box-shadow: -6px 0 0 -3px #7a5cff; }
+  .la-draft-bar .la-draft-scheiding { width: 1px; align-self: stretch; background: rgba(0,0,0,.12); margin: 0 2px; }
+  .la-draft-bar button.la-fmt { min-width: 28px; }
   .la-draft-na { font-size: 13px; color: var(--muted, #6b6b66); margin-top: 12px; padding-top: 10px; border-top: 1px solid #eee4cd; }
 
   /* Geneste subpunten: elk niveau springt een stap verder in en krijgt een haakje
@@ -640,6 +655,63 @@
     if (tekst) return zoekTekst(tekst, loc && loc.nth);
     return null;
   }
+  function laElementBijRect(rect) {
+    if (!rect) return null;
+    var cx = rect.x + (rect.w || 0) / 2, cy = rect.y + (rect.h || 0) / 2;
+    var vx = cx - scrollX, vy = cy - scrollY;
+    var el = null;
+    if (vx >= 0 && vy >= 0 && vx < innerWidth && vy < innerHeight) {
+      try { el = document.elementFromPoint(vx, vy); } catch (e) { el = null; }
+    }
+    if (!el) {
+      var nodes = document.body.getElementsByTagName("*");
+      var beste = null, oppervlak = Infinity;
+      for (var i = 0; i < nodes.length; i++) {
+        var n = nodes[i];
+        if (laUiHost(n) || n.id === "la-overlay") continue;
+        var b = n.getBoundingClientRect();
+        if (!b.width || !b.height) continue;
+        var x1 = b.left + scrollX, y1 = b.top + scrollY;
+        if (cx < x1 || cy < y1 || cx > x1 + b.width || cy > y1 + b.height) continue;
+        var opp = b.width * b.height;
+        if (opp < oppervlak) { beste = n; oppervlak = opp; }
+      }
+      el = beste;
+    }
+    while (el && (laUiHost(el) || el.id === "la-overlay" ||
+      (el.classList && (el.classList.contains("la-rect") || el.classList.contains("la-badge") ||
+        el.classList.contains("la-ghost"))))) {
+      el = el.parentElement;
+    }
+    if (!el || el === document.body || el === document.documentElement) return null;
+    return el;
+  }
+  function laKoppelRegio(a) {
+    if (!a || a.type === "text" || a.type === "edit") return;
+    if (a.locator && a.locator.ox != null && a.locator.path) return;
+    var el = laElementBijRect(a.rect);
+    if (!el || !a.rect) return;
+    var b = el.getBoundingClientRect();
+    a.locator = Object.assign({}, a.locator || {}, {
+      path: laBouwPad(el),
+      ox: Math.round(a.rect.x - (b.left + scrollX)),
+      oy: Math.round(a.rect.y - (b.top + scrollY)),
+      ow: a.rect.w, oh: a.rect.h
+    });
+  }
+  function laRegioLive(a) {
+    var loc = a.locator;
+    if (!loc || loc.ox == null || !loc.path) return a.rect;
+    var el = laQueryPad(loc.path);
+    if (!el) return a.rect;
+    var b = el.getBoundingClientRect();
+    return {
+      x: Math.round(b.left + scrollX + loc.ox),
+      y: Math.round(b.top + scrollY + loc.oy),
+      w: loc.ow != null ? loc.ow : (a.rect && a.rect.w),
+      h: loc.oh != null ? loc.oh : (a.rect && a.rect.h)
+    };
+  }
 
   /* ---- tekenen --------------------------------------------------- */
   /* Een annotatie verliest haar anker precies doordat de tekst is aangepast: dat
@@ -730,6 +802,21 @@
   if (window.ResizeObserver) {
     try { new ResizeObserver(herteken).observe(document.body); } catch (e) {}
   }
+  /* Binnen-scrollers (overflow:auto) bewegen de pagina zonder window.scrollY.
+     Absolute body-coords blijven dan op het scherm plakken. Op scroll opnieuw
+     meten via rAF — de 60ms-herteken is te traag en laat de kaders slepen. */
+  var hertekenRaf = null;
+  function hertekenSnel() {
+    if (hertekenRaf != null) return;
+    hertekenRaf = requestAnimationFrame(function () {
+      hertekenRaf = null;
+      if (bezigMetTekenen) return;
+      bezigMetTekenen = true;
+      try { render(); } finally { bezigMetTekenen = false; }
+    });
+  }
+  document.addEventListener("scroll", hertekenSnel, true);
+  addEventListener("scroll", hertekenSnel);
 
   function render() {
     document.querySelectorAll(".la-badge,.la-rect").forEach(function (n) { n.remove(); });
@@ -747,7 +834,12 @@
         var nieuw = zoekAnker(a);
         if (nieuw) { a.rect = rect = nieuw; }
         else { wezen.push(a); return; }
-      } else if (a.stale) {
+      } else if (a.type !== "edit") {
+        laKoppelRegio(a);
+        var live = laRegioLive(a);
+        if (live) a.rect = rect = live;
+      }
+      if (a.stale) {
         /* regio-annotatie van een oudere paginaversie: coördinaten zijn verdacht */
         wezen.push(a); return;
       }
@@ -1061,6 +1153,7 @@
 
   /* ---- opslaan / verwijderen ------------------------------------- */
   function bewaarAnnotatie(a) {
+    laKoppelRegio(a);
     if (!anns.some(function (x) { return x.id === a.id; })) anns.push(a);
     bewaarLokaal(); render();
     return post("/save", Object.assign(basis(), {
@@ -1070,6 +1163,8 @@
         refs: a.refs || null, img: a.img || null, createdAt: a.createdAt,
         /* bewerkingen op een conceptbericht; leeg voor de andere types */
         veld: a.veld || null, origineel: a.origineel || null, nieuw: a.nieuw || null,
+        origineelHtml: a.origineelHtml || null, nieuwHtml: a.nieuwHtml || null,
+        rijk: a.rijk || null,
         diff: a.diff || null, hunks: a.hunks || null
       }
     })).then(function (j) {
@@ -1157,11 +1252,13 @@
       ruimGhostOp();
       if (g) { g.classList.add("la-ghost-vast"); hangendeGhost = g; }
       teller += 1;
-      openPopup({
+      var regio = {
         id: Date.now() + "-" + teller, nr: teller, type: "region", rect: rect,
         target: tekstBij(rect), comment: "", img: null,
         createdAt: new Date().toISOString()
-      });
+      };
+      laKoppelRegio(regio);
+      openPopup(regio);
     });
   }
   document.getElementById("la-toggle").addEventListener("click", function () { zetModus(!overlay); });
@@ -1225,9 +1322,197 @@
      sneller om het gewoon anders op te schrijven. Daarom is elke .la-draft-txt te
      bewerken, en wordt het verschil met de oorspronkelijke tekst zelf de annotatie:
      voor, na, en de losse wijzigingen. Zo hoeft er niets vertaald te worden van
-     bedoeling naar tekst. */
+     bedoeling naar tekst.
+
+     De kaart is rich text: opsommingen, vet, cursief en links worden getoond zoals de
+     ontvanger ze straks in de mail ziet. Het toegestane setje is bewust klein en
+     mail-veilig (p, ul, ol, li, b, i, a, br) — precies wat Outlook zonder gedoe rendert.
+
+     Het diffen gebeurt NIET op die HTML maar op de platte-tekstprojectie ervan (zie
+     docs/DECISIONS.md, 2026-08-28). Tekst en opmaak zijn twee kanalen:
+       · tekstwijzigingen  -> hunks zoals altijd (voor/na/verwijderd/toegevoegd),
+                              plaatsbaar met pas-hunk-toe.py;
+       · opmaakwijzigingen -> eigen hunks met soort:"opmaak", die beschrijven wat er
+                              met een blok gebeurde ("regel werd een opsomming").
+     Zo blijft het ankermechanisme dat een bewerking een reload laat overleven precies
+     zoals het was, en wordt opmaak niet stilletjes als woordruis meegedift. */
 
   function laTokens(s) { return s.match(/\s+|\S+/g) || []; }
+
+  /* === blokmodel ===================================================
+     Een concept is een lijst blokken. Een blok is een alinea of één opsommingsregel;
+     de tekst erin mag harde regelovergangen (\n) bevatten. Runs dragen de inline-opmaak.
+     Alles wat niet in dit model past wordt bij het inlezen platgeslagen tot tekst —
+     dat is meteen de sanitizer: er kan niets de kaart in dat niet mail-veilig is. */
+
+  function laVetStijl(el) {
+    var w = el.style && el.style.fontWeight;
+    if (!w) return false;
+    return w === "bold" || w === "bolder" || parseInt(w, 10) >= 600;
+  }
+  function laCursiefStijl(el) {
+    return !!(el.style && el.style.fontStyle === "italic");
+  }
+
+  function laRunsVanNode(node, erf, uit) {
+    var kinderen = node.childNodes;
+    for (var i = 0; i < kinderen.length; i++) {
+      var k = kinderen[i];
+      if (k.nodeType === 3) {
+        if (k.nodeValue) uit.push({ t: k.nodeValue, b: erf.b, i: erf.i, href: erf.href });
+        continue;
+      }
+      if (k.nodeType !== 1) continue;
+      var nm = k.nodeName;
+      if (nm === "BR") { uit.push({ t: "\n", b: erf.b, i: erf.i, href: erf.href }); continue; }
+      /* opmaak van de tracked-change-weergave zelf telt niet mee als inhoud */
+      if (nm === "SUP" && k.className === "la-hunk-nr") continue;
+      if (nm === "DEL") continue;
+      laRunsVanNode(k, {
+        b: erf.b || nm === "B" || nm === "STRONG" || laVetStijl(k),
+        i: erf.i || nm === "I" || nm === "EM" || laCursiefStijl(k),
+        href: nm === "A" ? (k.getAttribute("href") || erf.href) : erf.href
+      }, uit);
+    }
+  }
+
+  function laNormRuns(runs) {
+    var uit = [];
+    runs.forEach(function (r) {
+      if (!r.t) return;
+      var l = uit[uit.length - 1];
+      if (l && !!l.b === !!r.b && !!l.i === !!r.i && (l.href || "") === (r.href || "")) { l.t += r.t; }
+      else { uit.push({ t: r.t, b: !!r.b, i: !!r.i, href: r.href || "" }); }
+    });
+    return uit;
+  }
+  function laRunsNaarChars(runs) {
+    var uit = [];
+    runs.forEach(function (r) {
+      for (var i = 0; i < r.t.length; i++) { uit.push({ c: r.t.charAt(i), b: r.b, i: r.i, href: r.href }); }
+    });
+    return uit;
+  }
+  function laCharsNaarRuns(chars) {
+    return laNormRuns(chars.map(function (c) { return { t: c.c, b: c.b, i: c.i, href: c.href }; }));
+  }
+  function laBlokTekst(b) {
+    return b.runs.map(function (r) { return r.t; }).join("");
+  }
+
+  /* Heeft de kaart blokstructuur, of is het één stuk platte tekst met pre-wrap?
+     Dat bepaalt niet alleen de weergave maar ook hoe er bewerkt wordt: platte kaarten
+     blijven plaintext-only tot de reviewer zelf opmaak aanzet. */
+  function laIsRijk(box) { return !!box.querySelector("p,ul,ol,li,div"); }
+
+  function laBlokkenVanTekst(box) {
+    var runs = []; laRunsVanNode(box, {}, runs);
+    var chars = laRunsNaarChars(laNormRuns(runs));
+    var tekst = chars.map(function (c) { return c.c; }).join("");
+    var blokken = [], start = 0, re = /\n[ \t]*\n[ \t\n]*/g, m;
+    while ((m = re.exec(tekst)) !== null) {
+      blokken.push({ soort: "p", runs: laCharsNaarRuns(chars.slice(start, m.index)) });
+      start = m.index + m[0].length;
+    }
+    blokken.push({ soort: "p", runs: laCharsNaarRuns(chars.slice(start)) });
+    var gevuld = blokken.filter(function (b) { return laBlokTekst(b) !== ""; });
+    return gevuld.length ? gevuld : [{ soort: "p", runs: [] }];
+  }
+
+  /* Recursief, want een editor-commando levert geneste structuur op die geen mailclient
+     zo bedoeld rendert: Chrome zet een <ul> gerust binnen een <p>, en een subopsomming
+     binnen een <li>. Alles wordt hier platgeslagen tot één rij blokken. */
+  function laLeesBlokken(node, blokken) {
+    var los = [];
+    function spoel() {
+      var n = laNormRuns(los); los = [];
+      if (laBlokTekst({ runs: n }) !== "") { blokken.push({ soort: "p", runs: n }); }
+    }
+    Array.prototype.forEach.call(node.childNodes, function (k) {
+      var nm = k.nodeName;
+      if (k.nodeType === 1 && (nm === "UL" || nm === "OL")) {
+        spoel();
+        var soort = nm === "UL" ? "ul" : "ol";
+        Array.prototype.forEach.call(k.children, function (li) {
+          if (li.nodeName !== "LI") return;
+          var eigen = [], sub = [];
+          Array.prototype.forEach.call(li.childNodes, function (kk) {
+            if (kk.nodeType === 1 && (kk.nodeName === "UL" || kk.nodeName === "OL")) { sub.push(kk); return; }
+            laRunsVanNode({ childNodes: [kk] }, {}, eigen);
+          });
+          var runs = laNormRuns(eigen);
+          if (laBlokTekst({ runs: runs }) !== "") { blokken.push({ soort: soort, runs: runs }); }
+          /* Diepere nesting wordt één niveau: mailclients tonen die toch niet
+             betrouwbaar, en de projectie kent geen niveaus. */
+          sub.forEach(function (x) { laLeesBlokken({ childNodes: [x] }, blokken); });
+        });
+        return;
+      }
+      if (k.nodeType === 1 && (nm === "P" || nm === "DIV" || nm === "BLOCKQUOTE")) {
+        spoel();
+        if (k.querySelector("ul,ol,p,div")) { laLeesBlokken(k, blokken); return; }
+        var r = []; laRunsVanNode(k, {}, r);
+        var rr = laNormRuns(r);
+        if (laBlokTekst({ runs: rr }) !== "") { blokken.push({ soort: "p", runs: rr }); }
+        return;
+      }
+      laRunsVanNode({ childNodes: [k] }, {}, los);
+    });
+    spoel();
+  }
+
+  function laBlokkenVanBox(box) {
+    if (!laIsRijk(box)) return laBlokkenVanTekst(box);
+    var blokken = [];
+    laLeesBlokken(box, blokken);
+    return blokken.length ? blokken : [{ soort: "p", runs: [] }];
+  }
+
+  /* De platte-tekstprojectie: precies de tekst die in een plain-text mail zou staan.
+     Bewust zónder opmaakmarkeringen (geen "- ", geen "**"): die zouden botsen met tekst
+     die de reviewer zelf typt, en zouden opmaak als woordwijziging in de tekstdiff duwen.
+     Alinea's staan een lege regel uit elkaar, opsommingsregels een enkele. */
+  function laProjectie(blokken) {
+    var uit = "";
+    blokken.forEach(function (b, i) {
+      if (i > 0) {
+        var vorige = blokken[i - 1];
+        uit += (b.soort !== "p" && vorige.soort !== "p") ? "\n" : "\n\n";
+      }
+      uit += laBlokTekst(b);
+    });
+    return uit;
+  }
+
+  /* Serialisatie naar mail-veilige HTML. Alleen p/ul/ol/li/b/i/a/br: dat is de
+     doorsnede die Outlook, Gmail en Teams alle drie zonder eigen interpretatie tonen. */
+  function laEsc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function laRunsNaarHtml(runs) {
+    var h = runs.map(function (r) {
+      var s = laEsc(r.t).replace(/\n/g, "<br>");
+      if (r.b) s = "<b>" + s + "</b>";
+      if (r.i) s = "<i>" + s + "</i>";
+      if (r.href) s = '<a href="' + laEsc(r.href).replace(/"/g, "&quot;") + '">' + s + "</a>";
+      return s;
+    }).join("");
+    return h || "<br>";
+  }
+  function laBlokkenNaarHtml(blokken) {
+    var uit = "", i = 0;
+    while (i < blokken.length) {
+      var b = blokken[i];
+      if (b.soort === "p") { uit += "<p>" + laRunsNaarHtml(b.runs) + "</p>"; i++; continue; }
+      var tag = b.soort === "ul" ? "ul" : "ol";
+      uit += "<" + tag + ">";
+      while (i < blokken.length && blokken[i].soort === b.soort) {
+        uit += "<li>" + laRunsNaarHtml(blokken[i].runs) + "</li>"; i++;
+      }
+      uit += "</" + tag + ">";
+    }
+    return uit;
+  }
 
   /* Woord-diff via LCS. Woordniveau, niet teken- of regelniveau: bij lopende tekst
      leest dat als tracked changes in plaats van als ruis. */
@@ -1290,12 +1575,24 @@
     return (voor.split(/\n\s*\n/).length);
   }
 
-  function laHunks(ops, nieuweTekst) {
+  function laHunks(ops, nieuweTekst, blokken) {
     var lijst = [], posNieuw = 0;
     ops.forEach(function (o) {
       lijst.push({ op: o.op, t: o.t, nieuw: posNieuw });
       if (o.op !== "-") posNieuw += o.t.length;
     });
+    /* Het anker mag niet buiten het eigen blok reiken. In de HTML-bron staat tussen twee
+       blokken een tag, dus een anker dat een blokgrens overschrijdt is daar nooit terug
+       te vinden — en pas-hunk-toe.py zou het blok dan niet kunnen plaatsen. Binnen het
+       blok is de tekst wél letterlijk wat er in de bron staat. */
+    var bereiken = blokken ? laBlokBereiken(blokken) : null;
+    function blokBij(pos) {
+      if (!bereiken) return null;
+      for (var k = 0; k < bereiken.length; k++) {
+        if (pos >= bereiken[k].start && pos <= bereiken[k].tot) return { b: bereiken[k], i: k };
+      }
+      return null;
+    }
     var hunks = [], i = 0, n = 0;
     while (i < lijst.length) {
       if (lijst[i].op === "=") { i++; continue; }
@@ -1306,11 +1603,18 @@
         i++;
       }
       n += 1;
+      var pos = lijst[start].nieuw;
+      var vak = blokBij(pos);
+      var maxVoor = vak ? Math.max(0, Math.min(40, pos - vak.b.start)) : 40;
+      var naPos = i < lijst.length ? lijst[i].nieuw : pos;
+      var maxNa = vak ? Math.max(0, Math.min(40, vak.b.eind - naPos)) : 40;
       hunks.push({
         n: n,
-        alinea: laAlinea(nieuweTekst, lijst[start].nieuw),
-        voor: start > 0 ? laStaart(lijst[start - 1].t, 40) : "",
-        na: i < lijst.length ? laKop(lijst[i].t, 40) : "",
+        soort: "tekst",
+        alinea: laAlinea(nieuweTekst, pos),
+        blok: vak ? laBlokTekst(blokken[vak.i]).slice(0, 80) : "",
+        voor: start > 0 ? laStaart(lijst[start - 1].t, maxVoor) : "",
+        na: i < lijst.length ? laKop(lijst[i].t, maxNa) : "",
         verwijderd: verwijderd,
         toegevoegd: toegevoegd
       });
@@ -1318,29 +1622,275 @@
     return hunks;
   }
 
-  function laTeken(box, ops) {
-    box.textContent = "";
-    var n = 0, vorigeWasWijziging = false;
+  /* === opmaakkanaal ================================================
+     Opmaak zit niet in de projectie, dus verandert er niets aan de tekstdiff wanneer een
+     regel een bullet wordt of een woord vet. Die wijzigingen krijgen hun eigen hunks.
+     Blokken worden gekoppeld op hun tekst (LCS); een blok waarvan óók de tekst wijzigde
+     koppelt niet en zit dus al in de tekst-hunks — de volledige nieuwe versie staat
+     hoe dan ook in `nieuwHtml`. */
+  function laBlokLcs(oud, nieuw) {
+    var a = oud.map(laBlokTekst), b = nieuw.map(laBlokTekst);
+    var n = a.length, m = b.length, i, j;
+    var d = [];
+    for (i = 0; i <= n; i++) { d.push(new Uint32Array(m + 1)); }
+    for (i = n - 1; i >= 0; i--) {
+      for (j = m - 1; j >= 0; j--) {
+        d[i][j] = a[i] === b[j] ? d[i + 1][j + 1] + 1 : Math.max(d[i + 1][j], d[i][j + 1]);
+      }
+    }
+    var paren = [], nieuwGekoppeld = {};
+    i = 0; j = 0;
+    while (i < n && j < m) {
+      if (a[i] === b[j]) { paren.push([i, j]); nieuwGekoppeld[j] = true; i++; j++; }
+      else if (d[i + 1][j] >= d[i][j + 1]) { i++; }
+      else { j++; }
+    }
+    return { paren: paren, nieuwGekoppeld: nieuwGekoppeld };
+  }
+
+  var LA_SOORTNAAM = { p: "alinea", ul: "opsomming", ol: "genummerde opsomming" };
+
+  /* Waar in dit blok verschilt een merk? Geeft de tekst waarop het merk aan- of
+     uitging, zodat de melding aanwijst wat er vet werd en niet alleen dát er iets vet werd. */
+  function laMerkVerschil(oudB, nieuwB, merk) {
+    var a = laRunsNaarChars(oudB.runs), b = laRunsNaarChars(nieuwB.runs);
+    var aan = "", uit = "", k;
+    for (k = 0; k < b.length && k < a.length; k++) {
+      var va = merk === "href" ? (a[k].href || "") : !!a[k][merk];
+      var vb = merk === "href" ? (b[k].href || "") : !!b[k][merk];
+      if (va === vb) continue;
+      if (merk === "href") { if (vb) { aan += b[k].c; } else { uit += b[k].c; } }
+      else if (vb) { aan += b[k].c; } else { uit += b[k].c; }
+    }
+    return { aan: aan.trim(), uit: uit.trim() };
+  }
+
+  function laOpmaakVanBlok(b) {
+    var stukken = [];
+    if (b.soort !== "p") { stukken.push(LA_SOORTNAAM[b.soort]); }
+    var vet = "", cur = "", link = "";
+    b.runs.forEach(function (r) {
+      if (r.b) vet += r.t;
+      if (r.i) cur += r.t;
+      if (r.href && !link) link = r.href;
+    });
+    if (vet.trim()) stukken.push('vet op "' + vet.trim().slice(0, 40) + '"');
+    if (cur.trim()) stukken.push('cursief op "' + cur.trim().slice(0, 40) + '"');
+    if (link) stukken.push("link naar " + link);
+    return stukken;
+  }
+
+  function laOpmaakHunks(oudBlokken, nieuwBlokken, startNr) {
+    var koppel = laBlokLcs(oudBlokken, nieuwBlokken);
+    var hunks = [], n = startNr;
+    koppel.paren.forEach(function (paar) {
+      var o = oudBlokken[paar[0]], b = nieuwBlokken[paar[1]];
+      var beschrijving = [];
+      if (o.soort !== b.soort) {
+        beschrijving.push(LA_SOORTNAAM[o.soort] + " werd " + LA_SOORTNAAM[b.soort]);
+      }
+      ["b", "i", "href"].forEach(function (merk) {
+        var v = laMerkVerschil(o, b, merk);
+        var naam = merk === "b" ? "vet" : merk === "i" ? "cursief" : "link";
+        if (v.aan) beschrijving.push(naam + ' aan op "' + v.aan.slice(0, 40) + '"');
+        if (v.uit) beschrijving.push(naam + ' weg op "' + v.uit.slice(0, 40) + '"');
+      });
+      if (!beschrijving.length) return;
+      n += 1;
+      hunks.push({
+        n: n, soort: "opmaak", blokIndex: paar[1],
+        blok: laBlokTekst(b).slice(0, 80),
+        van: LA_SOORTNAAM[o.soort], naar: LA_SOORTNAAM[b.soort],
+        omschrijving: beschrijving.join(", ")
+      });
+    });
+    /* Een regel die de reviewer nieuw typte én meteen opmaak gaf: de tekst zit in de
+       tekst-hunks, maar dat het een bullet is zou anders nergens staan. */
+    nieuwBlokken.forEach(function (b, j) {
+      if (koppel.nieuwGekoppeld[j]) return;
+      var stukken = laOpmaakVanBlok(b);
+      if (!stukken.length) return;
+      n += 1;
+      hunks.push({
+        n: n, soort: "opmaak", blokIndex: j, nieuwBlok: true,
+        blok: laBlokTekst(b).slice(0, 80),
+        van: "", naar: LA_SOORTNAAM[b.soort],
+        omschrijving: "nieuwe regel, " + stukken.join(", ")
+      });
+    });
+    return hunks;
+  }
+
+  /* === weergave van de tracked changes =============================
+     De diff loopt over de projectie; de weergave over de blokken. Elk blok kent zijn
+     bereik in de projectie (inclusief de scheiding erna, zodat elk teken bij precies één
+     blok hoort), en daarbinnen wordt per stukje bepaald of het ongewijzigd, toegevoegd of
+     verwijderd is. Zo blijft de kaart eruitzien als de mail terwijl de wijzigingen
+     erin zichtbaar zijn. */
+  function laBlokBereiken(blokken) {
+    var bereiken = [], pos = 0;
+    blokken.forEach(function (b, i) {
+      var start = pos, lengte = laBlokTekst(b).length;
+      pos += lengte;
+      var scheiding = 0;
+      if (i < blokken.length - 1) {
+        var volgende = blokken[i + 1];
+        scheiding = (volgende.soort !== "p" && b.soort !== "p") ? 1 : 2;
+        pos += scheiding;
+      }
+      bereiken.push({ start: start, eind: start + lengte, tot: pos });
+    });
+    return bereiken;
+  }
+
+  /* Ops -> segmenten over de nieuwe tekst (= en +) plus losse verwijderingen die op een
+     positie in de nieuwe tekst hangen. Het hunknummer telt precies zoals laHunks telt:
+     één nummer per aaneengesloten reeks wijzigingen. */
+  function laSegmenten(ops) {
+    var seg = [], weg = [], pos = 0, nr = 0, inWijziging = false;
     ops.forEach(function (o) {
       if (o.op === "=") {
-        box.appendChild(document.createTextNode(o.t));
-        vorigeWasWijziging = false;
-        return;
+        seg.push({ start: pos, eind: pos + o.t.length, op: "=", nr: 0 });
+        pos += o.t.length; inWijziging = false; return;
       }
-      if (!vorigeWasWijziging) {
-        /* nummer vóór elk blok, zodat "hunk 2" in de chat hetzelfde blok aanwijst
-           als het nummer op het scherm */
-        n += 1;
-        var sup = document.createElement("sup");
-        sup.className = "la-hunk-nr";
-        sup.textContent = n;
-        box.appendChild(sup);
-        vorigeWasWijziging = true;
+      if (!inWijziging) { nr += 1; inWijziging = true; }
+      if (o.op === "+") {
+        seg.push({ start: pos, eind: pos + o.t.length, op: "+", nr: nr });
+        pos += o.t.length;
+      } else {
+        weg.push({ pos: pos, t: o.t, nr: nr });
       }
-      var e = document.createElement(o.op === "+" ? "ins" : "del");
-      e.textContent = o.t;
-      box.appendChild(e);
     });
+    return { seg: seg, weg: weg };
+  }
+
+  function laMaakInline(runs, bereik, segmenten, getoond) {
+    /* Geeft een DocumentFragment met de runs van één blok, opgeknipt op de
+       segmentgrenzen. `getoond` onthoudt welke hunknummers al een superscript kregen. */
+    var frag = document.createDocumentFragment();
+    var chars = laRunsNaarChars(runs);
+    function nummer(nr) {
+      if (!nr || getoond[nr]) return null;
+      getoond[nr] = true;
+      var sup = document.createElement("sup");
+      sup.className = "la-hunk-nr";
+      sup.textContent = nr;
+      return sup;
+    }
+    function stuk(vanaf, tot, op, nr) {
+      var deel = chars.slice(vanaf, tot);
+      if (!deel.length) return;
+      var sup = op === "+" ? nummer(nr) : null;
+      if (sup) frag.appendChild(sup);
+      laCharsNaarRuns(deel).forEach(function (r) {
+        var knoop = document.createDocumentFragment();
+        r.t.split("\n").forEach(function (regel, idx) {
+          if (idx) knoop.appendChild(document.createElement("br"));
+          if (regel) knoop.appendChild(document.createTextNode(regel));
+        });
+        var el = knoop;
+        function wikkel(tag) {
+          var e = document.createElement(tag); e.appendChild(el); el = e; return e;
+        }
+        if (r.b) wikkel("b");
+        if (r.i) wikkel("i");
+        if (r.href) { wikkel("a").setAttribute("href", r.href); }
+        if (op === "+") { wikkel("ins"); }
+        frag.appendChild(el);
+      });
+    }
+    /* verwijderingen op positie invoegen, gemengd met de segmenten */
+    var punten = [];
+    segmenten.seg.forEach(function (s) {
+      var van = Math.max(s.start, bereik.start), tot = Math.min(s.eind, bereik.eind);
+      if (tot > van) punten.push({ soort: "seg", van: van, tot: tot, op: s.op, nr: s.nr });
+    });
+    segmenten.weg.forEach(function (w) {
+      if (w.pos >= bereik.start && w.pos <= bereik.tot && w.pos <= bereik.eind) {
+        punten.push({ soort: "weg", van: w.pos, t: w.t, nr: w.nr });
+      } else if (w.pos > bereik.eind && w.pos <= bereik.tot) {
+        punten.push({ soort: "weg", van: bereik.eind, t: w.t, nr: w.nr });
+      }
+    });
+    punten.sort(function (a, b) {
+      if (a.van !== b.van) return a.van - b.van;
+      return a.soort === "weg" ? -1 : 1;
+    });
+    punten.forEach(function (p) {
+      if (p.soort === "seg") { stuk(p.van - bereik.start, p.tot - bereik.start, p.op, p.nr); return; }
+      var sup = nummer(p.nr);
+      if (sup) frag.appendChild(sup);
+      var del = document.createElement("del");
+      del.textContent = p.t;
+      frag.appendChild(del);
+    });
+    return frag;
+  }
+
+  function laTekenBlokken(box, blokken, ops, rijk, opmaakHunks) {
+    box.textContent = "";
+    var bereiken = laBlokBereiken(blokken);
+    var segmenten = laSegmenten(ops);
+    var getoond = {};
+    var perBlok = {};
+    (opmaakHunks || []).forEach(function (h) {
+      if (h.blokIndex == null) return;
+      (perBlok[h.blokIndex] = perBlok[h.blokIndex] || []).push(h);
+    });
+    var i = 0, lijst = null, lijstSoort = null;
+    function sluitLijst() { lijst = null; lijstSoort = null; }
+    while (i < blokken.length) {
+      var b = blokken[i], bereik = bereiken[i];
+      var inhoud = laMaakInline(b.runs, bereik, segmenten, getoond);
+      var opm = perBlok[i];
+      if (!rijk) {
+        sluitLijst();
+        if (i > 0) {
+          var vorige = blokken[i - 1];
+          box.appendChild(document.createTextNode(
+            (b.soort !== "p" && vorige.soort !== "p") ? "\n" : "\n\n"));
+        }
+        if (opm) {
+          var merk = document.createElement("span");
+          merk.className = "la-opmaak";
+          merk.title = opm.map(function (h) { return h.omschrijving; }).join("; ");
+          opm.forEach(function (h) {
+            var s = document.createElement("sup");
+            s.className = "la-hunk-nr"; s.textContent = h.n;
+            merk.appendChild(s);
+          });
+          merk.appendChild(inhoud);
+          box.appendChild(merk);
+        } else {
+          box.appendChild(inhoud);
+        }
+        i++; continue;
+      }
+      var el;
+      if (b.soort === "p") {
+        sluitLijst();
+        el = document.createElement("p");
+        box.appendChild(el);
+      } else {
+        var tag = b.soort === "ul" ? "ul" : "ol";
+        if (!lijst || lijstSoort !== b.soort) {
+          lijst = document.createElement(tag); lijstSoort = b.soort; box.appendChild(lijst);
+        }
+        el = document.createElement("li");
+        lijst.appendChild(el);
+      }
+      if (opm) {
+        el.className = "la-opmaak";
+        el.title = opm.map(function (h) { return h.omschrijving; }).join("; ");
+        opm.forEach(function (h) {
+          var s = document.createElement("sup");
+          s.className = "la-hunk-nr"; s.textContent = h.n;
+          el.appendChild(s);
+        });
+      }
+      el.appendChild(inhoud);
+      i++;
+    }
   }
 
   /* Naam van het concept, om een bewerking na een reload bij de goede kaart terug te
@@ -1352,28 +1902,22 @@
     return t ? t.slice(0, 160) : "concept-" + (index + 1);
   }
 
-  /* Positie van een klik, uitgedrukt in tekens van de kale tekst: alles in een <del>
-     telt niet mee, want dat staat er straks niet meer. */
-  function laKlikOffset(box, x, y) {
-    var r = null;
-    if (document.caretRangeFromPoint) { r = document.caretRangeFromPoint(x, y); }
-    else if (document.caretPositionFromPoint) {
-      var cp = document.caretPositionFromPoint(x, y);
-      if (cp) { r = document.createRange(); r.setStart(cp.offsetNode, cp.offset); }
-    }
-    if (!r || !box.contains(r.startContainer)) return null;
-    var doel = r.startContainer, offset = r.startOffset, telling = 0, klaar = false;
+  /* === cursorposities =============================================
+     Posities worden geteld in tekens van de kale tekst zoals die in de DOM staat: alles
+     in een <del> telt niet mee (dat staat er straks niet meer) en het bloknummer is
+     opmaak, geen tekst. Blokscheidingen zitten in de rijke weergave niet in de DOM, dus
+     dezelfde telling geldt vóór en ná het omschakelen tussen opmaak en kale tekst. */
+  function laDomTeller(box, doel, doelOffset) {
+    var telling = 0, klaar = false;
     (function loop(node) {
       if (klaar) return;
       if (node.nodeType === 3) {
-        if (node === doel) { telling += offset; klaar = true; return; }
+        if (node === doel) { telling += doelOffset; klaar = true; return; }
         telling += node.nodeValue.length;
         return;
       }
+      if (node.nodeType !== 1) return;
       if (node.nodeName === "SUP" && node.className === "la-hunk-nr") {
-        /* Het blokummer is opmaak, geen tekst: het staat niet in de echte tekst en mag
-           dus niet meetellen, anders staat de cursor per voorafgaand blok één teken
-           naast. Klikken óp het nummer telt als de rand van dat blok. */
         if (node.contains(doel)) { klaar = true; }
         return;
       }
@@ -1383,38 +1927,122 @@
         if (node.contains(doel)) { klaar = true; }
         return;
       }
+      if (node.nodeName === "BR") { telling += 1; return; }
+      if (node === doel) {
+        /* offset in een element = aantal kinderen ervoor */
+        for (var k = 0; k < doelOffset && k < node.childNodes.length; k++) { loop(node.childNodes[k]); }
+        klaar = true; return;
+      }
       for (var i = 0; i < node.childNodes.length && !klaar; i++) { loop(node.childNodes[i]); }
     })(box);
-    return Math.min(telling, box.__nieuw.length);
+    return telling;
   }
 
-  function laZetCaret(box, offset) {
-    var t = box.firstChild;
-    if (!t || t.nodeType !== 3) return;
+  function laKlikOffset(box, x, y) {
+    var r = null;
+    if (document.caretRangeFromPoint) { r = document.caretRangeFromPoint(x, y); }
+    else if (document.caretPositionFromPoint) {
+      var cp = document.caretPositionFromPoint(x, y);
+      if (cp) { r = document.createRange(); r.setStart(cp.offsetNode, cp.offset); }
+    }
+    if (!r || !box.contains(r.startContainer)) return null;
+    return laDomTeller(box, r.startContainer, r.startOffset);
+  }
+
+  function laSelectieOffsets(box) {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    var r = sel.getRangeAt(0);
+    if (!box.contains(r.startContainer) || !box.contains(r.endContainer)) return null;
+    return {
+      start: laDomTeller(box, r.startContainer, r.startOffset),
+      eind: laDomTeller(box, r.endContainer, r.endOffset)
+    };
+  }
+
+  function laPuntOpOffset(box, n) {
+    var rest = n, gevonden = null, rand = null;
+    (function loop(node) {
+      if (gevonden) return;
+      if (node.nodeType === 3) {
+        if (rest < node.nodeValue.length) { gevonden = { node: node, offset: rest }; return; }
+        if (rest === node.nodeValue.length) {
+          /* Precies op de grens van twee blokken. Dat punt hoort bij het begin van het
+             volgende, niet bij het eind van het vorige: anders trekt een lijstcommando
+             de alinea erboven mee de opsomming in. Onthouden en doorlopen; is er geen
+             volgend blok, dan is deze rand alsnog het antwoord. */
+          rand = { node: node, offset: rest };
+        }
+        rest -= node.nodeValue.length; return;
+      }
+      if (node.nodeType !== 1) return;
+      if (node.nodeName === "SUP" && node.className === "la-hunk-nr") return;
+      if (node.nodeName === "DEL") return;
+      if (node.nodeName === "BR") { if (rest <= 1) { gevonden = { node: node.parentNode, offset: 0 }; return; } rest -= 1; return; }
+      for (var i = 0; i < node.childNodes.length && !gevonden; i++) { loop(node.childNodes[i]); }
+    })(box);
+    return gevonden || rand;
+  }
+
+  function laZetCaret(box, start, eind) {
+    var a = laPuntOpOffset(box, start);
+    if (!a) return;
+    var b = eind != null && eind !== start ? laPuntOpOffset(box, eind) : a;
     var r = document.createRange();
-    r.setStart(t, Math.max(0, Math.min(offset, t.nodeValue.length)));
-    r.collapse(true);
+    r.setStart(a.node, a.offset);
+    if (b) { r.setEnd(b.node, b.offset); } else { r.collapse(true); }
     var sel = window.getSelection();
     sel.removeAllRanges(); sel.addRange(r);
   }
 
+  /* === de kaart ==================================================== */
   function laDraftInit() {
+    try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) {}
     var boxen = document.querySelectorAll(".la-draft-txt");
     Array.prototype.forEach.call(boxen, function (box, index) {
       if (box.__laKlaar) return;
       box.__laKlaar = true;
-      box.__origineel = box.textContent;
-      box.__nieuw = box.textContent;
+      box.__rijk = laIsRijk(box);
+      box.__origBlokken = laBlokkenVanBox(box);
+      box.__blokken = box.__origBlokken;
+      box.__origineel = laProjectie(box.__origBlokken);
+      box.__nieuw = box.__origineel;
+      box.__origineelHtml = laBlokkenNaarHtml(box.__origBlokken);
+      box.__nieuwHtml = box.__origineelHtml;
       box.__veld = laVeld(box, index);
+      if (box.__rijk) box.classList.add("la-rijk");
 
       /* Altijd bewerkbaar. Een knop om "de bewerkmodus aan te zetten" is een drempel
-         voor iets wat de reviewer gewoon wil kunnen doen: klikken waar hij wil en typen. */
-      box.setAttribute("contenteditable", "plaintext-only");
+         voor iets wat de reviewer gewoon wil kunnen doen: klikken waar hij wil en typen.
+         Een kaart zonder blokstructuur blijft plaintext-only tot de reviewer zelf opmaak
+         aanzet: dan kan Enter geen <div> smokkelen die de projectie stilletjes verandert. */
+      box.setAttribute("contenteditable", box.__rijk ? "true" : "plaintext-only");
       box.classList.add("la-bewerkbaar");
 
       var bar = document.createElement("div");
       bar.className = "la-draft-bar";
+      var knoppen = [];
+      function maakKnop(label, titel, doe) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.innerHTML = label;
+        b.title = titel;
+        b.className = "la-fmt";
+        b.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+        b.addEventListener("click", function (ev) { ev.preventDefault(); doe(); });
+        bar.appendChild(b); knoppen.push(b);
+        return b;
+      }
+      maakKnop("<b>B</b>", "Bold (⌘B)", function () { laOpmaakCmd(box, "bold"); });
+      maakKnop("<i>I</i>", "Italic (⌘I)", function () { laOpmaakCmd(box, "italic"); });
+      maakKnop("Link", "Link (⌘K)", function () { laLinkCmd(box); });
+      maakKnop("• List", "Bulleted list", function () { laOpmaakCmd(box, "insertUnorderedList"); });
+      maakKnop("1. List", "Numbered list", function () { laOpmaakCmd(box, "insertOrderedList"); });
+      var scheiding = document.createElement("span");
+      scheiding.className = "la-draft-scheiding";
+      bar.appendChild(scheiding);
       var bHerstel = document.createElement("button");
+      bHerstel.type = "button";
       bHerstel.textContent = "↺ Restore original";
       bHerstel.style.display = "none";
       var meld = document.createElement("span");
@@ -1422,17 +2050,25 @@
       meld.textContent = "click the text to edit";
       bar.appendChild(bHerstel); bar.appendChild(meld);
       box.parentNode.insertBefore(bar, box.nextSibling);
-      box.__bar = { herstel: bHerstel, meld: meld };
+      box.__bar = { herstel: bHerstel, meld: meld, fmt: knoppen };
 
       /* De opgemaakte weergave (doorhaling + onderstreping) is alleen te zien als de
-         cursor er niet in staat. Zodra de reviewer erin klikt gaat hij terug naar kale tekst,
-         anders zou hij in zijn eigen doorhalingen zitten typen. */
+         cursor er niet in staat. Zodra de reviewer erin klikt gaat hij terug naar de kale
+         kaart, anders zou hij in zijn eigen doorhalingen zitten typen. */
       function toonMarkup() {
         if (box.__actief) return null;
         var ops = laDiff(box.__origineel, box.__nieuw);
-        var gewijzigd = ops.some(function (o) { return o.op !== "="; });
-        if (gewijzigd) { laTeken(box, ops); box.__markup = true; }
-        else { box.textContent = box.__nieuw; box.__markup = false; }
+        var tekstGewijzigd = ops.some(function (o) { return o.op !== "="; });
+        var opmaak = laOpmaakHunks(box.__origBlokken, box.__blokken,
+          tekstGewijzigd ? laHunks(ops, box.__nieuw, box.__blokken).length : 0);
+        var gewijzigd = tekstGewijzigd || opmaak.length > 0;
+        if (gewijzigd) {
+          laTekenBlokken(box, box.__blokken, ops, box.__rijk, opmaak);
+          box.__markup = true;
+        } else {
+          laToonKaal(box);
+          box.__markup = false;
+        }
         bHerstel.style.display = gewijzigd ? "" : "none";
         meld.textContent = gewijzigd
           ? (box.__nr ? "saved as annotation " + box.__nr : "edit not saved yet")
@@ -1443,9 +2079,10 @@
 
       function toonPlat() {
         if (!box.__markup) return;
-        box.textContent = box.__nieuw;
+        laToonKaal(box);
         box.__markup = false;
       }
+      box.__toonPlat = toonPlat;
 
       /* Klikken terwijl de opmaak zichtbaar is, is het lastige geval. De doorgehaalde
          tekst verdwijnt bij het terugschakelen naar kale tekst, dus de regel loopt anders
@@ -1463,10 +2100,24 @@
       });
       box.addEventListener("focus", function () { box.__actief = true; toonPlat(); });
 
+      /* Plakken gaat altijd als platte tekst: zo komt er geen vreemde opmaak de kaart in
+         die straks niet door een mailclient te renderen is. */
+      box.addEventListener("paste", function (ev) {
+        var t = ev.clipboardData && ev.clipboardData.getData("text/plain");
+        if (t == null) return;
+        ev.preventDefault();
+        try { document.execCommand("insertText", false, t); } catch (e) {}
+      });
+
       function bewaarNu() {
-        box.__nieuw = box.textContent;
+        box.__blokken = laBlokkenVanBox(box);
+        box.__nieuw = laProjectie(box.__blokken);
+        box.__nieuwHtml = laBlokkenNaarHtml(box.__blokken);
         var ops = laDiff(box.__origineel, box.__nieuw);
-        if (ops.some(function (o) { return o.op !== "="; })) { laBewaarBewerking(box, ops); }
+        var tekstGewijzigd = ops.some(function (o) { return o.op !== "="; });
+        var opmaak = laOpmaakHunks(box.__origBlokken, box.__blokken,
+          tekstGewijzigd ? laHunks(ops, box.__nieuw, box.__blokken).length : 0);
+        if (tekstGewijzigd || opmaak.length) { laBewaarBewerking(box, ops, opmaak); }
         else if (box.__annId) { laVerwijderBewerking(box); }
         return ops;
       }
@@ -1489,18 +2140,109 @@
       });
 
       box.addEventListener("keydown", function (ev) {
-        if (ev.key === "Escape") { ev.preventDefault(); box.blur(); }
+        if (ev.key === "Escape") { ev.preventDefault(); box.blur(); return; }
+        if (!(ev.metaKey || ev.ctrlKey)) return;
+        var k = ev.key.toLowerCase();
+        if (k === "b") { ev.preventDefault(); laOpmaakCmd(box, "bold"); }
+        else if (k === "i") { ev.preventDefault(); laOpmaakCmd(box, "italic"); }
+        else if (k === "k") { ev.preventDefault(); laLinkCmd(box); }
       });
 
       bHerstel.addEventListener("click", function () {
+        box.__blokken = box.__origBlokken;
         box.__nieuw = box.__origineel;
+        box.__nieuwHtml = box.__origineelHtml;
         box.__markup = false;
-        box.textContent = box.__origineel;
+        laToonKaal(box);
         laVerwijderBewerking(box);
         bHerstel.style.display = "none";
         meld.textContent = "original restored";
       });
     });
+  }
+
+  /* De kale kaart: platte tekst zolang de agent hem plat schreef, blokken zodra er
+     structuur in zit. Twee weergaven, één model. */
+  function laToonKaal(box) {
+    if (box.__rijk) { box.innerHTML = laBlokkenNaarHtml(box.__blokken); }
+    else { box.textContent = box.__nieuw; }
+  }
+
+  /* Opmaak aanzetten op een kaart die nog platte tekst is, betekent eerst omschakelen
+     naar blokken. Dat kan niet halverwege: pre-wrap uitzetten terwijl de rest nog uit
+     kale regelovergangen bestaat zou al die regels op één hoop gooien. Dus in één keer,
+     met de selectie op zijn plek terug. */
+  function laMaakRijk(box) {
+    if (box.__rijk) return;
+    var sel = laSelectieOffsets(box);
+    box.__blokken = laBlokkenVanBox(box);
+    box.__rijk = true;
+    box.classList.add("la-rijk");
+    box.setAttribute("contenteditable", "true");
+    box.innerHTML = laBlokkenNaarHtml(box.__blokken);
+    box.focus();
+    /* De scheidingen tussen blokken zijn in de platte kaart echte tekens en in de rijke
+       kaart alleen structuur. Een offset uit de ene telling wijst in de andere dus naar
+       een ander teken; daarom eerst omrekenen, anders springt de selectie. */
+    if (sel) {
+      laZetCaret(box, laProjNaarDom(box.__blokken, sel.start),
+        laProjNaarDom(box.__blokken, sel.eind));
+    }
+  }
+
+  function laProjNaarDom(blokken, n) {
+    var bereiken = laBlokBereiken(blokken), voor = 0;
+    for (var i = 0; i < bereiken.length; i++) {
+      var b = bereiken[i];
+      if (n <= b.eind) { return voor + Math.max(0, n - b.start); }
+      voor += b.eind - b.start;
+    }
+    return voor;
+  }
+
+  function laOpmaakCmd(box, cmd) {
+    if (box.__markup) { box.__actief = true; box.__toonPlat(); box.focus(); }
+    laMaakRijk(box);
+    box.focus();
+    try { document.execCommand(cmd, false, null); } catch (e) {}
+    laNormaliseer(box);
+    box.__bewaarNu();
+  }
+
+  /* Een editor-commando laat de DOM achter zoals de browser hem toevallig bouwt: een
+     <ul> in een <p>, een <span style="font-weight:700">, een lege <div>. Direct daarna
+     terugschrijven vanuit het model maakt er weer de kleine, mail-veilige vorm van —
+     dat is meteen de sanitizer. De tekstinhoud verandert daar niet van, dus de cursor
+     kan op dezelfde tekenpositie terug. */
+  function laNormaliseer(box) {
+    if (!box.__rijk) return;
+    var sel = laSelectieOffsets(box);
+    box.__blokken = laBlokkenVanBox(box);
+    box.innerHTML = laBlokkenNaarHtml(box.__blokken);
+    if (sel) { box.focus(); laZetCaret(box, sel.start, sel.eind); }
+  }
+
+  function laLinkCmd(box) {
+    if (box.__markup) { box.__actief = true; box.__toonPlat(); box.focus(); }
+    laMaakRijk(box);
+    box.focus();
+    var sel = window.getSelection();
+    var leeg = !sel || sel.isCollapsed;
+    var huidig = "";
+    try {
+      var n = sel && sel.anchorNode;
+      var a = n && (n.nodeType === 1 ? n : n.parentNode);
+      a = a && a.closest && a.closest("a");
+      if (a) huidig = a.getAttribute("href") || "";
+    } catch (e) {}
+    var url = prompt(leeg && !huidig ? "Select the text first, then add a link.\nURL:" : "URL:", huidig || "https://");
+    if (url === null) return;
+    try {
+      if (!url) { document.execCommand("unlink", false, null); }
+      else { document.execCommand("createLink", false, url); }
+    } catch (e) {}
+    laNormaliseer(box);
+    box.__bewaarNu();
   }
 
   function laVerwijderBewerking(box) {
@@ -1510,7 +2252,8 @@
     box.__annId = null; box.__nr = null;
   }
 
-  function laBewaarBewerking(box, ops) {
+  function laBewaarBewerking(box, ops, opmaak) {
+    var tekstHunks = ops.some(function (o) { return o.op !== "="; }) ? laHunks(ops, box.__nieuw, box.__blokken) : [];
     var a = {
       id: box.__annId || ("edit-" + Date.now() + "-" + Math.random().toString(16).slice(2, 6)),
       type: "edit",
@@ -1518,8 +2261,11 @@
       target: box.__veld,
       origineel: box.__origineel,
       nieuw: box.__nieuw,
+      origineelHtml: box.__origineelHtml,
+      nieuwHtml: box.__nieuwHtml,
+      rijk: !!box.__rijk,
       diff: ops,
-      hunks: laHunks(ops, box.__nieuw),
+      hunks: tekstHunks.concat(opmaak || []),
       comment: "Tekst herschreven in het concept",
       rect: { x: 0, y: 0, w: 0, h: 0 }
     };
@@ -1560,20 +2306,77 @@
     return null;
   }
 
+  /* Blokken uit een projectie terugbouwen, zodat een herplaatste tekst weer een model is.
+     Alinea's staan een lege regel uit elkaar; opsommingsstructuur komt daarna terug uit
+     de opmaak-hunks, die hun blok op de tekst terugvinden. */
+  function laBlokkenVanProjectie(tekst) {
+    return tekst.split(/\n[ \t]*\n[ \t\n]*/).map(function (deel) {
+      return { soort: "p", runs: deel ? [{ t: deel, b: false, i: false, href: "" }] : [] };
+    });
+  }
+
+  /* Een blok uit de projectie terugbouwen kent geen opsommingen: twee regels die samen
+     een lijst waren staan er als één alinea met een harde regelovergang. Het opmaakblok
+     wijst zijn regel aan; die wordt er zo nodig uitgesplitst voor hij zijn vorm terugkrijgt. */
+  function laPasOpmaakHunkToe(blokken, h) {
+    var doel = (h.blok || "").trim();
+    if (!doel) return false;
+    var soort = h.naar === "opsomming" ? "ul" : h.naar === "genummerde opsomming" ? "ol" : "p";
+    for (var i = 0; i < blokken.length; i++) {
+      var t = laBlokTekst(blokken[i]);
+      if (t.trim() === doel) { blokken[i].soort = soort; return true; }
+      var regels = t.split("\n");
+      if (regels.length < 2) continue;
+      var r = -1;
+      for (var k = 0; k < regels.length; k++) { if (regels[k].trim() === doel) { r = k; break; } }
+      if (r < 0) continue;
+      var vervanging = regels.map(function (regel, k) {
+        return {
+          soort: k === r ? soort : blokken[i].soort,
+          runs: regel ? [{ t: regel, b: false, i: false, href: "" }] : []
+        };
+      });
+      blokken.splice.apply(blokken, [i, 1].concat(vervanging));
+      return true;
+    }
+    return false;
+  }
+
   /* Na een reload staan de bewerkingen op schijf maar toont de kaart weer de tekst zoals
-     hij nu is. Openstaande blokken worden daar één voor één op teruggeplaatst — niet de
-     opgeslagen eindtekst in één keer. Dat verschil telt zodra een agent één blok heeft
-     doorgevoerd: de pagina is dan veranderd, en alleen wat nog openstaat hoort nog te
-     worden getoond. Blokken die al verwerkt zijn verdwijnen vanzelf. */
+     hij nu is. Is de concepttekst onveranderd, dan komt de bewerkte versie er compleet
+     terug — inclusief opmaak. Is de tekst wél gewijzigd, dan worden openstaande blokken
+     er één voor één op teruggeplaatst, niet de opgeslagen eindtekst in één keer. Dat
+     verschil telt zodra een agent één blok heeft doorgevoerd: de pagina is dan veranderd,
+     en alleen wat nog openstaat hoort nog te worden getoond. */
   function laHerstelBewerkingen() {
     var perVeld = {};
     anns.forEach(function (a) { if (a.type === "edit" && a.veld) { perVeld[a.veld] = a; } });
     Array.prototype.forEach.call(document.querySelectorAll(".la-draft-txt"), function (box) {
       var a = perVeld[box.__veld];
       if (!a || !box.__toonMarkup) return;
-      var hunks = (a.hunks || []).filter(function (h) { return !h.resolved; });
+      var alle = a.hunks || [];
+      var open = alle.filter(function (h) { return !h.resolved; });
+      var tekstHunks = open.filter(function (h) { return h.soort !== "opmaak"; });
+      var opmaakHunks = open.filter(function (h) { return h.soort === "opmaak"; });
 
-      if (!hunks.length) {
+      /* Onveranderd concept: de bewerkte versie compleet terug, opmaak incluis. */
+      if (a.origineel === box.__origineel && open.length === alle.length && a.nieuwHtml) {
+        var houder = document.createElement("div");
+        houder.innerHTML = a.nieuwHtml;
+        box.__annId = a.id; box.__nr = a.nr;
+        box.__blokken = laBlokkenVanBox(houder);
+        box.__nieuw = laProjectie(box.__blokken);
+        box.__nieuwHtml = a.nieuwHtml;
+        if (a.rijk && !box.__rijk) {
+          box.__rijk = true;
+          box.classList.add("la-rijk");
+          box.setAttribute("contenteditable", "true");
+        }
+        box.__toonMarkup();
+        return;
+      }
+
+      if (!alle.length) {
         /* Oudere bewerking zonder blokken: alleen terugzetten als de tekst nog exact
            is zoals hij was, anders zou de oude versie over de nieuwe heen komen. */
         if (a.origineel && a.origineel !== box.__origineel) {
@@ -1581,21 +2384,39 @@
           return;
         }
         box.__annId = a.id; box.__nr = a.nr; box.__nieuw = a.nieuw || box.__origineel;
+        box.__blokken = laBlokkenVanProjectie(box.__nieuw);
         box.__toonMarkup();
         return;
       }
 
       var tekst = box.__origineel, geplaatst = 0, kwijt = [];
-      hunks.forEach(function (h) {
+      tekstHunks.forEach(function (h) {
         var r = laPlaatsHunk(tekst, h);
         if (r === null) { kwijt.push(h.n); } else { tekst = r; geplaatst += 1; }
+      });
+      if (tekstHunks.length && !geplaatst) {
+        box.__bar.meld.textContent =
+          "annotation " + a.nr + ": text changed too much to show the edit";
+        return;
+      }
+      var blokken = laBlokkenVanProjectie(tekst);
+      opmaakHunks.forEach(function (h) {
+        if (laPasOpmaakHunkToe(blokken, h)) { geplaatst += 1; } else { kwijt.push(h.n); }
       });
       if (!geplaatst) {
         box.__bar.meld.textContent =
           "annotation " + a.nr + ": text changed too much to show the edit";
         return;
       }
-      box.__annId = a.id; box.__nr = a.nr; box.__nieuw = tekst;
+      box.__annId = a.id; box.__nr = a.nr;
+      box.__nieuw = tekst;
+      box.__blokken = blokken;
+      box.__nieuwHtml = laBlokkenNaarHtml(blokken);
+      if (blokken.some(function (b) { return b.soort !== "p"; }) && !box.__rijk) {
+        box.__rijk = true;
+        box.classList.add("la-rijk");
+        box.setAttribute("contenteditable", "true");
+      }
       box.__toonMarkup();
       if (kwijt.length) {
         box.__bar.meld.textContent = "annotation " + a.nr + ": hunk " + kwijt.join(", ") +
@@ -1623,10 +2444,14 @@
     },
     drafts: function () {
       return Array.prototype.map.call(document.querySelectorAll(".la-draft-txt"), function (b) {
-        return { veld: b.__veld, origineel: b.__origineel, nieuw: b.__nieuw, nr: b.__nr || null };
+        return { veld: b.__veld, origineel: b.__origineel, nieuw: b.__nieuw,
+          origineelHtml: b.__origineelHtml, nieuwHtml: b.__nieuwHtml,
+          rijk: !!b.__rijk, blokken: b.__blokken, nr: b.__nr || null };
       });
     },
     diff: laDiff,
+    draftModel: { blokken: laBlokkenVanBox, projectie: laProjectie, html: laBlokkenNaarHtml,
+      opmaakHunks: laOpmaakHunks, hunks: laHunks },
     add: function (a) {
       teller += 1;
       a.nr = teller; a.type = a.type || (a.selectedText ? "text" : "region");

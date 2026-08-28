@@ -132,6 +132,14 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
                 # alineanummer is om naar te verwijzen; het anker is de tekst eromheen.
                 for h in hunks:
                     vlag = " (afgevinkt)" if h.get("resolved") else ""
+                    if h.get("soort") == "opmaak":
+                        # Opmaak zit niet in de tekst, dus valt er niets te vervangen:
+                        # dit blok beschrijft wat er met de vorm van een regel gebeurde.
+                        print("      blok %s, opmaak%s: %s"
+                              % (h.get("n"), vlag, h.get("omschrijving") or "gewijzigd"))
+                        if h.get("blok"):
+                            print("        op: %s" % h["blok"].replace("\n", " ")[:100])
+                        continue
                     print("      blok %s, alinea %s%s"
                           % (h.get("n"), h.get("alinea"), vlag))
                     if h.get("verwijderd"):
@@ -142,6 +150,9 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
                     if context.strip():
                         print("          volgt op: ...%s" % context.strip())
                 print("      toepassen: pas-hunk-toe.py <json> --nr %s --hunks <n>" % a.get("nr"))
+                if any(h.get("soort") == "opmaak" for h in hunks):
+                    print("      let op: opmaakblokken plaatst het script niet — neem de"
+                          " opmaak over uit 'nieuwe HTML' hieronder")
             else:
                 for o in a.get("diff") or []:
                     if o.get("op") == "=":
@@ -155,6 +166,11 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
                 print("      nieuwe tekst:")
                 for regel in nieuwe.splitlines():
                     print("        | %s" % regel[:110])
+            # De volledige nieuwe versie inclusief opmaak, mail-veilig (p/ul/ol/li/b/i/a/br).
+            # Dit is de grondwaarheid als tekst en opmaak allebei wijzigden.
+            if a.get("nieuwHtml"):
+                print("      nieuwe HTML:")
+                print("        | %s" % a["nieuwHtml"][:600])
         if a.get("image"):
             pad = os.path.join(map_, a["image"])
             print("      crop   : %s%s" % (pad if paden else a["image"],

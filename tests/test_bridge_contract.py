@@ -116,7 +116,8 @@ def main():
         body = json.loads(raw.decode("utf-8"))
         n += check("B2 /p/ buiten home is 403", code == 403 and body.get("ok") is False)
 
-        for pad in ("/session", "/save", "/delete", "/remove-all", "/resolve", "/sessie"):
+        for pad in ("/session", "/save", "/delete", "/remove-all", "/resolve",
+                    "/state", "/state-save", "/sessie"):
             code, _, raw = http("POST", basis + pad, {})
             n += check("B3 %s antwoordt" % pad, code in (200, 400))
         code, _, raw = http("POST", basis + "/sessie", {"url": "file:///etc/passwd"})
@@ -207,6 +208,41 @@ def main():
         })
         terug = json.loads(open(save3["jsonPath"], encoding="utf-8").read())["annotations"][0]
         n += check("B3 resolve terug te draaien", terug.get("resolved") is not True)
+
+        # B26: component-state (LA-CHECKLIST) los van de rondes.
+        code, _, raw = http("POST", basis + "/state", slug)
+        leeg = json.loads(raw.decode("utf-8"))
+        n += check("B26 state leeg leesbaar", code == 200 and leeg.get("ok")
+                   and leeg.get("state", {}).get("components") == {})
+        code, _, raw = http("POST", basis + "/state-save", {
+            **slug, "component": "checklist", "key": "#74",
+            "value": {"checked": True, "label": "demo-item"},
+        })
+        st1 = json.loads(raw.decode("utf-8"))
+        n += check("B26 state-save ok", code == 200 and st1.get("ok")
+                   and st1["entry"].get("checked") is True and st1["entry"].get("changedAt"))
+        code, _, raw = http("POST", basis + "/state-save", {"component": "checklist", **slug})
+        n += check("B26 state-save zonder key is 400", code == 400)
+        http("POST", basis + "/state-save", {
+            **slug, "component": "checklist", "key": "#74",
+            "value": {"checked": False},
+        })
+        code, _, raw = http("POST", basis + "/state", slug)
+        st2 = json.loads(raw.decode("utf-8"))
+        entry = st2["state"]["components"]["checklist"]["#74"]
+        n += check("B26 value gemergd, label blijft",
+                   entry.get("checked") is False and entry.get("label") == "demo-item")
+        n += check("B26 state.json op schijf, buiten ronde-NN",
+                   os.path.isfile(st2["statePath"])
+                   and os.path.basename(st2["statePath"]) == "state.json"
+                   and "ronde-" not in st2["statePath"]
+                   and os.path.dirname(st2["statePath"]) == os.path.dirname(os.path.dirname(json_pad)))
+        n += check("B26 updatedAt gezet", bool(st2["state"].get("updatedAt")))
+        http("POST", basis + "/remove-all", slug)
+        _, _, raw = http("POST", basis + "/state", slug)
+        st3 = json.loads(raw.decode("utf-8"))
+        n += check("B26 remove-all raakt state niet",
+                   "#74" in st3["state"]["components"].get("checklist", {}))
     finally:
         proc.kill()
         proc.wait(timeout=3)

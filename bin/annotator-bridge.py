@@ -273,6 +273,9 @@ def h_session(payload):
             "veld": a.get("veld") or "",
             "origineel": a.get("origineel") or "",
             "nieuw": a.get("nieuw") or "",
+            "origineelHtml": a.get("origineelHtml") or "",
+            "nieuwHtml": a.get("nieuwHtml") or "",
+            "rijk": bool(a.get("rijk")),
             "diff": a.get("diff") or [],
             "hunks": a.get("hunks") or [],
             "createdAt": a.get("createdAt"),
@@ -409,6 +412,12 @@ def h_save(payload):
         rec["veld"] = (ann.get("veld") or "").strip()
         rec["origineel"] = ann.get("origineel") or ""
         rec["nieuw"] = ann.get("nieuw") or ""
+        # De kaart is rich text: naast de platte projectie (waarop gedift wordt) bewaren
+        # we de mail-veilige HTML van beide versies. Die is de grondwaarheid zodra er
+        # ook opmaak wijzigde, want opmaak staat per definitie niet in de platte tekst.
+        rec["origineelHtml"] = ann.get("origineelHtml") or ""
+        rec["nieuwHtml"] = ann.get("nieuwHtml") or ""
+        rec["rijk"] = bool(ann.get("rijk"))
         rec["diff"] = ann.get("diff") or []
         # Per hunk bewaren we of hij al verwerkt is. Bestond deze bewerking al, dan
         # blijven eerder afgevinkte hunks afgevinkt zolang ze inhoudelijk hetzelfde
@@ -416,12 +425,16 @@ def h_save(payload):
         oude_hunks = {}
         if bestaande:
             for h in bestaande.get("hunks") or []:
-                sleutel = (h.get("verwijderd", ""), h.get("toegevoegd", ""))
+                sleutel = (h.get("soort", "tekst"), h.get("verwijderd", ""),
+                           h.get("toegevoegd", ""), h.get("blok", ""),
+                           h.get("omschrijving", ""))
                 oude_hunks[sleutel] = h.get("resolved", False)
         hunks = []
         for h in ann.get("hunks") or []:
             h = dict(h)
-            sleutel = (h.get("verwijderd", ""), h.get("toegevoegd", ""))
+            sleutel = (h.get("soort", "tekst"), h.get("verwijderd", ""),
+                       h.get("toegevoegd", ""), h.get("blok", ""),
+                       h.get("omschrijving", ""))
             h["resolved"] = oude_hunks.get(sleutel, False)
             hunks.append(h)
         rec["hunks"] = hunks
@@ -513,6 +526,60 @@ def h_remove_all(payload):
             "jsonPath": json_pad}
 
 
+def _state_pad(payload):
+    map_pad, bestand = pagina_map(payload)
+    return os.path.join(map_pad, "state.json"), bestand
+
+
+def h_state(payload):
+    """Leest de opgeslagen componentstate van een pagina (bv. checkboxen).
+
+    Body: {"page": "..."} (of pageFile/slug, zoals de andere routes).
+    State leeft per pagina in <slug>/state.json, los van de annotatierondes:
+    een checkbox-vinkje is een blijvende status, geen feedbackronde.
+    """
+    p, _ = _state_pad(payload)
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        data = {"components": {}}
+    return {"ok": True, "statePath": p, "state": data}
+
+
+def h_state_save(payload):
+    """Bewaart één state-wijziging van een paginacomponent.
+
+    Body: {"page": "...", "component": "checklist", "key": "#74",
+           "value": {"checked": true, "label": "..."}}
+    De value wordt over de bestaande entry gemergd; changedAt wordt gezet zodat
+    een agent ziet wanneer er iets gewijzigd is (net als bij annotaties).
+    """
+    key = (payload.get("key") or "").strip()
+    if not key:
+        raise ValueError("geef key mee")
+    component = (payload.get("component") or "default").strip()
+    p, bestand = _state_pad(payload)
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        data = {"page": payload.get("page"), "pageFile": bestand, "components": {}}
+    nu = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    comp = data.setdefault("components", {}).setdefault(component, {})
+    entry = comp.setdefault(key, {})
+    waarde = payload.get("value")
+    if isinstance(waarde, dict):
+        entry.update(waarde)
+    else:
+        entry["value"] = waarde
+    entry["changedAt"] = nu
+    data["updatedAt"] = nu
+    schrijf(p, data)
+    return {"ok": True, "statePath": p, "component": component, "key": key,
+            "entry": entry}
+
+
 def h_sessie(payload):
     """Opent een nieuwe Claude Code-sessie met een voorgeladen prompt.
 
@@ -537,6 +604,7 @@ def h_sessie(payload):
 
 ROUTES = {"/session": h_session, "/save": h_save, "/delete": h_delete,
           "/remove-all": h_remove_all, "/resolve": h_resolve,
+          "/state": h_state, "/state-save": h_state_save,
           "/sessie": h_sessie}
 
 

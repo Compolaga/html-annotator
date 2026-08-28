@@ -31,7 +31,7 @@ getest. Volledige paginascreenshots worden gecached in
 `$TMPDIR/luc-annotator-shots`.
 
 Endpoints: `GET /ping`, `GET /p/<pad>`, `POST /session`, `/save`, `/delete`,
-`/remove-all`, `/resolve`, `/sessie`.
+`/remove-all`, `/resolve`, `/state`, `/state-save`, `/sessie`.
 
 `/session` geeft naast de tellingen ook de openstaande annotaties terug (nr, id,
 type, rect, comment, selectedText, `stale`), zodat de pagina weet wat hij moet
@@ -243,23 +243,55 @@ fallback als dat niet zo is.
 
 <div class="la-draft">
   <div class="la-draft-hdr"><b>Aan:</b> Anne Dijkstra &nbsp;·&nbsp; <b>Cc:</b> Marco Bonsink &nbsp;·&nbsp; <b>Onderwerp:</b> Even bijpraten over security</div>
-  <div class="la-draft-txt">Hi Anne,
-
-Eerste alinea van het bericht.
-
-Groet,
-de reviewer</div>
+  <div class="la-draft-txt">
+    <p>Hi Anne,</p>
+    <p>Eerste alinea van het bericht.</p>
+    <ul>
+      <li>Anne: schiet het issue in bij <a href="https://…/pbi/1234">PBI 1234</a></li>
+      <li>Ik: stuur de opzet door</li>
+    </ul>
+    <p>Groet,<br>de reviewer</p>
+  </div>
   <div class="la-draft-na">Openstaand: welk issue heb je ingeschoten? Zodra je dat zegt maak ik de eerste zin concreet.</div>
 </div>
 ```
+
+**Rich text.** De kaart toont het bericht zoals de ontvanger het krijgt: alinea's,
+opsommingen, vet, cursief en links. Het toegestane setje is klein en mail-veilig —
+`p`, `ul`, `ol`, `li`, `b`, `i`, `a`, `br` — precies de doorsnede die Outlook, Gmail en
+Teams zonder eigen interpretatie renderen. Wat je er verder in zet wordt bij het inlezen
+platgeslagen tot tekst; plakken gaat altijd als platte tekst. Er is geen bibliotheek en
+geen CDN in het spel: het snippet blijft één bestand.
+
+De reviewer heeft onder elke kaart een balkje met **B**, *I*, link, • en 1. (en ⌘B / ⌘I /
+⌘K). Een kaart die je als platte tekst schreef blijft platte tekst — pre-wrap,
+`plaintext-only` — tot hij zelf een opmaakknop gebruikt; dan gaat de héle kaart in één
+keer over op blokken. Half omschakelen zou de overgebleven harde regelovergangen op één
+hoop gooien.
 
 **Tracked changes.** Elke `la-draft-txt` is direct bewerkbaar: de reviewer klikt in de tekst,
 de cursor staat waar hij klikte, en hij typt. Er is bewust geen knop om "de bewerkmodus
 aan te zetten" — dat was een drempel voor iets wat hij gewoon wil kunnen doen. Klikt hij
 eruit, dan verschijnt het verschil met de oorspronkelijke tekst als doorhaling en
-onderstreping, en gaat het als annotatie van `type: "edit"` naar de bridge. Dat is vaak
-sneller dan een comment: in plaats van uitleggen wat er anders moet, schrijft hij het
-gewoon anders op. "↺ Herstel origineel" zet de kaart terug en verwijdert de bewerking.
+onderstreping — in de opgemaakte kaart, dus een gewijzigde bullet blijft een bullet — en
+gaat het als annotatie van `type: "edit"` naar de bridge. Dat is vaak sneller dan een
+comment: in plaats van uitleggen wat er anders moet, schrijft hij het gewoon anders op.
+"↺ Herstel origineel" zet de kaart terug en verwijdert de bewerking.
+
+Er wordt **niet op de HTML gedift maar op de platte-tekstprojectie** ervan: precies de
+tekst die in een plain-text mail zou staan, zonder opmaakmarkeringen erin. Opmaak is een
+eigen kanaal. Dat levert twee soorten blokken op:
+
+- `soort: "tekst"` — de vertrouwde hunk met `voor` / `na` / `verwijderd` / `toegevoegd`.
+  Het anker blijft binnen zijn eigen blok, want tussen twee blokken staat in de bron een
+  tag. `pas-hunk-toe.py` plaatst deze blokken gewoon.
+- `soort: "opmaak"` — "alinea werd opsomming", `vet aan op "issue"`. Die staan per
+  definitie niet in de tekst, dus `pas-hunk-toe.py` raakt ze niet aan en zegt dat ook:
+  die neem je over uit `nieuwHtml`.
+
+Wijzigden tekst én opmaak in hetzelfde blok, dan zie je alleen het tekstblok.
+`nieuwHtml` op de annotatie is dan de grondwaarheid: dat is de volledige nieuwe versie,
+mail-veilig, klaar om als body te gebruiken.
 
 Meerdere wijzigingen in dezelfde kaart worden losse blokken, genummerd in de tekst (¹ ² ³)
 zodat de reviewer en jij hetzelfde blok bedoelen. Je kunt ze los doorvoeren en los afvinken; wat
@@ -272,13 +304,20 @@ want de doorgehaalde tekst verdwijnt bij het terugschakelen en de regel loopt da
 
 Een bewerking krijgt bewust géén badge en komt niet in de weeslijst: hij is al zichtbaar
 in de kaart zelf. Na een reload wordt hij teruggezet, gekoppeld op de kop van de kaart.
-Is de concepttekst zelf gewijzigd sinds de bewerking, dan zet het snippet niets terug —
-dat zou de oude tekst over de nieuwe heen leggen — maar meldt het dat bij de kaart.
+Is de concepttekst zelf ongewijzigd, dan komt de bewerkte versie compleet terug, opmaak
+incluis. Is de tekst wél veranderd sinds de bewerking, dan worden alleen de openstaande
+blokken op hun anker herplaatst en meldt het snippet wat het niet meer terugvond.
 
 Regels bij het gebruik:
 
-- De berichttekst staat letterlijk in `la-draft-txt`, met echte regelafbrekingen.
-  `white-space: pre-wrap` doet de rest, dus geen `<br>` of `<p>` erin.
+- Schrijf de berichttekst in blokken: `<p>` per alinea, `<ul>`/`<ol>` met `<li>` voor
+  opsommingen, `<br>` voor een harde regelovergang binnen een alinea. Alleen die tags,
+  plus `<b>`, `<i>` en `<a href>`. Geen `style`, geen `<div>`, geen tabellen.
+- Streepjes-als-bullet (`- Anne: …` als gewone tekstregel) zijn geen opsomming meer.
+  Wil je een opsomming, schrijf er dan één.
+- Kortere kaarten mogen nog steeds platte tekst zijn: laat je de blokken weg, dan
+  gedraagt de kaart zich als voorheen (echte regelafbrekingen, `white-space: pre-wrap`,
+  geen `<br>` of `<p>`). Bedoel je opmaak, gebruik dan blokken — niet allebei door elkaar.
 - `la-draft-na` is jouw notitie, niet die van de ontvanger: wat nog open staat,
   welke vraag beantwoord moet worden, of wat er gebeurt zodra het verstuurd is.
 - De concepten staan bovenaan de pagina, met een lead-regel die duidelijk maakt
@@ -323,3 +362,47 @@ Punten om op te letten:
   bijvoorbeeld `20px` op een smalle pagina. Het haakje rekent mee.
 - Nesting is puur visueel: de blokken blijven zussen in de HTML. Dat is bewust —
   echte nesting zou de annotator, de banden en de tellingen op de todolijst raken.
+
+## Deel 8: het checklist-component (LA-CHECKLIST)
+
+Voor elke HTML met afvinkbare items of rijen (todolijsten, testcase-tabellen,
+reviewrijen). Het component is een los blok, `<!-- LA-CHECKLIST v1` t/m
+`<!-- /LA-CHECKLIST -->`, canoniek in `references/checklist-snippet.html`.
+Self-contained, geen dependencies, net als het annotator-snippet.
+
+**Inbouwen:**
+
+1. Plak het volledige blok uit `references/checklist-snippet.html` vlak vóór
+   het LUC-ANNOTATOR-blok.
+2. Zet `data-la-check="<unieke-key>"` op elk afvinkbaar element. De key is het
+   blijvende anker in de state — kies iets stabiels (bv. het itemnummer,
+   `"#74"`), geen volgnummer dat verschuift.
+3. Optioneel `data-la-label="..."` voor een expliciet label; anders pakt het
+   script de tekst van `.what` of van het element zelf (max 140 tekens).
+
+Het script injecteert een Notion-stijl checkbox — in `.la-check-slot` als die
+er is, anders in de eerste `summary`, anders vooraan het element — laadt de
+opgeslagen state bij page load via `POST /state`, en schrijft elke wijziging
+via `POST /state-save` met `{component:"checklist", key, value:{checked,
+label}}`. Een aangevinkt element krijgt de class `la-checked` (titel
+doorgestreept en gedimd; de CSS mikt op `.what`, ook binnen een `summary`).
+
+**State, los van de rondes.** De vinkjes zijn blijvende status, geen
+feedbackronde: ze leven per pagina in `~/Desktop/annotaties/<slug>/state.json`,
+naast de `ronde-NN`-mappen. Formaat:
+
+```json
+{ "components": { "checklist": {
+    "#74": { "checked": true, "label": "…", "changedAt": "2026-08-28T…" } } },
+  "updatedAt": "2026-08-28T…" }
+```
+
+**Uitlezen als agent:** lees `state.json` direct, of vraag het de bridge met
+`POST /state` en `{"page": "..."}` (of `pageFile`/`slug`, zoals de andere
+routes). Gebruik `changedAt` per key en `updatedAt` op het geheel om te zien
+wat er sinds de vorige keer veranderd is — analoog aan hoe je
+`annotations.json` leest. Er valt niets te resolven: een vinkje ís de status.
+
+`/state-save` merget de meegegeven `value` over de bestaande entry en zet
+`changedAt`; andere componenten dan `checklist` kunnen dezelfde twee routes
+gebruiken met een eigen `component`-naam.
