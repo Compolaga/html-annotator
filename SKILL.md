@@ -27,6 +27,27 @@ bottom of every HTML file, just before `</body>` or at the end of the
 file. The block runs from `<!-- LUC-ANNOTATOR v2 -->` to
 `<!-- /LUC-ANNOTATOR -->`.
 
+**Anchor on the LAST `</body>`, never the first.** A page can contain
+`</body>` inside a JavaScript string long before the real one — bundled
+libraries and any code that builds HTML in a variable do this routinely.
+Insert on the first match and the snippet lands in the middle of a
+script: that script breaks, its output renders as raw text on the page,
+and everything it was supposed to draw silently disappears.
+
+```python
+i = html.rindex("</body>")        # rindex, not index
+html = html[:i] + snippet + "\n" + html[i:]
+```
+
+`str.replace(..., 1)` and `sed` both hit the first match, so neither is
+safe here. No `</body>` at all: append at the end of the file.
+
+On 2026-08-28 this broke `jamezz-cs-flows/flows.html` (3.5 MB, three
+`</body>` occurrences — two of them inside DOMPurify and a `btoa()`
+call). The Mermaid diagrams vanished and a wall of minified JS appeared
+under the tables. Verify after embedding: open the page and check that
+what it normally renders is still there.
+
 On an existing page:
 - `LUC-ANNOTATOR v2` already present: do nothing;
 - older block (`LUC-ANNOTATOR v1`, no end marker): replace everything
