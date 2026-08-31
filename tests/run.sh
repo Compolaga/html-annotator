@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runner voor de annotator-bridge-suite.
 #
-#   tests/run.sh                # A7: 00 02–09 11–14 (geen case-01 spend, geen mutate)
+#   tests/run.sh                # A7: 00 02–09 11–17 (geen case-01 spend, geen mutate)
 #   tests/run.sh 02 03          # alleen deze cases
 #   tests/run.sh 01 10          # verse-agent + mutatie, expliciet
 #   CASE01_RUNS=1 tests/run.sh 01
@@ -21,7 +21,7 @@ CASE01_RUNS="${CASE01_RUNS:-3}"
 GEVRAAGD=("$@")
 # Default = wat A7 van iedereen eist. case-01 (spend) en case-10 (mutatie,
 # bewust traag + eigen boom) alleen als je ze noemt.
-DEFAULT="00 02 03 04 05 06 07 08 09 11 12 13 14"
+DEFAULT="00 02 03 04 05 06 07 08 09 11 12 13 14 15 16 17"
 wil() {
   if [ ${#GEVRAAGD[@]} -eq 0 ]; then
     for g in $DEFAULT; do [ "$g" = "$1" ] && return 0; done
@@ -160,6 +160,33 @@ if wil 14; then
   echo "case-14: change-suggestie bewerken in plaats van overschrijven"
   node ./case-14-suggest-change-bewerken.mjs
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
+  echo
+fi
+
+if wil 15; then
+  echo "case-15: suggestie die pas later zichtbaar wordt"
+  node ./case-15-suggest-zichtbaar.mjs
+  rc=$?
+  [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
+  [ $rc -eq 1 ] && FALEN=$((FALEN + 1))
+  echo
+fi
+
+if wil 16; then
+  echo "case-16: gedeelde suggest-key is één suggestie met één pill"
+  node ./case-16-suggest-gedeelde-key.mjs
+  rc=$?
+  [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
+  [ $rc -eq 1 ] && FALEN=$((FALEN + 1))
+  echo
+fi
+
+if wil 17; then
+  echo "case-17: losse suggest-keys beslissen onafhankelijk"
+  node ./case-17-suggest-losse-keys.mjs
+  rc=$?
+  [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
+  [ $rc -eq 1 ] && FALEN=$((FALEN + 1))
   echo
 fi
 

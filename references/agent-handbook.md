@@ -432,6 +432,26 @@ heeft dus alles al; `references/suggest-snippet.html` is vervallen.
   `table`, of iets dat die bevat) één regiokader. Zet hem alleen expliciet
   (`"text"` of `"region"`) als die autodetectie verkeerd kiest.
 
+**Eén key = één suggestie = één pill.** De beslissing wordt per key opgeslagen,
+dus zet dezelfde `data-la-suggest` alleen op meerdere elementen als het écht
+één beslissing is. Doe je dat, dan tekent de laag alle rects van die elementen
+als één visuele groep met precies één pill erbij — wat je ziet is dan wat er
+gebeurt. Wil de reviewer per rij kunnen beslissen (een work-item-rij met zijn
+subtaakrijen bijvoorbeeld), geef elke rij dan een eigen key: parent `wi-<id>`,
+subtaken `wi-<parentid>-<subid>`, elk met een eigen `data-la-suggest-desc`.
+(Tot 31-08-2026 tekende de laag per element een pill op een gedeelde key: vijf
+knoppen die stiekem samen één beslissing waren.)
+
+**Verborgen bij het laden mag.** Suggesties in een ingeklapte tabelgroep, achter
+een filter of in later ingevoegde DOM krijgen hun pill zodra ze zichtbaar
+worden: de laag hertekent op DOM- en zichtbaarheidswijzigingen. Je hoeft dus
+niets extra's te doen om inklapbare secties te ondersteunen. Wat de laag daarvoor
+ziet: DOM die erbij komt of weggaat, en de attributen `class`, `style`,
+`hidden` en `open`. Klapt jouw pagina puur in CSS in of uit (een
+`input:checked ~ tabel`-truc, of een stylesheet die wisselt), dan verandert er
+geen attribuut en blijft de pill weg — laat zo'n toggle dan ook een class of
+een style zetten.
+
 **Wat de reviewer ziet:** exact de annotatie-mechaniek. Elke suggestie krijgt
 de vertrouwde selectie-rects (blauw) over de gewijzigde tekst, met aan het
 einde de badge breed uitgetrokken tot een pill met de drie acties erin:

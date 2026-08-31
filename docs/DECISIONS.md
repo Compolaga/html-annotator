@@ -144,3 +144,65 @@ weg: een verwerkende agent hoort geen dode change-comment op een accepted key
 te vinden. En een voorgevuld commentveld zet de cursor achter de tekst in
 plaats van ervoor — dat gold ook al voor het bewerken van een gewone
 annotatie. Bewijs: `tests/case-14-suggest-change-bewerken.mjs`.
+
+## 2026-08-31 — De LA-SUGGEST-laag hertekent bij zichtbaarheid, en één key is één pill
+
+Twee bugs uit de KPI-pagina's van een klantproject, allebei in de LA-SUGGEST-laag.
+
+**Verborgen rijen kregen geen pill.** De suggest-rijen zaten in ingeklapte
+tabelgroepen (`collapsed-hide`) en dus zonder rect bij het tekenen; de laag
+sloeg ze over. Uitklappen leverde geen hertekening op: de ResizeObserver kijkt
+naar `document.body`, en die groeit niet als de tabel in zijn eigen
+`overflow:auto`-scroller onder een `overflow:hidden`-body zit. Pas een andere
+interactie (een annotatie plaatsen) liet de pills alsnog verschijnen. Besluit:
+generiek meeliften op DOM- en zichtbaarheidswijzigingen — een MutationObserver
+op `documentElement` (`childList` + de attributen `class`/`style`/`hidden`/
+`open`) die de bestaande debounced `herteken()` aanroept, niet iets specifieks
+voor deze inklapknoppen. Om te voorkomen dat de laag zichzelf aan de gang
+houdt, gooit `render()` aan het eind zijn eigen mutatierecords weg
+(`takeRecords`); filteren op klassenaam is te laat, want `el()` hangt de div
+eerst in de body en zet de `la-`class er daarna pas op. Bewijs:
+`tests/case-15-suggest-zichtbaar.mjs`, inclusief een rustmeting die een
+render-lus zou betrappen.
+
+**Eén key besliste stiekem over vijf rijen.** In de HTML van dat project deelden een
+work-item-rij en zijn subtaakrijen dezelfde key (`wi-1042` op vijf rijen). De
+laag tekende per element een pill, maar de beslissing gaat per key naar
+`state.json` — vijf knoppen die samen één beslissing waren. Besluit: één key is
+één suggestie, dus `renderSuggesties()` groepeert per key: alle rects van alle
+elementen met die key worden gehighlight als één groep, met precies één pill.
+Wat je ziet is dan wat er gebeurt. Wie per rij wil beslissen geeft elke rij een
+eigen key (parent `wi-<id>`, subtaken `wi-<parentid>-<subid>`); zo staan de
+live pagina's nu ook. Bewijs: `tests/case-16-suggest-gedeelde-key.mjs` en
+`tests/case-17-suggest-losse-keys.mjs`.
+
+Neveneffect in de suite: de mutant in `case-12` (snippet zonder scroll-listener
+moet blijven plakken) sloeg om, omdat het plaatsen van de testannotatie zelf de
+DOM muteert en de debounced hertekening dan ná de scroll viel. De mutant wacht
+nu eerst 400ms uit; hij blijft daarmee aantoonbaar plakken en meet nog steeds
+het ontbreken van de scroll-listener.
+
+### Wat de falsificatieronde van 31-08-2026 aan die twee fixes veranderde
+
+Twee onafhankelijke falsifiers vonden drie gaten die er toe deden, allemaal
+verholpen voor de uitrol:
+
+- **De debounce was uit te hongeren.** Nu elke mutatie `herteken()` voedt, kan
+  een pagina die zichzelf per frame aanraakt (een rAF-animatie die een style
+  zet) de timer eindeloos resetten: er wordt dan nooit getekend en de pill
+  blijft weg — hetzelfde symptoom als de bug zelf. De debounce heeft daarom een
+  plafond van 250ms: langer dan dat wachten we niet. Bewijs: assertie 5 in
+  `case-15`, die rood wordt op een snippet zonder plafond.
+- **De pill van een groep stond bij de verkeerde rij.** Hij hing aan het laatste
+  rect van de hele groep, terwijl zijn tekst en popup van het eerste element
+  komen: op een cluster van vijf rijen stond de knop naast de laatste subtaak.
+  Het eerste element in documentvolgorde draagt nu de pill.
+- **Een lege `data-la-suggest=""` voegde losse suggesties samen.** Een lege key
+  groepeert niet meer.
+
+Blijvende grens, bewust: de laag kijkt naar DOM-wijzigingen en naar de
+attributen `class`, `style`, `hidden`, `open`. Een in- en uitklap die puur in
+CSS gebeurt (`input:checked ~ tabel`) verandert geen attribuut en levert dus
+geen hertekening op; dat staat als voorwaarde in het handboek. Een periodieke
+sanity-render zou dat dekken, maar kost stroom op elke pagina en is voor de
+KPI-pagina's (die `classList.toggle` gebruiken) niet nodig.

@@ -165,6 +165,11 @@ ${stuk}`);
           target: 'regio-anker in de scroller',
         });
       });
+      /* Eerst laten uitrazen: het plaatsen van de annotatie muteert zelf de DOM
+         en de laag hertekent daarop (debounce 60ms). Scroll je daar bovenop, dan
+         valt die hertekening ná de scroll en volgen de kaders alsnog — dan meet
+         de mutant de debounce en niet het ontbreken van de scroll-listener. */
+      await pageM.waitForTimeout(400);
       await pageM.evaluate(() => { document.getElementById('rol').scrollTop = 160; });
       await pageM.waitForTimeout(120);
       const mut = await pageM.evaluate(() => {

@@ -801,16 +801,30 @@
      resize, en vooral zodra een <details> open- of dichtklapt: alles eronder
      schuift dan, en zonder hertekenen wijzen de badges naar het verkeerde stuk
      of lijken ze zelfs kwijt. */
-  var hertekenTimer = null, bezigMetTekenen = false;
+  var hertekenTimer = null, bezigMetTekenen = false, hertekenSinds = 0;
+  function tekenNu() {
+    hertekenTimer = null; hertekenSinds = 0;
+    bezigMetTekenen = true;
+    try { render(); } finally {
+      setTimeout(function () { bezigMetTekenen = false; }, 0);
+    }
+  }
   function herteken() {
     if (bezigMetTekenen) return;
+    var nu = Date.now();
+    if (!hertekenSinds) hertekenSinds = nu;
+    /* Debounce met een plafond. Zonder plafond kan een pagina die zichzelf
+       elke 40ms aanraakt (een klok, een animatie die een style zet) het
+       hertekenen eindeloos vooruitschuiven: elke mutatie reset de timer en er
+       wordt nooit getekend — precies het symptoom dat deze laag hoort te
+       verhelpen. Na 250ms wachten tekenen we hoe dan ook. */
+    if (nu - hertekenSinds >= 250) {
+      clearTimeout(hertekenTimer);
+      tekenNu();
+      return;
+    }
     clearTimeout(hertekenTimer);
-    hertekenTimer = setTimeout(function () {
-      bezigMetTekenen = true;
-      try { render(); } finally {
-        setTimeout(function () { bezigMetTekenen = false; }, 0);
-      }
-    }, 60);
+    hertekenTimer = setTimeout(tekenNu, 60);
   }
   addEventListener("load", herteken);
   addEventListener("resize", herteken);
@@ -820,6 +834,58 @@
   }, true);
   if (window.ResizeObserver) {
     try { new ResizeObserver(herteken).observe(document.body); } catch (e) {}
+  }
+  /* Kaders en pills kunnen op elementen zitten die pas later zichtbaar worden:
+     een ingeklapte tabelgroep (display:none via een class), een filter, of DOM
+     die er bij het laden nog niet was. De ResizeObserver hierboven ziet dat niet
+     als de pagina zelf niet groeit — bij een tabel in een eigen overflow:auto-
+     scroller (body overflow:hidden) blijft body precies even hoog en werd er dus
+     nooit hertekend: de suggestie-pills bleven weg tot een andere interactie
+     toevallig een render uitlokte. Daarom luisteren we generiek mee op DOM- en
+     zichtbaarheidswijzigingen. Onze eigen kaders, badges en panelen filteren we
+     eruit, anders houdt render() zichzelf via zijn eigen mutaties aan de gang. */
+  function laEigenNode(n) {
+    var e = n && (n.nodeType === 1 ? n : n.parentNode);
+    if (!e || e.nodeType !== 1) return false;
+    if ((e.id || "").indexOf("la-") === 0) return true;
+    var c = (typeof e.className === "string") ? e.className : "";
+    if (/(^|\s)la-/.test(c)) return true;
+    try { return !!(e.closest && e.closest('[id^="la-"], .la-badge, .la-rect')); }
+    catch (err) { return false; }
+  }
+  function laBoeiendeMutatie(recs) {
+    for (var i = 0; i < recs.length; i++) {
+      var r = recs[i];
+      if (r.type === "attributes") {
+        if (!laEigenNode(r.target)) return true;
+        continue;
+      }
+      var lijsten = [r.addedNodes, r.removedNodes];
+      for (var j = 0; j < 2; j++) {
+        for (var k = 0; k < lijsten[j].length; k++) {
+          if (!laEigenNode(lijsten[j][k])) return true;
+        }
+      }
+    }
+    return false;
+  }
+  var laMutObs = null;
+  /* Wat render() zelf aan de DOM doet gooien we na afloop weg (takeRecords),
+     zodat het tekenen zichzelf niet opnieuw aanroept: el() hangt een div in de
+     body en zet de la--class er pas daarna op, dus op naam filteren is te laat. */
+  function laVergeetEigenMutaties() {
+    if (laMutObs) { try { laMutObs.takeRecords(); } catch (e) {} }
+  }
+  if (window.MutationObserver) {
+    try {
+      laMutObs = new MutationObserver(function (recs) {
+        if (laBoeiendeMutatie(recs)) herteken();
+      });
+      laMutObs.observe(document.documentElement, {
+        subtree: true, childList: true, attributes: true,
+        attributeFilter: ["class", "style", "hidden", "open"]
+      });
+    } catch (e) { laMutObs = null; }
   }
   /* Binnen-scrollers (overflow:auto) bewegen de pagina zonder window.scrollY.
      Absolute body-coords blijven dan op het scherm plakken. Op scroll opnieuw
@@ -878,6 +944,7 @@
     });
     toonWezen(wezen);
     renderSuggesties();
+    laVergeetEigenMutaties();
   }
 
   /* ---- LA-SUGGEST-laag: voorgestelde wijzigingen -------------------
@@ -908,29 +975,58 @@
     var body = basis(); body.component = "suggest"; body.key = sugKey(elm); body.value = value;
     post("/state-save", body).catch(function () {});
   }
+  /* tekst krijgt tekstregel-rects (als een selectie), visuals één regiokader:
+     losse rects op de aslabels van een grafiek zeggen niets over "deze figuur
+     is nieuw". Expliciet te sturen met data-la-suggest-mode="text"|"region". */
+  function sugStukken(elm) {
+    var modus = elm.getAttribute("data-la-suggest-mode") ||
+      ((elm.matches("figure,img,svg,canvas,video,table") ||
+        elm.querySelector("svg,img,canvas,video")) ? "region" : "text");
+    var stukken = null;
+    if (modus !== "region") {
+      var range = document.createRange();
+      try { range.selectNodeContents(elm); } catch (e) { return null; }
+      var rr = laRectsVanRange(range);
+      stukken = rr ? ((rr.rects && rr.rects.length) ? rr.rects : [rr]) : null;
+    }
+    if (!stukken) {
+      var bb = elm.getBoundingClientRect();
+      if (!bb.width && !bb.height) return null;
+      stukken = [{ x: Math.round(bb.left + scrollX), y: Math.round(bb.top + scrollY),
+                   w: Math.round(bb.width), h: Math.round(bb.height) }];
+    }
+    return stukken.length ? stukken : null;
+  }
   function renderSuggesties() {
     document.querySelectorAll(".la-sug-rect,.la-badge.la-sug").forEach(function (n) { n.remove(); });
     var elms = [].slice.call(document.querySelectorAll("[data-la-suggest]"));
+    /* Eén key is één suggestie, dus ook één pill. Staat dezelfde
+       data-la-suggest op meerdere elementen (een work-item-rij met zijn
+       subtaakrijen bijvoorbeeld), dan is dat samen één visuele groep: alle
+       rects krijgen hun kader, maar er komt één pill. De beslissing wordt per
+       key opgeslagen, dus vijf pills tekenen zou vijf knoppen geven die stiekem
+       allemaal hetzelfde beslissen. Wil je per rij een eigen beslissing, geef
+       elke rij dan een eigen key. */
+    var volgorde = [], groepen = {};
     elms.forEach(function (elm, i) {
-      /* tekst krijgt tekstregel-rects (als een selectie), visuals één regiokader:
-         losse rects op de aslabels van een grafiek zeggen niets over "deze figuur
-         is nieuw". Expliciet te sturen met data-la-suggest-mode="text"|"region". */
-      var modus = elm.getAttribute("data-la-suggest-mode") ||
-        ((elm.matches("figure,img,svg,canvas,video,table") ||
-          elm.querySelector("svg,img,canvas,video")) ? "region" : "text");
-      var stukken = null;
-      if (modus !== "region") {
-        var range = document.createRange();
-        try { range.selectNodeContents(elm); } catch (e) { return; }
-        var rr = laRectsVanRange(range);
-        stukken = rr ? ((rr.rects && rr.rects.length) ? rr.rects : [rr]) : null;
+      var stukken = sugStukken(elm);
+      if (!stukken) return;
+      /* Een lege key is geen key: die groepeert niets, anders zouden twee
+         losse suggesties met een vergeten key stilzwijgend één pill worden. */
+      var key = sugKey(elm);
+      var mk = key ? "k:" + key : "leeg:" + i;
+      if (!groepen[mk]) {
+        /* Het eerste element in documentvolgorde is de baas van de groep: zijn
+           desc staat in de tooltip en zijn rects dragen de pill, zodat de knop
+           bij de rij staat die hij beschrijft en niet onderaan het cluster. */
+        groepen[mk] = { elm: elm, stukken: [], anker: stukken };
+        volgorde.push(mk);
       }
-      if (!stukken) {
-        var bb = elm.getBoundingClientRect();
-        if (!bb.width && !bb.height) return;
-        stukken = [{ x: Math.round(bb.left + scrollX), y: Math.round(bb.top + scrollY),
-                     w: Math.round(bb.width), h: Math.round(bb.height) }];
-      }
+      groepen[mk].stukken = groepen[mk].stukken.concat(stukken);
+    });
+    volgorde.forEach(function (mk) {
+      var elm = groepen[mk].elm, stukken = groepen[mk].stukken,
+          anker = groepen[mk].anker;
       var st = sugState[sugKey(elm)] || {};
       var d = (st.decision && st.decision !== "pending" && !st.processed) ? st.decision : null;
       var cls = d ? (d === "accepted" ? " la-sug-acc" : d === "rejected" ? " la-sug-rej" : " la-sug-chg") : "";
@@ -939,7 +1035,7 @@
         r.style.left = stuk.x + "px"; r.style.top = stuk.y + "px";
         r.style.width = stuk.w + "px"; r.style.height = stuk.h + "px";
       });
-      var last = stukken[stukken.length - 1];
+      var last = anker[anker.length - 1];
       var b = el("div"); b.className = "la-badge la-sug" + cls;
       var desc = elm.getAttribute("data-la-suggest-desc") || "";
       var icoX = '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M3.5 3.5l7 7M10.5 3.5l-7 7"/></svg>';
