@@ -24,6 +24,25 @@
   .la-badge.la-tekst { background: #7a4bd6; }
   .la-rect { position: absolute; border: 1.5px solid rgba(47,107,236,.55); background: rgba(47,107,236,.07); z-index: 99996; pointer-events: none; border-radius: 2px; }
   .la-rect.la-tekst { border-color: rgba(122,75,214,.5); background: rgba(122,75,214,.10); }
+  /* LA-SUGGEST-laag: voorgestelde wijzigingen, zelfde mechaniek als annotaties */
+  .la-rect.la-sug-rect { border-color: rgba(47,107,236,.45); background: rgba(47,107,236,.08); }
+  .la-rect.la-sug-rect.la-sug-acc { border-color: rgba(31,122,77,.45); background: rgba(31,122,77,.08); }
+  .la-rect.la-sug-rect.la-sug-rej { border-color: rgba(155,22,20,.4); background: rgba(155,22,20,.07); }
+  .la-rect.la-sug-rect.la-sug-chg { border-color: rgba(168,101,10,.45); background: rgba(168,101,10,.08); }
+  .la-badge.la-sug { background: rgba(255,255,255,.96); color: #6a6a6a;
+    border: 1px solid rgba(0,0,0,.1); box-shadow: 0 1px 4px rgba(0,0,0,.14);
+    display: inline-flex; align-items: center; justify-content: center; }
+  .la-badge.la-sug svg { width: 12px; height: 12px; display: block; }
+  .la-badge.la-sug.la-sug-open { width: auto; padding: 0 3px; border-radius: 11px; gap: 1px; }
+  .la-sug-i { display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%; cursor: pointer; color: #6a6a6a; }
+  .la-sug-i svg { width: 12px; height: 12px; display: block; }
+  .la-sug-i:hover { background: rgba(0,0,0,.06); color: #111; }
+  .la-sug-i.la-sug-i-rej:hover { background: rgba(155,22,20,.08); color: #9b1614; }
+  .la-sug-i.la-sug-i-acc:hover { background: rgba(31,122,77,.1); color: #1f7a4d; }
+  .la-badge.la-sug.la-sug-acc { color: #1f7a4d; }
+  .la-badge.la-sug.la-sug-rej { color: #9b1614; }
+  .la-badge.la-sug.la-sug-chg { color: #a8650a; }
   /* Orphan list ("likely processed"): collapsed by default. Same quiet chrome
      as the toolbar/popup — no amber alert styling, no shadow. */
   #la-wees { position: fixed; left: 14px; bottom: 12px; z-index: 99997; width: 300px;
@@ -858,7 +877,137 @@
       b.addEventListener("click", function (ev) { ev.stopPropagation(); openPopup(a); });
     });
     toonWezen(wezen);
+    renderSuggesties();
   }
+
+  /* ---- LA-SUGGEST-laag: voorgestelde wijzigingen -------------------
+     Elementen met data-la-suggest zijn wijzigingen die de agent al in de
+     pagina heeft doorgevoerd. Ze krijgen exact de annotatie-mechaniek:
+     dezelfde selectie-rects, dezelfde genummerde badge, dezelfde popup.
+     De beslissing (accepteren / afwijzen / anders) gaat via /state-save
+     (component "suggest") naar state.json, niet naar de annotatieronde. */
+  var sugState = {};
+  function sugKey(elm) { return elm.getAttribute("data-la-suggest"); }
+  function sugSave(elm, decision, comment, extra) {
+    var vorig = sugState[sugKey(elm)] || {};
+    var value = { decision: decision, comment: comment || "",
+      label: (elm.getAttribute("data-la-suggest-desc") || elm.textContent || "")
+        .replace(/\s+/g, " ").trim().slice(0, 140),
+      kind: elm.getAttribute("data-la-suggest-kind") || "edit" };
+    /* Terugklikken naar pending mag de getypte change-tekst niet wissen: anders
+       kan de reviewer zijn eigen suggestie niet bijwerken, alleen overschrijven
+       vanaf nul. Bij accepteren/afwijzen laten we de tekst juist vallen, zodat
+       de verwerkende agent geen dode comment op een accepted key ziet. */
+    if (decision === "pending" && !comment && !vorig.processed) {
+      value.comment = vorig.comment || "";
+      if (vorig.commentExpanded) value.commentExpanded = vorig.commentExpanded;
+      if (vorig.refs) value.refs = vorig.refs;
+    }
+    if (extra) for (var k in extra) value[k] = extra[k];
+    sugState[sugKey(elm)] = value;
+    var body = basis(); body.component = "suggest"; body.key = sugKey(elm); body.value = value;
+    post("/state-save", body).catch(function () {});
+  }
+  function renderSuggesties() {
+    document.querySelectorAll(".la-sug-rect,.la-badge.la-sug").forEach(function (n) { n.remove(); });
+    var elms = [].slice.call(document.querySelectorAll("[data-la-suggest]"));
+    elms.forEach(function (elm, i) {
+      /* tekst krijgt tekstregel-rects (als een selectie), visuals één regiokader:
+         losse rects op de aslabels van een grafiek zeggen niets over "deze figuur
+         is nieuw". Expliciet te sturen met data-la-suggest-mode="text"|"region". */
+      var modus = elm.getAttribute("data-la-suggest-mode") ||
+        ((elm.matches("figure,img,svg,canvas,video,table") ||
+          elm.querySelector("svg,img,canvas,video")) ? "region" : "text");
+      var stukken = null;
+      if (modus !== "region") {
+        var range = document.createRange();
+        try { range.selectNodeContents(elm); } catch (e) { return; }
+        var rr = laRectsVanRange(range);
+        stukken = rr ? ((rr.rects && rr.rects.length) ? rr.rects : [rr]) : null;
+      }
+      if (!stukken) {
+        var bb = elm.getBoundingClientRect();
+        if (!bb.width && !bb.height) return;
+        stukken = [{ x: Math.round(bb.left + scrollX), y: Math.round(bb.top + scrollY),
+                     w: Math.round(bb.width), h: Math.round(bb.height) }];
+      }
+      var st = sugState[sugKey(elm)] || {};
+      var d = (st.decision && st.decision !== "pending" && !st.processed) ? st.decision : null;
+      var cls = d ? (d === "accepted" ? " la-sug-acc" : d === "rejected" ? " la-sug-rej" : " la-sug-chg") : "";
+      stukken.forEach(function (stuk) {
+        var r = el("div"); r.className = "la-rect la-sug-rect" + cls;
+        r.style.left = stuk.x + "px"; r.style.top = stuk.y + "px";
+        r.style.width = stuk.w + "px"; r.style.height = stuk.h + "px";
+      });
+      var last = stukken[stukken.length - 1];
+      var b = el("div"); b.className = "la-badge la-sug" + cls;
+      var desc = elm.getAttribute("data-la-suggest-desc") || "";
+      var icoX = '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M3.5 3.5l7 7M10.5 3.5l-7 7"/></svg>';
+      var icoV = '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 7.2l2.8 2.8L11 4.2"/></svg>';
+      var icoP = '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" d="M9.6 2.6l1.8 1.8L5 10.8l-2.4.6.6-2.4zM8.5 3.7l1.8 1.8"/></svg>';
+      if (d) {
+        /* beslist: klein badge met het gekozen icoon; klik = terug naar pending */
+        b.innerHTML = d === "accepted" ? icoV : d === "rejected" ? icoX : icoP;
+        b.title = desc + " \u2014 " + (st.commentExpanded || st.comment || d) +
+          (d === "change"
+            ? " (klik om terug te gaan naar pending; je tekst blijft staan en"
+              + " staat weer in de popup als je opnieuw \u270e kiest)"
+            : " (klik om de keuze terug te draaien)");
+        b.addEventListener("click", function (ev) {
+          ev.stopPropagation(); sugSave(elm, "pending", ""); renderSuggesties();
+        });
+      } else {
+        /* pending: de badge breed uitgetrokken met de drie acties erin */
+        b.classList.add("la-sug-open");
+        b.title = desc;
+        [[icoX, "la-sug-i-rej", "afwijzen \u2014 de wijziging wordt teruggedraaid", function () {
+            sugSave(elm, "rejected", ""); renderSuggesties(); }],
+         [icoV, "la-sug-i-acc", "accepteren \u2014 de wijziging blijft staan", function () {
+            sugSave(elm, "accepted", ""); renderSuggesties(); }],
+         [icoP, "la-sug-i-chg", "anders \u2014 beschrijf de change", function () { sugPopup(elm); }]
+        ].forEach(function (spec) {
+          var k = document.createElement("span");
+          k.className = "la-sug-i " + spec[1]; k.innerHTML = spec[0]; k.title = spec[2];
+          k.addEventListener("click", function (ev) { ev.stopPropagation(); spec[3](); });
+          b.appendChild(k);
+        });
+      }
+      b.style.left = (last.x + last.w - 8) + "px"; b.style.top = (last.y - 12) + "px";
+    });
+  }
+  function sugPopup(elm) {
+    /* sugState komt bij het laden van de pagina uit /state, dus een eerder
+       getypte change-tekst staat er ook na een reload nog in en wordt hier
+       voorgevuld — bewerken in plaats van opnieuw beginnen. Een al verwerkte
+       entry telt als leeg: die tekst is door de agent afgehandeld. */
+    var st = sugState[sugKey(elm)] || {};
+    if (st.processed) st = {};
+    var bb = elm.getBoundingClientRect();
+    openPopup({ type: "text",
+      selectedText: elm.getAttribute("data-la-suggest-desc") || "",
+      comment: st.comment || "", refs: (st.refs && st.refs.length) ? st.refs : null,
+      rect: { x: Math.round(bb.left + scrollX), y: Math.round(bb.top + scrollY),
+              w: Math.round(bb.width), h: Math.round(bb.height) },
+      _composer: {
+        onSave: function (parsed) {
+          var refs = parsed.refs || [];
+          var expanded = (parsed.comment || "").replace(/\u27E6(r\d+)\u27E7/g, function (m, id) {
+            for (var j = 0; j < refs.length; j++) if (refs[j].id === id) return '"' + refs[j].selectedText + '"';
+            return m;
+          });
+          sugSave(elm, "change", parsed.comment,
+            { commentExpanded: expanded, refs: refs.length ? refs : null });
+          renderSuggesties();
+        }
+      } });
+  }
+  (function sugInit() {
+    if (!document.querySelector("[data-la-suggest]")) return;
+    post("/state", basis()).then(function (res) {
+      var comp = (res && res.state && res.state.components && res.state.components.suggest) || {};
+      sugState = comp; renderSuggesties();
+    }).catch(function () {});
+  })();
 
   /* ---- popup + tekst-referenties --------------------------------- */
   var popup = null, hangendeGhost = null, refPickMode = false, refPickInsert = null;
@@ -1045,6 +1194,18 @@
       '<div class="la-hint"></div>';
     document.body.appendChild(popup);
     if (a.type === "text") popup.querySelector(".la-quote").textContent = a.selectedText || "";
+    if (a._composer) {
+      /* composer-modus (o.a. LA-SUGGEST): zelfde popup; attach is hier niet
+         van toepassing, del/done worden afwijzen/accepteren als de aanroeper
+         die acties levert en verdwijnen anders */
+      popup.querySelector(".la-attach").style.display = "none";
+      var delBtn = popup.querySelector(".la-del"), doneBtn = popup.querySelector(".la-done");
+      if (a._composer.onReject) { delBtn.textContent = "\u2715"; delBtn.title = "Afwijzen \u2014 de wijziging wordt teruggedraaid"; }
+      else delBtn.style.display = "none";
+      if (a._composer.onAccept) { doneBtn.title = "Accepteren \u2014 de wijziging blijft staan"; }
+      else doneBtn.style.display = "none";
+      if (a._composer.saveLabel) popup.querySelector(".la-save").textContent = a._composer.saveLabel;
+    }
     var hint = popup.querySelector(".la-hint");
     if (!brug.ok) {
       hint.className = "la-hint la-waarschuwing";
@@ -1117,9 +1278,11 @@
       inp.click();
     });
     popup.querySelector(".la-del").addEventListener("click", function () {
+      if (a._composer) { if (a._composer.onReject) a._composer.onReject(); sluitPopup(); return; }
       verwijder(a); sluitPopup();
     });
     popup.querySelector(".la-done").addEventListener("click", function () {
+      if (a._composer) { if (a._composer.onAccept) a._composer.onAccept(); sluitPopup(); return; }
       markeerVerwerkt(a); sluitPopup();
     });
     popup.querySelector(".la-cancel").addEventListener("click", function () { render(); sluitPopup(); });
@@ -1133,6 +1296,7 @@
         ed.focus();
         return;
       }
+      if (a._composer) { a._composer.onSave(parsed); sluitPopup(); return; }
       a.comment = parsed.comment;
       a.refs = parsed.refs.length ? parsed.refs : null;
       bewaarAnnotatie(a); sluitPopup();
@@ -1149,6 +1313,16 @@
       }
     });
     ed.focus();
+    /* Bij een voorgevuld veld (bewerken van een bestaande annotatie of van een
+       eerder getypte LA-SUGGEST-change) hoort de cursor achter de tekst: een
+       kale focus() zet hem vóóraan, waardoor je je eigen zin in tikt. */
+    if (ed.textContent.length) {
+      var eind = document.createRange();
+      eind.selectNodeContents(ed); eind.collapse(false);
+      var sel0 = window.getSelection();
+      sel0.removeAllRanges(); sel0.addRange(eind);
+      laRefCursorBewaar(ed);
+    }
   }
 
   /* ---- opslaan / verwijderen ------------------------------------- */
@@ -2452,6 +2626,13 @@
     diff: laDiff,
     draftModel: { blokken: laBlokkenVanBox, projectie: laProjectie, html: laBlokkenNaarHtml,
       opmaakHunks: laOpmaakHunks, hunks: laHunks },
+    /* Hergebruik van de volledige popup (chips, plakken, Cmd+Enter) door
+       andere componenten, zoals LA-SUGGEST. onSave krijgt {comment, refs}. */
+    openComposer: function (opts) {
+      openPopup({ type: "text", selectedText: opts.quote || "",
+        comment: opts.comment || "", refs: opts.refs || null,
+        rect: opts.rect || null, _composer: opts });
+    },
     add: function (a) {
       teller += 1;
       a.nr = teller; a.type = a.type || (a.selectedText ? "text" : "region");

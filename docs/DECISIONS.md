@@ -112,3 +112,35 @@ Consequences accepted:
   `plaintext-only`) until the reviewer uses a formatting button. Then the
   whole card converts to blocks in one step — half-converting would
   collapse the remaining hard line breaks.
+
+## 2026-08-29 — LA-SUGGEST als laag in het annotator-snippet, niet als los component
+
+Suggested changes (agent wijzigt de pagina, reviewer accepteert/wijst af per
+stuk) begonnen als eigen snippet met eigen highlight, pill en popup. Drie
+iteraties lieten zien dat elke eigen implementatie (cel-gebonden knoppen,
+gele mark, zelf positioneren in sticky tabellen) opnieuw de problemen opriep
+die de annotator al lang had opgelost. Besluit: de laag leeft ín
+annotator-snippet.html en hergebruikt letterlijk de annotatie-mechaniek —
+la-rect-selecties (tekstregels voor tekst, één regiokader voor visuals), de
+badge breed uitgetrokken tot pill met ✕ ✓ ✎, en voor ✎ de echte popup via
+`LucAnnotator.openComposer` (chips incluis). Beslissingen zijn status
+(state.json, component `suggest`), geen annotaties. `references/
+suggest-snippet.html` is een deprecatie-pointer; niet meer inplakken.
+
+## 2026-08-31 — Een LA-SUGGEST-change is te bewerken; pending wist de tekst niet
+
+Bug: na ✎ + tekst + save kon de reviewer zijn eigen suggestie niet meer
+bijschaven. Het oranje ✎-badge draait de keuze terug naar pending, en dat
+deed `sugSave(elm, "pending", "")` — met een leeg `comment` en zonder
+`refs`/`commentExpanded`, dus de getypte zin werd zowel in `sugState` als in
+`state.json` overschreven. De volgende popup opende leeg.
+
+Besluit: terugklikken naar pending is nog steeds terugklikken (de badge-flow
+blijft), maar het bewaart de change-tekst, chips incluis. `sugPopup` vult het
+commentveld met wat er in `sugState` staat — dat komt bij het laden uit
+`POST /state`, dus de voorvulling overleeft een reload. Een al `processed`
+entry telt daarbij als leeg. Bij `accepted`/`rejected` valt de tekst juist
+weg: een verwerkende agent hoort geen dode change-comment op een accepted key
+te vinden. En een voorgevuld commentveld zet de cursor achter de tekst in
+plaats van ervoor — dat gold ook al voor het bewerken van een gewone
+annotatie. Bewijs: `tests/case-14-suggest-change-bewerken.mjs`.

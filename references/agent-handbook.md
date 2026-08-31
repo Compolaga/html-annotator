@@ -81,7 +81,9 @@ berichten stuurt (geen extra bevestiging vragen of hij het meent):
 
 On a bare `.` find the open round yourself (via
 `bin/toon-annotaties.py --open` or the bridge), instead of waiting for an
-explicit path.
+explicit path. Check on the same trigger whether the page's `state.json`
+holds unprocessed LA-SUGGEST decisions (component `suggest`, deel 9) — the
+reviewer uses one `.` for both channels.
 
 de reviewer plakt soms ook een berichtje in de trant van "Kijk, hier staan de annotaties:
 `<pad>/ronde-NN/annotations.json`. Het zijn er X." Lees dat bestand.
@@ -406,3 +408,69 @@ wat er sinds de vorige keer veranderd is — analoog aan hoe je
 `/state-save` merget de meegegeven `value` over de bestaande entry en zet
 `changedAt`; andere componenten dan `checklist` kunnen dezelfde twee routes
 gebruiken met een eigen `component`-naam.
+
+## Deel 9: voorgestelde wijzigingen (LA-SUGGEST-laag)
+
+Voor wijzigingen die jij als agent in een bestaande HTML aanbrengt en die de
+reviewer per stuk wil kunnen accepteren of terugdraaien — zoals suggested
+changes in code. Sinds v5 is dit **geen apart snippet meer**: de laag zit in
+het gewone annotator-snippet en activeert zichzelf zodra er elementen met
+`data-la-suggest` op de pagina staan. Een pagina met het LUC-ANNOTATOR-blok
+heeft dus alles al; `references/suggest-snippet.html` is vervallen.
+
+**Markeren (bij het maken van de wijziging):** zet op elk gewijzigd element
+
+- `data-la-suggest="<unieke-key>"` — stabiele key (bv. `"wi-29119"`), verplicht;
+- `data-la-suggest-desc="..."` — één zin die zegt wát je veranderd hebt; dit
+  wordt het quote-blok in de popup;
+- `data-la-suggest-old="..."` — de oorspronkelijke tekst, zodat een afwijzing
+  exact terug te draaien is. Verplicht bij `kind="edit"`;
+- `data-la-suggest-kind` — `"edit"` (default), `"add"` (nieuw; afwijzen =
+  weghalen), `"del"` (voorstel tot verwijderen; afwijzen = laten staan);
+- `data-la-suggest-mode` — meestal weglaten: tekst krijgt vanzelf
+  tekstregel-selecties en visuals (`figure`/`svg`/`img`/`canvas`/`video`/
+  `table`, of iets dat die bevat) één regiokader. Zet hem alleen expliciet
+  (`"text"` of `"region"`) als die autodetectie verkeerd kiest.
+
+**Wat de reviewer ziet:** exact de annotatie-mechaniek. Elke suggestie krijgt
+de vertrouwde selectie-rects (blauw) over de gewijzigde tekst, met aan het
+einde de badge breed uitgetrokken tot een pill met de drie acties erin:
+**✕ afwijzen · ✓ accepteren · ✎ anders**. Bij ✎ opent de gewone
+annotator-popup, met het voorstel als quote en het volledige commentveld
+(inclusief tekst-chips via het kettingicoon); Save = "anders, namelijk zó".
+Na een beslissing krimpt de pill tot één gekleurd badge (groen ✓ / rood ✕ /
+oranje ✎); daarop klikken draait de keuze terug naar pending. Bij een
+change-beslissing blijft de getypte tekst daarbij bewaard: kiest de reviewer
+opnieuw ✎, dan staat zijn eigen zin (chips incluis) weer in de popup en kan
+hij hem bijschaven in plaats van overtypen. Dat werkt ook na een reload — de
+voorvulling komt uit de geladen state, niet uit een variabele. Accepteren of
+afwijzen laat de tekst juist vallen, zodat jij geen dode change-comment op
+een accepted key vindt.
+
+**State.** Beslissingen zijn blijvende status, geen feedbackronde: ze staan in
+`~/Desktop/annotaties/<slug>/state.json` onder component `suggest`
+(`POST /state-save`), met per key `decision` (`"accepted"`, `"rejected"`,
+`"change"`, `"pending"`), `comment`, en bij chips ook `refs` (id +
+selectedText + locator) en `commentExpanded` (chips inline uitgeschreven).
+
+**Verwerken als agent.** Zelfde triggers als annotaties (kale `.`, "verwerk").
+Lees de state (`state.json` of `POST /state`) en handel per key af:
+
+- `accepted` → de wijziging blijft. Haal de `data-la-suggest*`-attributen weg.
+- `rejected` → draai exact terug: bij `kind="edit"` zet je
+  `data-la-suggest-old` terug, bij `"add"` verwijder je het element, bij
+  `"del"` laat je het staan. Daarna de attributen weghalen.
+- `change` → voer `commentExpanded` uit; gebruik `refs[].locator` als de
+  bedoelde tekst vaker op de pagina staat. Onduidelijk: vragen, niet gokken.
+- `pending` of geen entry → laten staan. Een pending entry kan nog een
+  `comment` dragen (tekst van een teruggeklikte change): dat is een concept
+  van de reviewer, geen opdracht — niet uitvoeren.
+
+Meld elke afgehandelde key af met `POST /state-save` en
+`{"component":"suggest","key":"...","value":{"processed":true}}` — de laag
+slaat entries met `processed` over bij het herladen. Zeg in je antwoord wat
+je geaccepteerd gelaten, teruggedraaid en gewijzigd hebt.
+
+Een LA-SUGGEST-beslissing is status (zoals een vinkje), géén annotatie: hij
+komt niet in `annotations.json` en hoeft niet via `/resolve`. Gewone
+annotaties op dezelfde pagina blijven gewoon werken.

@@ -144,6 +144,23 @@ Format: `{"components": {"checklist": {"<key>": {"checked": true,
 `changedAt` to see what changed since your last read, analogous to
 reading `annotations.json`. Details: handbook part 8.
 
+### Suggested changes (LA-SUGGEST layer)
+
+When you change an existing HTML deliverable and the reviewer should accept
+or undo each change individually, mark every changed element with
+`data-la-suggest="<unique-key>"` plus `data-la-suggest-desc`,
+`data-la-suggest-old` (original content) and optionally
+`data-la-suggest-kind` (`edit`/`add`/`del`). Nothing else is needed: the
+regular LUC-ANNOTATOR snippet detects these attributes and renders each
+suggestion with the exact annotation mechanics — blue selection rects for
+text, one region frame for visuals, and the badge stretched into a white
+pill holding ✕ reject · ✓ accept · ✎ change; ✎ opens the normal annotator
+popup (chips included) for "do it differently". Decisions land via
+`POST /state-save` (component `suggest`) in the page's `state.json`.
+Processing on `.`: accepted → keep and strip markers, rejected → restore the
+original, change → apply the comment; then mark the key `processed`.
+Full rules: handbook part 9.
+
 ## Processing (short port)
 
 Triggers — do not ask for confirmation:

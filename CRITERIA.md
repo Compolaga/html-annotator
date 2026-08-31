@@ -285,6 +285,23 @@ touch it. Snippet: `references/checklist-snippet.html` (LA-CHECKLIST).
 
 </details>
 
+<details><summary><strong>B27 — A LA-SUGGEST "change" is editable, and pending keeps the typed text.</strong></summary>
+
+*Expected behaviour:* opening the ✎ popup for a suggestion that already
+carries a `change` decision prefills the comment field with the stored
+comment (chips included) and puts the caret behind it; saving replaces the
+decision instead of stacking one. Clicking the orange badge still returns
+the suggestion to pending, but keeps `comment`/`refs`/`commentExpanded` in
+`state.json`, so the text is still there after a reload — the prefill comes
+from `POST /state`, not from an in-memory variable. `accepted` and
+`rejected` drop the text, so a processing agent never finds a dead change
+comment on an accepted key.
+
+*Evidence:* `tests/case-14-suggest-change-bewerken.mjs`; decision in
+`docs/DECISIONS.md` (2026-08-31).
+
+</details>
+
 <details><summary><strong>B23 — Region and text boxes scroll with the HTML they mark, including inside an <code>overflow:auto</code> scroller.</strong></summary>
 
 *Expected behaviour:* after the marked row moves in a nested scroller, the
@@ -342,9 +359,9 @@ Gitignored runtime does not count.
 
 </details>
 
-<details><summary><strong>A7 — B1–B15 plus B16/B21/B22/B23/B24/B25/B26 stay green.</strong></summary>
+<details><summary><strong>A7 — B1–B15 plus B16/B21/B22/B23/B24/B25/B26/B27 stay green.</strong></summary>
 
-*Evidence:* `tests/run.sh` (default: 00 02–09 11–13). The suite header
+*Evidence:* `tests/run.sh` (default: 00 02–09 11–14). The suite header
 prints `git rev-parse --short HEAD` and a dirty-tree count. Captures
 live in `tests/red/ronde-NN-*.txt`; never overwrite an existing ronde.
 
