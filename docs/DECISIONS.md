@@ -46,8 +46,8 @@ cleanup, "it may change drastically". Content remains in git at
 
 `zoekAnker` no longer treats "start span still exists" as processed.
 The label comes from the start row; `zoekHostViaLabel` / `laHostPast`
-keep repeated cell text on that row. Source: Reconi owners, 2026-08-23.
-No Reconi page in the suite — case-08 is the reduced form.
+keep repeated cell text on that row. Source: the client's owners, 2026-08-23.
+No client page in the suite — case-08 is the reduced form.
 
 ## 2026-08-23 — Root is a port, CLIs in bin/
 

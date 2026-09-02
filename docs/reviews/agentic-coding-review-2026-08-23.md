@@ -22,7 +22,7 @@ captures is hoger omdat ongemutileerde baselines meekomen.
    *Bestaand gedrag*. Op 472cf63 bestaan `zoekHostViaLabel` / `laHostPast` /
    `laRegioTeWijd` niet. A7 leest als regressiegarantie over code die samen met
    zijn tests is geschreven. C3. Remedie: B16 naar gewijzigd gedrag, met de
-   gerapporteerde bug erbij. Geen Reconi-pagina in de suite — die staat niet in
+   gerapporteerde bug erbij. Geen klantpagina in de suite — die staat niet in
    deze repo; case-08 is al de gereduceerde vorm (cross-row + herhaalde
    `Backlog`).
 
@@ -71,5 +71,5 @@ captures is hoger omdat ongemutileerde baselines meekomen.
 
 ## Open twijfel
 
-Reconi-fixture in de suite: geen. De pagina hoort niet bij deze skill-repo.
+Klantfixture in de suite: geen. De pagina hoort niet bij deze skill-repo.
 case-08 encodeert de gerapporteerde bug al. Commit-splitsing: wacht op Luc.

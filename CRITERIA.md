@@ -190,7 +190,7 @@ row the locator named.
 
 *Evidence:* `tests/case-08-locator-tabel.mjs` · `tests/mutate-contract.sh`.
 
-*Gap:* no real Reconi page in the repo.
+*Gap:* no real client page in the repo.
 
 </details>
 
