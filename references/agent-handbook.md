@@ -274,9 +274,12 @@ hoop gooien.
 **Tracked changes.** Elke `la-draft-txt` is direct bewerkbaar: de reviewer klikt in de tekst,
 de cursor staat waar hij klikte, en hij typt. Er is bewust geen knop om "de bewerkmodus
 aan te zetten" — dat was een drempel voor iets wat hij gewoon wil kunnen doen. Klikt hij
-eruit, dan verschijnt het verschil met de oorspronkelijke tekst als doorhaling en
-onderstreping — in de opgemaakte kaart, dus een gewijzigde bullet blijft een bullet — en
-gaat het als annotatie van `type: "edit"` naar de bridge. Dat is vaak sneller dan een
+eruit, dan gaat de bewerking als annotatie van `type: "edit"` naar de bridge; de kaart
+blijft de kale, herschreven tekst tonen. Het verschil met de oorspronkelijke tekst
+(doorhaling en onderstreping, in de opgemaakte kaart, dus een gewijzigde bullet blijft een
+bullet) verschijnt alleen op verzoek via de knop "Show changes" in de bar, en verdwijnt
+weer met "Hide changes" of door in de tekst te klikken. Bewust niet automatisch bij het
+eruit klikken: dat sprong in het gezicht van wie gewoon aan het herschrijven was. Dat is vaak sneller dan een
 comment: in plaats van uitleggen wat er anders moet, schrijft hij het gewoon anders op.
 "↺ Herstel origineel" zet de kaart terug en verwijdert de bewerking.
 

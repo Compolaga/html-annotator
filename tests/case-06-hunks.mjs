@@ -68,6 +68,8 @@ await page.click('.la-draft-txt');
 await page.evaluate((t) => { document.querySelector('.la-draft-txt').textContent = t; }, NIEUW);
 await page.evaluate(() => document.querySelector('.la-draft-txt').blur());
 await sleep(1500);
+await page.click('.la-draft-diff');
+await sleep(300);
 
 const jsonPath = (await page.evaluate(() => window.LucAnnotator.bridge().jsonPath) || '')
   .replace(/^~/, homedir());
@@ -143,6 +145,8 @@ const browser2 = await chromium.launch({ channel: 'chrome', headless: true });
 const page2 = await browser2.newPage();
 await page2.goto(`http://127.0.0.1:${PORT}/p/Desktop/${slug}.html`, { waitUntil: 'load' });
 await sleep(2500);
+await page2.click('.la-draft-diff');
+await sleep(300);
 const herstel = await page2.evaluate(() => {
   const box = document.querySelector('.la-draft-txt');
   return {

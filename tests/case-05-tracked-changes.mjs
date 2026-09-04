@@ -61,7 +61,23 @@ await page.evaluate((t) => {
 await page.evaluate(() => document.querySelector('.la-draft-txt').blur());  // eruit klikken
 await sleep(1500);
 
-// 2. de markup moet ins én del tonen, niet alleen de nieuwe tekst
+// 1b. eruit klikken toont GEEN diff: de kaart blijft de kale herschreven tekst, met
+// alleen een knop "Show changes" in de bar. De automatische doorhaling sprong in het
+// gezicht van wie gewoon aan het herschrijven was.
+const naBlur = await page.evaluate(() => {
+  const box = document.querySelector('.la-draft-txt');
+  const knop = document.querySelector('.la-draft-diff');
+  return { ins: box.querySelectorAll('ins').length, del: box.querySelectorAll('del').length,
+           knop: !!knop && knop.style.display !== 'none', label: knop ? knop.textContent : '' };
+});
+zeg(naBlur.ins === 0 && naBlur.del === 0,
+  `na eruit klikken geen automatische diff (${naBlur.ins} ins, ${naBlur.del} del)`);
+zeg(naBlur.knop && /Show changes/.test(naBlur.label),
+  `knop "Show changes" staat klaar (${JSON.stringify(naBlur.label)})`);
+
+// 2. via de knop moet de markup ins én del tonen, niet alleen de nieuwe tekst
+await page.click('.la-draft-diff');
+await sleep(300);
 const markup = await page.evaluate(() => {
   const box = document.querySelector('.la-draft-txt');
   return { ins: box.querySelectorAll('ins').length, del: box.querySelectorAll('del').length };
@@ -145,6 +161,8 @@ if (!punt) {
 // 4. overleeft het een reload? Anders is Lucs werk weg zodra hij ververst.
 await page.reload({ waitUntil: 'load' });
 await sleep(2500);
+await page.click('.la-draft-diff');
+await sleep(300);
 const naReload = await page.evaluate(() => {
   const box = document.querySelector('.la-draft-txt');
   return { ins: box.querySelectorAll('ins').length, del: box.querySelectorAll('del').length,
