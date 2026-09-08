@@ -55,7 +55,7 @@ jobs:
           } > "$HOME/Desktop/ci-page.html"
           curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8791/p/Desktop/ci-page.html | grep -q 200
           # outside home must be refused
-          curl -s -o /dev/null -w '%{http_code}\n' 'http://127.0.0.1:8791/p/../../etc/passwd' | grep -q 403
+          curl -s --path-as-is -o /dev/null -w '%{http_code}\n' 'http://127.0.0.1:8791/p/../../etc/passwd' | grep -q 403
           curl -fsS -X POST http://127.0.0.1:8791/save -H 'Content-Type: application/json' -d '{
             "page": "http://127.0.0.1:8791/p/Desktop/ci-page.html",
             "pageFile": "~/Desktop/ci-page.html",
