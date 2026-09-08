@@ -18,6 +18,9 @@ import os
 import re
 import sys
 
+if hasattr(sys.stdout, "reconfigure"):  # Windows-console is standaard geen UTF-8
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
@@ -75,7 +78,7 @@ def paginas():
 
 
 def laad(f):
-    with open(f) as fh:
+    with open(f, encoding="utf-8") as fh:
         return json.load(fh)
 
 

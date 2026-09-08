@@ -5,3 +5,4 @@ tests/package-lock.json
 bridge-hook.log
 __pycache__/
 *.pyc
+tests/red/

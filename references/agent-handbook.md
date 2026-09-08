@@ -244,12 +244,12 @@ fallback als dat niet zo is.
 <p class="lead">Nog niet verstuurd. Annoteer gerust in de tekst zelf, dan pas ik aan.</p>
 
 <div class="la-draft">
-  <div class="la-draft-hdr"><b>Aan:</b> Anne Dijkstra &nbsp;·&nbsp; <b>Cc:</b> Marco Bonsink &nbsp;·&nbsp; <b>Onderwerp:</b> Even bijpraten over security</div>
+  <div class="la-draft-hdr"><b>Aan:</b> Alex Jansen &nbsp;·&nbsp; <b>Cc:</b> Sam de Vries &nbsp;·&nbsp; <b>Onderwerp:</b> Even bijpraten over security</div>
   <div class="la-draft-txt">
-    <p>Hi Anne,</p>
+    <p>Hi Alex,</p>
     <p>Eerste alinea van het bericht.</p>
     <ul>
-      <li>Anne: schiet het issue in bij <a href="https://…/pbi/1234">PBI 1234</a></li>
+      <li>Alex: schiet het issue in bij <a href="https://…/pbi/1234">PBI 1234</a></li>
       <li>Ik: stuur de opzet door</li>
     </ul>
     <p>Groet,<br>de reviewer</p>
@@ -318,7 +318,7 @@ Regels bij het gebruik:
 - Schrijf de berichttekst in blokken: `<p>` per alinea, `<ul>`/`<ol>` met `<li>` voor
   opsommingen, `<br>` voor een harde regelovergang binnen een alinea. Alleen die tags,
   plus `<b>`, `<i>` en `<a href>`. Geen `style`, geen `<div>`, geen tabellen.
-- Streepjes-als-bullet (`- Anne: …` als gewone tekstregel) zijn geen opsomming meer.
+- Streepjes-als-bullet (`- Alex: …` als gewone tekstregel) zijn geen opsomming meer.
   Wil je een opsomming, schrijf er dan één.
 - Kortere kaarten mogen nog steeds platte tekst zijn: laat je de blokken weg, dan
   gedraagt de kaart zich als voorheen (echte regelafbrekingen, `white-space: pre-wrap`,

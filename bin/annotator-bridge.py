@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Lokale bridge voor de HTML-annotator (LUC-ANNOTATOR v2).
 
-Draait op 127.0.0.1:8791 en schrijft annotaties direct naar
+Draait op 127.0.0.1:8791 (macOS, Linux, Windows) en schrijft annotaties direct naar
 ~/Desktop/annotaties/<pagina-slug>/ronde-NN/annotations.json, inclusief
 screenshot-crops in ronde-NN/screenshots/.
 
 Alleen stdlib nodig. Pillow wordt gebruikt als het toevallig beschikbaar is;
-anders knipt headless Chrome de crop zelf uit via een iframe-clip.
+anders knipt headless Chrome (of Edge) de crop zelf uit via een iframe-clip.
+Geen browser gevonden: de annotatie wordt zonder crop bewaard.
 
 Starten:  python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py
 Checken:  curl -s http://127.0.0.1:8791/ping
@@ -32,7 +33,43 @@ if _ROOT not in sys.path:
 from annotator.config import HOST, PORT, ROOT
 from annotator.refs import expand_comment
 from annotator.record import schoon_locator, zet_ref_velden
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+
+def vind_chrome():
+    """Pad naar een Chromium-browser voor headless crops, of None.
+
+    Volgorde: env ANNOTATOR_CHROME / LUC_ANNOTATOR_CHROME > PATH > bekende
+    installatiepaden per platform (macOS, Windows, Linux). Edge telt als
+    fallback: dezelfde headless-vlaggen werken daar.
+    """
+    for var in ("ANNOTATOR_CHROME", "LUC_ANNOTATOR_CHROME"):
+        p = os.environ.get(var)
+        if p:
+            return p if os.path.isfile(p) else shutil.which(p)
+    for naam in ("google-chrome", "google-chrome-stable", "chrome", "chromium",
+                 "chromium-browser", "msedge", "microsoft-edge"):
+        p = shutil.which(naam)
+        if p:
+            return p
+    kandidaten = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser",
+        "/snap/bin/chromium", "/usr/bin/microsoft-edge",
+    ]
+    for basis in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)"),
+                  os.environ.get("LocalAppData")):
+        if basis:
+            kandidaten.append(os.path.join(basis, "Google", "Chrome", "Application", "chrome.exe"))
+            kandidaten.append(os.path.join(basis, "Microsoft", "Edge", "Application", "msedge.exe"))
+    for p in kandidaten:
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+CHROME = vind_chrome()
 CACHE = os.path.join(tempfile.gettempdir(), "luc-annotator-shots")
 MARGE = 12
 LOCK = threading.Lock()
@@ -191,6 +228,7 @@ def volledige_shot(bestand, page_url, dw, dh):
     url = page_url
     if bestand:
         url = "file://" + urllib.parse.quote(bestand)
+    eis_chrome()
     subprocess.run(
         [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
          "--no-first-run", "--no-default-browser-check",
@@ -202,6 +240,7 @@ def volledige_shot(bestand, page_url, dw, dh):
 
 def crop_via_chrome(bestand, page_url, dw, dh, box, uit):
     """Fallback zonder Pillow: iframe-clip renderen met headless Chrome."""
+    eis_chrome()
     x0, y0, x1, y1 = box
     url = "file://" + urllib.parse.quote(bestand) if bestand else page_url
     html = (
@@ -229,6 +268,15 @@ def crop_via_chrome(bestand, page_url, dw, dh, box, uit):
         except OSError:
             pass
     return uit
+
+
+def eis_chrome():
+    """Geen Chrome/Edge: crop overslaan. h_save vangt dit en bewaart de annotatie
+    zonder afbeelding (imageError), zodat opslaan nooit van een browser afhangt."""
+    if not CHROME:
+        print("geen Chrome/Edge gevonden: crop overgeslagen, annotatie wel bewaard "
+              "(zet ANNOTATOR_CHROME om een browser aan te wijzen)", flush=True)
+        raise RuntimeError("geen Chrome/Edge gevonden (ANNOTATOR_CHROME)")
 
 
 def maak_crop(bestand, page_url, doc, rect, uit_pad):
@@ -580,12 +628,27 @@ def h_state_save(payload):
             "entry": entry}
 
 
+def open_url(url):
+    """Geeft een URL aan het OS: `open` (macOS), os.startfile (Windows),
+    xdg-open (Linux); anders webbrowser als laatste redmiddel."""
+    if sys.platform == "darwin":
+        subprocess.run(["open", url], check=True, capture_output=True, timeout=20)
+    elif os.name == "nt":
+        os.startfile(url)  # type: ignore[attr-defined]
+    elif shutil.which("xdg-open"):
+        subprocess.run(["xdg-open", url], check=True, capture_output=True, timeout=20)
+    else:
+        import webbrowser
+        if not webbrowser.open(url):
+            raise RuntimeError("geen manier gevonden om een URL te openen")
+
+
 def h_sessie(payload):
     """Opent een nieuwe Claude Code-sessie met een voorgeladen prompt.
 
     Nodig omdat een ingebedde browser custom schemes als claude:// niet aan het
     OS doorgeeft: een klik doet daar stilzwijgend niets. De bridge draait buiten
-    de browser en kan `open` wel aanroepen.
+    de browser en kan de URL aan het OS doorgeven (open/startfile/xdg-open).
 
     Bewust beperkt tot het claude-scheme, zodat dit geen algemene URL-opener
     wordt waarmee een willekeurige pagina van alles kan starten.
@@ -598,7 +661,7 @@ def h_sessie(payload):
         url = "claude://code/new?q=" + urllib.parse.quote(prompt)
     if not url.startswith("claude://"):
         raise ValueError("alleen claude:// is toegestaan")
-    subprocess.run(["open", url], check=True, capture_output=True, timeout=20)
+    open_url(url)
     return {"ok": True, "geopend": url[:80] + ("..." if len(url) > 80 else "")}
 
 

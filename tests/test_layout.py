@@ -31,7 +31,7 @@ NAAM = re.compile(r"luc|luke", re.I)
 
 
 RUNTIME = {"bridge.log", "bridge.pid", "bridge-hook.log", "__pycache__"}
-DOT_OK = {".gitignore", ".git"}
+DOT_OK = {".gitignore", ".git", ".github", ".claude"}
 OUD_NAMEN = (
     "annotator_config.py", "annotator_record.py", "annotator_refs.py",
     "annotator-bridge.py", "ensure-bridge.sh", "hook-ensure-bridge.sh",

@@ -42,7 +42,7 @@ html = html[:i] + snippet + "\n" + html[i:]
 `str.replace(..., 1)` and `sed` both hit the first match, so neither is
 safe here. No `</body>` at all: append at the end of the file.
 
-On 2026-08-28 this broke `jamezz-cs-flows/flows.html` (3.5 MB, three
+On 2026-08-28 this broke a client's process-flow page (3.5 MB, three
 `</body>` occurrences — two of them inside DOMPurify and a `btoa()`
 call). The Mermaid diagrams vanished and a wall of minified JS appeared
 under the tables. Verify after embedding: open the page and check that

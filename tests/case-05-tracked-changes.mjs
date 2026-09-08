@@ -22,7 +22,7 @@ const PORT = process.env.LUC_ANNOTATOR_PORT || '8791';
 const sh = (c, a) => { try { return execFileSync(c, a, { encoding: 'utf8' }).trim(); } catch { return ''; } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const ORIGINEEL = `Hi Anne,
+const ORIGINEEL = `Hi Alex,
 
 Ik wil even bijpraten over de security-afscherming.
 
@@ -34,7 +34,7 @@ const bestand = join(homedir(), 'Desktop', `${slug}.html`);
 const pagina = `<!doctype html><meta charset="utf-8"><title>${slug}</title>
 <h2>Mail-concepten</h2>
 <div class="la-draft">
-  <div class="la-draft-hdr"><b>Aan:</b> Anne Dijkstra &nbsp;·&nbsp; <b>Onderwerp:</b> Security</div>
+  <div class="la-draft-hdr"><b>Aan:</b> Alex Jansen &nbsp;·&nbsp; <b>Onderwerp:</b> Security</div>
   <div class="la-draft-txt">${ORIGINEEL}</div>
   <div class="la-draft-na">Nog niet verstuurd.</div>
 </div>
@@ -116,7 +116,7 @@ if (opSchijf) {
   // Niet toetsen op een percentage — bij het herschrijven van een hele zin verandert
   // terecht veel — maar op tekst die aantoonbaar níet is aangeraakt: aanhef en afsluiting.
   const gelijk = (opSchijf.diff || []).filter((o) => o.op === '=').map((o) => o.t).join('');
-  zeg(/Hi Anne,/.test(gelijk) && /Groet,/.test(gelijk) && /Luc/.test(gelijk),
+  zeg(/Hi Alex,/.test(gelijk) && /Groet,/.test(gelijk) && /Luc/.test(gelijk),
     'aanhef en afsluiting staan als onveranderd in de diff, niet als vervangen');
 }
 
