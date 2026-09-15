@@ -110,7 +110,12 @@ preview pane.** The bridge serves local files on `GET /p/<path-from-home>`:
 ```
 
 Build: absolute path, strip the home directory, put the rest after
-`http://127.0.0.1:8791/p/`. Paths outside home → 403. A preview pane
+`http://127.0.0.1:8791/p/`. Paths outside home → 403.
+
+**Hand the URL to the reviewer as a clickable markdown link**
+(`[title](http://127.0.0.1:8791/p/…)`), never inside backticks or a code
+block: a code block forces copy-paste, a link opens with one click
+(Luc, 2026-09-15). A preview pane
 as `data:` can never reach loopback (Private Network Access). Via
 `/p/` the page is same-origin with the bridge.
 
@@ -169,7 +174,12 @@ Triggers — do not ask for confirmation:
 - "process my feedback" / a path to `annotations.json` or a round.
 
 On `.`, find the open round yourself (`bin/toon-annotaties.py --open`
-or the bridge). Understand first, then apply, then `POST /resolve`.
+or the bridge). Without a page name that picks the most recently annotated
+page with open annotations, within a 7-day window, and names the others in
+one tail line. Older rounds stay on disk: `--lijst` shows every page with
+open annotations, `--zoek <term>` finds one by name, `--sinds N` widens the
+window. Never dump the full page list into context.
+Understand first, then apply, then `POST /resolve`.
 Read `references/agent-handbook.md` (part 4) for refs, locators, hunks,
 crops. `bin/toon-annotaties.py` reprints the work rule whenever
 something is still open.

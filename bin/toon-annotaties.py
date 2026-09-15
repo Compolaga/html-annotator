@@ -2,21 +2,29 @@
 """Toont open annotaties, zodat je daar geen ad-hoc script meer voor schrijft.
 
 Gebruik:
-  toon-annotaties.py                    laatste ronde van de enige/laatste pagina
-  toon-annotaties.py todos     laatste ronde van die pagina
-  toon-annotaties.py todos 8   ronde 8
+  toon-annotaties.py --open             de pagina die als laatste is geannoteerd
+  toon-annotaties.py todos              laatste ronde van die pagina
+  toon-annotaties.py todos 8            ronde 8
+  toon-annotaties.py --lijst            pagina's met open annotaties, compact
+  toon-annotaties.py --zoek gamify      pagina's waarvan de naam die term bevat
   toon-annotaties.py --alles            elke pagina, elke ronde, alleen tellingen
-  toon-annotaties.py --open             alleen nog niet resolved annotaties
+
+Zonder paginanaam kiest het script zelf: de meest recent gewijzigde pagina met
+open annotaties, binnen een venster van 7 dagen. Oudere blijven op schijf en zijn
+vindbaar met --lijst of --zoek, maar komen niet ongevraagd in beeld: dat scheelt
+duizenden tokens context bij elke aanroep.
 
 Extra vlaggen:
   --resolved   toon ook de al afgehandelde annotaties (standaard verborgen)
   --paden      print de absolute paden naar json en screenshot-crops
+  --sinds N    verruim het venster naar N dagen (--sinds 0 = geen venster)
 """
 
 import json
 import os
 import re
 import sys
+import time
 
 if hasattr(sys.stdout, "reconfigure"):  # Windows-console is standaard geen UTF-8
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -80,6 +88,46 @@ def paginas():
 def laad(f):
     with open(f, encoding="utf-8") as fh:
         return json.load(fh)
+
+
+VENSTER_DAGEN = 7
+
+
+def open_info(pagina):
+    """(aantal open annotaties, mtime van de laatst gewijzigde ronde)."""
+    n, mt = 0, 0.0
+    for _, f in rondes(pagina):
+        try:
+            d = laad(f)
+        except (OSError, ValueError):
+            continue
+        n += len([a for a in d.get("annotations", []) if not a.get("resolved")])
+        mt = max(mt, os.path.getmtime(f))
+    return n, mt
+
+
+def kandidaten(ps, alleen_open, venster_dagen):
+    """Pagina's die in aanmerking komen, nieuwste eerst.
+
+    Zonder venster zou elke aanroep de hele geschiedenis tonen; met venster komt
+    alleen recent werk in beeld. Dat omzeilt de vraag wanneer een ronde 'klaar'
+    is: niet-afgevinkt werk van weken geleden verjaart vanzelf uit de default.
+    """
+    grens = time.time() - venster_dagen * 86400 if venster_dagen else 0
+    uit = []
+    for p in ps:
+        n, mt = open_info(p)
+        if alleen_open and not n:
+            continue
+        if mt < grens:
+            continue
+        uit.append((p, n, mt))
+    uit.sort(key=lambda r: r[2], reverse=True)
+    return uit
+
+
+def datum(mt):
+    return time.strftime("%d-%m", time.localtime(mt)) if mt else "?"
 
 
 def toon(f, nr, alleen_open, ook_resolved, paden):
@@ -196,16 +244,57 @@ def toon(f, nr, alleen_open, ook_resolved, paden):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    vlaggen = {a for a in sys.argv[1:] if a.startswith("--")}
+    argv = sys.argv[1:]
+    vlaggen = {a for a in argv if a.startswith("--")}
+    args = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--sinds" and i + 1 < len(argv):
+            i += 2
+            continue
+        if a == "--zoek" and i + 1 < len(argv):
+            i += 2
+            continue
+        if not a.startswith("--"):
+            args.append(a)
+        i += 1
+
+    def waarde(vlag, standaard):
+        if vlag in argv:
+            k = argv.index(vlag)
+            if k + 1 < len(argv):
+                return argv[k + 1]
+        return standaard
+
     alleen_open = "--open" in vlaggen
     ook_resolved = "--resolved" in vlaggen
     paden = "--paden" in vlaggen
+    zoekterm = waarde("--zoek", None)
+    try:
+        venster = int(waarde("--sinds", VENSTER_DAGEN))
+    except ValueError:
+        venster = VENSTER_DAGEN
 
     ps = paginas()
     if not ps:
         print("Geen annotaties gevonden in %s" % ROOT)
         return 1
+
+    if zoekterm or "--lijst" in vlaggen:
+        rijen = kandidaten(ps, alleen_open or not zoekterm, 0)
+        if zoekterm:
+            rijen = [r for r in rijen if zoekterm.lower() in r[0].lower()]
+        if not rijen:
+            print("Niets gevonden%s." % (" voor '%s'" % zoekterm if zoekterm else ""))
+            return 1
+        kop = "pagina's met '%s'" % zoekterm if zoekterm else "pagina's met open annotaties"
+        print("%s (%d):" % (kop, len(rijen)))
+        for naam, n, mt in rijen[:40]:
+            print("  %-52s %3d open  %s" % (naam, n, datum(mt)))
+        if len(rijen) > 40:
+            print("  ... nog %d, verfijn met --zoek" % (len(rijen) - 40))
+        return 0
 
     if "--alles" in vlaggen:
         for p in ps:
@@ -218,16 +307,40 @@ def main():
                       % (nr, len(anns), o, "  [gesloten]" if d.get("closed") else ""))
         return 0
 
-    pagina = args[0] if args else (ps[-1] if len(ps) == 1 else None)
-    if pagina is None:
-        print("Meerdere pagina's, kies er een: %s" % ", ".join(ps))
-        return 1
-    if pagina not in ps:
-        treffers = [p for p in ps if pagina in p]
-        if len(treffers) != 1:
-            print("Onbekende pagina '%s'. Beschikbaar: %s" % (pagina, ", ".join(ps)))
+    rest = []
+    if args:
+        pagina = args[0]
+        if pagina not in ps:
+            treffers = [p for p in ps if pagina.lower() in p.lower()]
+            if len(treffers) == 1:
+                pagina = treffers[0]
+            elif not treffers:
+                print("Onbekende pagina '%s'. Zoek met: --zoek %s" % (pagina, pagina))
+                return 1
+            else:
+                print("'%s' past op %d pagina's:" % (pagina, len(treffers)))
+                for t in treffers[:15]:
+                    print("  %s" % t)
+                if len(treffers) > 15:
+                    print("  ... nog %d" % (len(treffers) - 15))
+                return 1
+    else:
+        rijen = kandidaten(ps, alleen_open, venster)
+        if not rijen and alleen_open:
+            # Niets open is geen fout: zeg het kort en stop met exit 0.
+            binnen = " (laatste %d dagen)" % venster if venster else ""
+            ouder = kandidaten(ps, True, 0)
+            print("(niets open)%s" % binnen)
+            if ouder:
+                print("Wel %d pagina%s met oudere open annotaties  ->  --lijst"
+                      % (len(ouder), "'s" if len(ouder) != 1 else ""))
+            return 0
+        if not rijen:
+            print("Geen annotaties in de laatste %d dagen. Ouder werk: --lijst of --zoek <term>."
+                  % venster if venster else "Geen annotaties gevonden.")
             return 1
-        pagina = treffers[0]
+        pagina = rijen[0][0]
+        rest = rijen[1:]
 
     rs = rondes(pagina)
     print("=== %s  (%d rondes)" % (pagina, len(rs)))
@@ -242,6 +355,13 @@ def main():
 
     for nr, f in rs:
         toon(f, nr, alleen_open, ook_resolved, paden)
+
+    if rest:
+        namen = ", ".join("%s (%d)" % (n, o) for n, o, _ in rest[:3])
+        extra = ", ..." if len(rest) > 3 else ""
+        binnen = " binnen %d dagen" % venster if venster else ""
+        print("\nNog %d pagina%s met open annotaties%s: %s%s   ->  --lijst voor alles"
+              % (len(rest), "'s" if len(rest) != 1 else "", binnen, namen, extra))
     return 0
 
 
