@@ -94,7 +94,8 @@ def main():
     n = 0
     root = tempfile.mkdtemp(prefix="ann-root-")
     pagina = os.path.join(tempfile.mkdtemp(prefix="ann-page-"), "demo.html")
-    blok = "<!-- LUC-ANNOTATOR v2 -->\n<script>var x=1;</script>\n<!-- /LUC-ANNOTATOR -->"
+    blok = "<!-- HTML-ANNOTATOR v3 -->\n<script>var x=1;</script>\n<!-- /HTML-ANNOTATOR -->"
+    oud_blok = "<!-- LUC-ANNOTATOR v2 -->\n<script>var x=1;</script>\n<!-- /LUC-ANNOTATOR -->"
     with open(pagina, "w", encoding="utf-8") as f:
         f.write("<!doctype html><title>demo</title><p>inhoud</p>\n" + blok + "\n")
 
@@ -109,6 +110,12 @@ def main():
         f.write("<p>gewijzigd</p>\n")
     h3 = mod.content_hash(pagina, "abc")
     n += check("B5 hash ziet echte wijziging", h1 != h3)
+    # Een pagina met het oude LUC-ANNOTATOR-blok moet dezelfde hash houden.
+    oud = tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8")
+    oud.write("<!doctype html><title>demo</title><p>inhoud</p>\n" + oud_blok + "\n")
+    oud.close()
+    n += check("B5 hash negeert ook een LUC-ANNOTATOR v2-blok",
+               mod.content_hash(oud.name, "abc") == h1)
 
     poort = vrije_poort()
     proc, basis = start_bridge(root, poort)
@@ -116,7 +123,9 @@ def main():
         code, hdr, raw = http("GET", basis + "/ping")
         ping = json.loads(raw.decode("utf-8"))
         n += check("B1 ping 200", code == 200 and ping.get("ok") is True)
-        n += check("B1 ping identiteit", ping.get("bridge") == "luc-annotator")
+        n += check("B1 ping identiteit", ping.get("bridge") == "html-annotator")
+        from html_annotator import __version__
+        n += check("B1 ping release", ping.get("release") == __version__)
         n += check("B1 CORS *", hdr.get("Access-Control-Allow-Origin") == "*")
 
         code, _, _ = http("OPTIONS", basis + "/save")

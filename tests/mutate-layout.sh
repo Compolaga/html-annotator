@@ -171,7 +171,7 @@ t = open(p).read()
 oud = "bin/hook-ensure-bridge.py"
 if oud not in t:
     raise SystemExit("anker voor de hook-verwijzing ontbreekt")
-open(p, "w").write(t.replace(oud, "bin/show-annotations.py"))
+open(p, "w").write(t.replace(oud, "bin/bestaat-niet.py"))
 PY
 if python3 ./test_layout.py >/tmp/ann-mut-layout-binref.txt 2>&1; then
   zeg 1 "A4 blijft groen met een verzonnen bin-naam"

@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""A1–A9: de repo ziet eruit als een installeerbare skill, niet als een
-persoonlijke scriptbak — en de core draait zonder bash."""
+"""A1–A11: de repo ziet eruit als een installeerbare skill, niet als een
+persoonlijke scriptbak — de core draait zonder bash, en het pakket is te
+installeren (A10) met één bron voor het snippet (A11).
+
+De venv-case (pip install -e .) slaat zichzelf over zonder netwerk of zonder
+venv-module; hij rapporteert dat dan als SKIP, niet als PASS.
+"""
 
 import json
 import os
@@ -10,10 +15,13 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+from html_annotator import __version__ as VERSIE  # noqa: E402
 
 # A1: ports. Snippet and handbook live in references/. Decisions in docs/.
 ROOT_OK = {
-    "README.md", "SKILL.md", "INSTALL.md", "CRITERIA.md", ".gitignore",
+    "README.md", "SKILL.md", "INSTALL.md", "CRITERIA.md", "CHANGELOG.md",
+    "LICENSE", "pyproject.toml", ".gitignore",
 }
 ROOT_DIRS_OK = {"html_annotator", "bin", "references", "tests", "docs",
                 "extras", ".git"}
@@ -21,12 +29,14 @@ ROOT_DIRS_OK = {"html_annotator", "bin", "references", "tests", "docs",
 # Agent-facing: what a stranger or installer reads. No tests/, no docs/
 # history, no extras/.
 AGENT_FILES = ("SKILL.md", "README.md", "INSTALL.md", "CRITERIA.md")
-# Identifiers die gedrag dragen: B1 assert luc-annotator; contentHash stript
-# LUC-ANNOTATOR; window.LucAnnotator is de publieke API; env LUC_ANNOTATOR_*;
-# localStorage-prefix luc-annotaties.
+# Identifiers die gedrag dragen: contentHash en de hook herkennen naast
+# HTML-ANNOTATOR ook nog het oude LUC-ANNOTATOR-blok, de oude page-global is de
+# deprecated alias voor bestaande pagina's, env LUC_ANNOTATOR_* zijn deprecated
+# aliassen en luc-annotaties is de localStorage-prefix. De lookaheads houden de
+# oude naam zelf uit dit bestand.
 ALLOW = re.compile(
-    r"LucAnnotator(?:Bridge)?|/?LUC-ANNOTATOR|luc-annotator|luc-annotaties|"
-    r"LUC_ANNOTATOR_[A-Z0-9_*]+",
+    r"Luc(?=Annotator)|\(\?:HTML\|LUC\)-ANNOTATOR|/?LUC-ANNOTATOR|"
+    r"luc(?=-annotaties)|LUC(?=_ANNOTATOR_)",
     re.I,
 )
 NAAM = re.compile(r"luc|luke", re.I)
@@ -51,6 +61,11 @@ NL = re.compile(
     r"\b(worden|wordt|bestand|draai|hieronder|wanneer|voordat|nadat|tenzij|volgende)\b",
     re.I,
 )
+# A11: het snippet heeft één bron op schijf. references/ is die bron; een
+# tweede kopie in het pakket mag alleen bestaan als hij byte-identiek is
+# (dan komt hij uit een build), anders kunnen ze uit elkaar lopen.
+SNIPPETS = ("annotator-snippet.html", "checklist-snippet.html",
+            "suggest-snippet.html")
 # A9: geen bash in de core. tests/ mag bash houden voor de Playwright-suite.
 BASH_VRIJ = ("html_annotator", "bin", "references", "docs", ".github")
 
@@ -124,6 +139,57 @@ def shell_scripts_in_core():
         if f.endswith((".sh", ".bash")):
             hit.append(f)
     return sorted(hit)
+
+
+
+
+def snippet_duplicaten():
+    """Snippets die in references/ én in het pakket staan en verschillen."""
+    uit = []
+    pakket = os.path.join(ROOT, "html_annotator", "snippets")
+    for naam in SNIPPETS:
+        bron = os.path.join(ROOT, "references", naam)
+        kopie = os.path.join(pakket, naam)
+        if not os.path.isfile(kopie):
+            continue
+        if not os.path.isfile(bron):
+            continue
+        if open(bron, "rb").read() != open(kopie, "rb").read():
+            uit.append(naam)
+    return uit
+
+
+def venv_install_check():
+    """pip install -e . in een verse venv; (status, toelichting)."""
+    tmp = tempfile.mkdtemp(prefix="ann-venv-")
+    doel = os.path.join(tmp, "venv")
+    maak = subprocess.run([sys.executable, "-m", "venv", doel],
+                          capture_output=True, text=True)
+    if maak.returncode != 0:
+        return "skip", "venv aanmaken lukt niet (%s)" % (
+            (maak.stderr or maak.stdout or "").strip().splitlines()[-1:] or "?")
+    bin_dir = "Scripts" if os.name == "nt" else "bin"
+    py = os.path.join(doel, bin_dir, "python.exe" if os.name == "nt" else "python")
+    uit = subprocess.run([py, "-m", "pip", "install", "-q", "-e", ROOT],
+                         capture_output=True, text=True)
+    if uit.returncode != 0:
+        staart = (uit.stderr or uit.stdout or "").strip().splitlines()[-4:]
+        if any(w in (uit.stderr or "").lower()
+               for w in ("network", "temporary failure", "connection", "resolve",
+                         "proxy", "retries exceeded")):
+            return "skip", "geen netwerk voor de build-backend: %s" % " | ".join(staart)
+        return "fail", "pip install -e . rc=%s: %s" % (uit.returncode, " | ".join(staart))
+    exe = os.path.join(doel, bin_dir, "html-annotator.exe" if os.name == "nt" else "html-annotator")
+    if not os.path.isfile(exe):
+        return "fail", "console script html-annotator is niet ge\u00efnstalleerd"
+    v = subprocess.run([exe, "--version"], capture_output=True, text=True)
+    if v.returncode != 0 or VERSIE not in (v.stdout or ""):
+        return "fail", "html-annotator --version gaf %r (rc=%s)" % (v.stdout, v.returncode)
+    m = subprocess.run([py, "-m", "html_annotator", "--version"],
+                       capture_output=True, text=True)
+    if VERSIE not in (m.stdout or ""):
+        return "fail", "python -m html_annotator --version gaf %r" % m.stdout
+    return "ok", "html-annotator %s uit een verse venv" % VERSIE
 
 
 def check(naam, conditie):
@@ -287,6 +353,37 @@ def main():
         if "hook-ensure-bridge.py" in (h.get("command") or "")
     )
     n += check("A4 install-hooks idempotent", aantal == 2)
+
+    # ---- A10: het pakket is installeerbaar -----------------------------
+    n += check("A10 pyproject bestaat", os.path.isfile(os.path.join(ROOT, "pyproject.toml")))
+    pyproject = open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8").read()
+    n += check("A10 console script",
+               'html-annotator = "html_annotator.cli:main"' in pyproject)
+    n += check("A10 versie op \u00e9\u00e9n plek",
+               '"1.0' not in pyproject and "html_annotator/__init__.py" in pyproject)
+    n += check("A10 LICENSE bestaat", os.path.isfile(os.path.join(ROOT, "LICENSE")))
+    n += check("A10 CHANGELOG noemt deze versie",
+               VERSIE in open(os.path.join(ROOT, "CHANGELOG.md"), encoding="utf-8").read())
+    v = cli(home, "--version")
+    n += check("A10 --version werkt",
+               v.returncode == 0 and VERSIE in v.stdout)
+
+    # ---- A11: \u00e9\u00e9n bron voor het snippet ------------------------------
+    dubbel = snippet_duplicaten()
+    n += check("A11 geen afwijkende snippet-kopie", dubbel == [])
+    if dubbel:
+        print("      lopen uiteen: %s" % ", ".join(dubbel))
+    import html_annotator.config as cfg
+    n += check("A11 snippet vindbaar via het pakket",
+               os.path.isfile(str(cfg.snippet_path())))
+
+    status, toelichting = venv_install_check()
+    if status == "skip":
+        print("SKIP  A10 pip install -e . (%s)" % toelichting)
+    else:
+        n += check("A10 pip install -e . + console script", status == "ok")
+        if status != "ok":
+            print("      %s" % toelichting)
     return n
 
 

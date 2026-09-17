@@ -8,7 +8,8 @@ Registered twice in ~/.claude/settings.local.json (see
   write HTML. This is the layer that counts: the PostToolUse layer misses an
   agent that writes the file through Bash.
 * PostToolUse on Edit|Write — starts the bridge when the written file is
-  .html/.htm and carries the LUC-ANNOTATOR marker.
+  .html/.htm and carries an annotator marker (HTML-ANNOTATOR, or the older
+  LUC-ANNOTATOR on pages that were embedded before the rename).
 
 Cheap and quiet, and it always exits 0: a hook must never fail a tool call.
 """
@@ -36,7 +37,8 @@ def main():
         if p.suffix.lower() not in (".html", ".htm") or not p.is_file():
             return 0
         try:
-            if "LUC-ANNOTATOR" not in p.read_text(encoding="utf-8", errors="replace"):
+            bron = p.read_text(encoding="utf-8", errors="replace")
+            if "HTML-ANNOTATOR" not in bron and "LUC-ANNOTATOR" not in bron:
                 return 0
         except OSError:
             return 0

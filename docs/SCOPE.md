@@ -58,7 +58,10 @@ storing `type: "edit"` records.
 
 Agent-facing text names no person and points at no machine-specific
 path (criterion A6, `tests/test_layout.py`). The annotation root is
-configurable and defaults to `~/annotations`. The identifiers
-`LUC-ANNOTATOR`, `window.LucAnnotator`, `luc-annotator` and
-`LUC_ANNOTATOR_*` stay: they are the public API of pages that already
-exist, and renaming them without a migration orphans those pages.
+configurable and defaults to `~/annotations`. Since 1.0.0rc1 the public
+names are `window.HtmlAnnotator`, the `HTML-ANNOTATOR` markers, bridge
+identity `html-annotator` and `HTML_ANNOTATOR_*`. The previous
+generation is not deleted but kept as deprecated aliases until 1.1
+(page-global alias, `LUC-ANNOTATOR` blocks, `LUC_ANNOTATOR_*`,
+localStorage prefix `luc-annotaties`), because dropping them without a
+migration orphans pages that already exist. See `CHANGELOG.md`.

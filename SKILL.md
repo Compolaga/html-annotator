@@ -26,8 +26,8 @@ Install: `INSTALL.md`.
 
 Paste the full contents of `references/annotator-snippet.html` at the
 bottom of every HTML file, just before `</body>` or at the end of the
-file. The block runs from `<!-- LUC-ANNOTATOR v2 -->` to
-`<!-- /LUC-ANNOTATOR -->`.
+file. The block runs from `<!-- HTML-ANNOTATOR v3 -->` to
+`<!-- /HTML-ANNOTATOR -->`.
 
 **Anchor on the LAST `</body>`, never the first.** A page can contain
 `</body>` inside a JavaScript string long before the real one — bundled
@@ -50,11 +50,14 @@ under the tables. Verify after embedding: open the page and check that
 what it normally renders is still there.
 
 On an existing page:
-- `LUC-ANNOTATOR v2` already present: do nothing;
-- older block (`LUC-ANNOTATOR v1`, no end marker): replace everything
+- a block already present (`HTML-ANNOTATOR v3`, or the older
+  `LUC-ANNOTATOR v2` that is still supported): do nothing;
+- oldest block (`LUC-ANNOTATOR v1`, no end marker): replace everything
   from `<!-- LUC-ANNOTATOR` through the matching `</script>` with the
   new block;
 - nothing there: append at the bottom.
+
+Never leave two annotator blocks in one page.
 
 Self-contained: no libraries, no CDN, no external fonts. Works on
 `file://` and localhost.
@@ -64,7 +67,7 @@ call it blindly on every deliverable and every update of a page that
 already has the snippet:
 
 ```bash
-python -m html_annotator ensure
+python -m html_annotator ensure     # or: html-annotator ensure
 ```
 
 If it is already running, the command does nothing. If not, it starts
@@ -82,7 +85,8 @@ this skill, registered in `~/.claude/settings.local.json` by
   PostToolUse layer misses an agent that writes the file via Bash, and
   in auto-mode Bash is the prescribed route.
 - **PostToolUse on `Edit|Write`** — if the written file is `.html`/`.htm`
-  with the `LUC-ANNOTATOR` marker, the bridge comes up.
+  with an annotator marker (`HTML-ANNOTATOR`, or `LUC-ANNOTATOR` on an
+  older page), the bridge comes up.
 
 The matcher is not widened to `Bash`, because that would fire on every
 Bash call in every project. What the chosen route does: the
@@ -129,16 +133,18 @@ What the reviewer can do (behaviour unchanged; details in the handbook):
 - orphan list **"N likely processed"**;
 - no download button, no Remove-all in the UI.
 
-Test/debug API: `window.LucAnnotator.add({type:'region'|'text', rect,
+Test/debug API: `window.HtmlAnnotator.add({type:'region'|'text', rect,
 comment, selectedText})`, `.anns()`, `.bridge()`, `.session()`,
-`.resolve(annotation)`.
+`.resolve(annotation)`. Pages written before the rename reach the same
+object through the deprecated global alias the snippet still assigns; see
+the migration section in `CHANGELOG.md`.
 
 ### Checklist component (LA-CHECKLIST)
 
 Any HTML deliverable with checkable items or rows (todo lists,
 test-case tables, review queues) also gets the block from
 `references/checklist-snippet.html` (`<!-- LA-CHECKLIST v1` to
-`<!-- /LA-CHECKLIST -->`), pasted right before the LUC-ANNOTATOR
+`<!-- /LA-CHECKLIST -->`), pasted right before the HTML-ANNOTATOR
 block. Put `data-la-check="<unique-key>"` on each checkable element
 (optional `data-la-label` for an explicit label). The script injects a
 Notion-style checkbox, loads saved state on page load via `POST /state`
@@ -160,7 +166,7 @@ or undo each change individually, mark every changed element with
 `data-la-suggest="<unique-key>"` plus `data-la-suggest-desc`,
 `data-la-suggest-old` (original content) and optionally
 `data-la-suggest-kind` (`edit`/`add`/`del`). Nothing else is needed: the
-regular LUC-ANNOTATOR snippet detects these attributes and renders each
+regular HTML-ANNOTATOR snippet detects these attributes and renders each
 suggestion with the exact annotation mechanics — blue selection rects for
 text, one region frame for visuals, and the badge stretched into a white
 pill holding ✕ reject · ✓ accept · ✎ change; ✎ opens the normal annotator

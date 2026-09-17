@@ -10,18 +10,24 @@
     url PATH         print the http://127.0.0.1:<port>/p/... URL for a file
     install-skill    put this checkout at ~/.claude/skills/html-annotator
     install-hooks    register the SessionStart + PostToolUse hooks
+    --version        print the version and exit
+
+Installed as a console script this is `html-annotator <command>`;
+`python -m html_annotator <command>` keeps working and means the same thing.
 """
 
 import argparse
 import json
 import sys
 
-from . import config, install, service
+from . import __version__, config, install, service
 
 
 def _p(argv=None):
-    ap = argparse.ArgumentParser(prog="python -m html_annotator",
+    ap = argparse.ArgumentParser(prog="html-annotator",
                                  description="HTML annotator bridge and CLI")
+    ap.add_argument("--version", "-V", action="version",
+                    version="html-annotator %s" % __version__)
     sub = ap.add_subparsers(dest="cmd")
 
     sub.add_parser("serve", help="run the bridge in the foreground")
@@ -68,6 +74,9 @@ def _nummers(tekst):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in ("--version", "-V"):
+        print("html-annotator %s" % __version__)
+        return 0
     # show/apply-hunk have their own flags; argparse must not eat them.
     if argv and argv[0] == "show":
         from . import show

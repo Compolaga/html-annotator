@@ -1,7 +1,8 @@
 """One place for host, port, annotation root, skill dir and state dir.
 
-Environment overrides (the old ``LUC_ANNOTATOR_*`` names still work, so an
-existing install keeps running):
+Environment overrides. ``HTML_ANNOTATOR_*`` is primary; the ``LUC_ANNOTATOR_*``
+names are deprecated aliases that still work, so an existing install keeps
+running:
 
     HTML_ANNOTATOR_PORT   port the bridge listens on (default 8791)
     HTML_ANNOTATOR_ROOT   where rounds are written (default ~/annotations)
@@ -19,8 +20,38 @@ from pathlib import Path
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8791
 
+#: directory of the package itself (site-packages/html_annotator in an install)
+PACKAGE_DIR = Path(__file__).resolve().parent
 #: directory of the checkout / installed skill
-SKILL_DIR = Path(__file__).resolve().parent.parent
+SKILL_DIR = PACKAGE_DIR.parent
+
+
+def is_checkout():
+    """True when we run from a git checkout or an installed skill directory.
+
+    False for a pip/pipx install, where ``SKILL_DIR`` is site-packages and the
+    skill files travel inside the package instead (see pyproject.toml).
+    """
+    return (SKILL_DIR / "SKILL.md").is_file()
+
+
+def snippets_dir():
+    """Directory holding the pasteable snippets, checkout or installed."""
+    if is_checkout():
+        return SKILL_DIR / "references"
+    return PACKAGE_DIR / "snippets"
+
+
+def snippet_path(naam="annotator-snippet.html"):
+    """Absolute path of a snippet that ships with this package."""
+    return snippets_dir() / naam
+
+
+def skill_source_dir():
+    """Directory ``install-skill`` copies from: the checkout, or package data."""
+    if is_checkout():
+        return SKILL_DIR
+    return PACKAGE_DIR / "_skill"
 
 
 def env(*names, default=None):
@@ -67,7 +98,13 @@ def state_dir():
     return Path(basis) / "html-annotator"
 
 
-def pid_file():
+def pid_file(poort=None):
+    """One pid file per port, so a test bridge on another port never gets stopped by
+    accident. The pre-1.0 single ``bridge.pid`` is still read as a fallback."""
+    return state_dir() / ("bridge-%d.pid" % (poort or port()))
+
+
+def legacy_pid_file():
     return state_dir() / "bridge.pid"
 
 

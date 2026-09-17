@@ -84,10 +84,32 @@ def _kopieer(bron, doel):
     shutil.copytree(bron, doel, ignore=negeer, dirs_exist_ok=True)
 
 
+def _kopieer_uit_pakket(doel):
+    """Assemble the skill from package data (pip/pipx install, no checkout).
+
+    Copies exactly the files an agent needs: SKILL.md, references/ and the bin
+    wrappers. The Python code itself stays in site-packages; the wrappers and
+    hooks call the installed interpreter.
+    """
+    bron = config.skill_source_dir()
+    doel.mkdir(parents=True, exist_ok=True)
+    skill_md = bron / "SKILL.md"
+    if skill_md.is_file():
+        shutil.copyfile(skill_md, doel / "SKILL.md")
+    refs = config.snippets_dir()
+    if refs.is_dir():
+        _kopieer(refs, doel / "references")
+    if (bron / "bin").is_dir():
+        _kopieer(bron / "bin", doel / "bin")
+    return 0, "skill installed from the package at %s" % doel
+
+
 def install_skill(kopie=None, bron=None):
-    bron = Path(bron or config.SKILL_DIR).resolve()
     doel = config.skills_dir() / "html-annotator"
     doel.parent.mkdir(parents=True, exist_ok=True)
+    if bron is None and not config.is_checkout():
+        return _kopieer_uit_pakket(doel)
+    bron = Path(bron or config.SKILL_DIR).resolve()
     if kopie is None:
         kopie = os.name == "nt"
     if doel.is_symlink() and Path(os.readlink(doel)) == bron:

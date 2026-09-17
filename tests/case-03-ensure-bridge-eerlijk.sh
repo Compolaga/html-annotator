@@ -51,14 +51,14 @@ if ! kill -0 "$BEZETTER" 2>/dev/null; then
 fi
 
 RC=0
-if echo "$ANTWOORD" | grep -q luc-annotator; then
+if echo "$ANTWOORD" | grep -q html-annotator; then
   fail "ensure startte een echte bridge terwijl de poort bezet hoorde (exit $EXIT_CODE, lsof: $(bridge_pid))"
   RC=1
 elif [ "$EXIT_CODE" -eq 0 ]; then
   fail "ensure exit 0 op een niet-bridge-bezetter (ping: ${ANTWOORD:-leeg})"
   RC=1
 else
-  pass "exit $EXIT_CODE, bezetter leeft, ping is geen luc-annotator (lsof: $(bridge_pid))"
+  pass "exit $EXIT_CODE, bezetter leeft, ping is geen html-annotator (lsof: $(bridge_pid))"
 fi
 
 exit $RC

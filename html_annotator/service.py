@@ -36,11 +36,21 @@ def wait_for(poort=None, seconds=5.0):
     return None
 
 
-def read_pid():
-    try:
-        return int(config.pid_file().read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return None
+def read_pid(poort=None):
+    for pad in (config.pid_file(poort), config.legacy_pid_file()):
+        try:
+            return int(pad.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def _drop_pid(poort=None):
+    for pad in (config.pid_file(poort), config.legacy_pid_file()):
+        try:
+            pad.unlink()
+        except OSError:
+            pass
 
 
 def pid_alive(pid):
@@ -77,7 +87,7 @@ def _spawn(poort=None):
     else:
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(cmd, **kwargs)
-    config.pid_file().write_text(str(proc.pid), encoding="utf-8")
+    config.pid_file(poort).write_text(str(proc.pid), encoding="utf-8")
     return proc.pid
 
 
@@ -86,12 +96,9 @@ def ensure(poort=None, seconds=5.0):
     poort = poort or config.port()
     if ping(poort):
         return "already", "bridge already running on %s" % config.base_url(poort)
-    pid = read_pid()
+    pid = read_pid(poort)
     if pid and not pid_alive(pid):
-        try:
-            config.pid_file().unlink()
-        except OSError:
-            pass
+        _drop_pid(poort)
     pid = _spawn(poort)
     if wait_for(poort, seconds):
         return "started", "bridge started on %s (pid %d, log %s)" % (
@@ -108,17 +115,14 @@ def ensure(poort=None, seconds=5.0):
 def stop(poort=None):
     """Stop the bridge started by ensure. Returns (ok, message)."""
     poort = poort or config.port()
-    pid = read_pid()
+    pid = read_pid(poort)
     if not pid:
         if ping(poort):
             return False, ("something answers on %s but no pid file (%s) — "
-                           "stop it yourself" % (config.base_url(poort), config.pid_file()))
+                           "stop it yourself" % (config.base_url(poort), config.pid_file(poort)))
         return True, "no bridge to stop"
     if not pid_alive(pid):
-        try:
-            config.pid_file().unlink()
-        except OSError:
-            pass
+        _drop_pid(poort)
         return True, "no running bridge (stale pid %d removed)" % pid
     if os.name == "nt":
         subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True)
@@ -132,10 +136,7 @@ def stop(poort=None):
         if not pid_alive(pid):
             break
         time.sleep(0.2)
-    try:
-        config.pid_file().unlink()
-    except OSError:
-        pass
+    _drop_pid(poort)
     if pid_alive(pid):
         return False, "pid %d is still alive" % pid
     return True, "bridge stopped (pid %d)" % pid

@@ -57,10 +57,10 @@ if [ ! -f "$DOEL" ]; then
   exit 2
 fi
 
-if grep -q "LUC-ANNOTATOR" "$DOEL"; then
+if grep -qE "HTML-ANNOTATOR|LUC-ANNOTATOR" "$DOEL"; then
   pass "opgeleverde HTML bevat het annotator-snippet"
 else
-  fail "opgeleverde HTML bevat de LUC-ANNOTATOR-marker niet"
+  fail "opgeleverde HTML bevat geen annotator-marker (HTML-ANNOTATOR/LUC-ANNOTATOR)"
   RC=1
 fi
 

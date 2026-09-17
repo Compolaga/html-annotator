@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "html-annotator"
+dynamic = ["version"]
+description = "Pasteable HTML annotation snippet plus a local, stdlib-only bridge for agentic work"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "your-online" }]
+keywords = ["annotation", "html", "review", "feedback", "claude", "agents"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Quality Assurance",
+]
+# Runtime is stdlib only. Pillow only makes crops faster.
+dependencies = []
+
+[project.optional-dependencies]
+crops = ["Pillow>=9"]
+
+[project.urls]
+Homepage = "https://github.com/your-online/html-annotator"
+Source = "https://github.com/your-online/html-annotator"
+
+[project.scripts]
+html-annotator = "html_annotator.cli:main"
+
+[tool.hatch.version]
+path = "html_annotator/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["html_annotator"]
+
+# One source on disk: the snippets live in references/ (the human-facing copy)
+# and are mapped into the wheel so they are importable as
+# html_annotator/snippets/<name>.html. SKILL.md and the bin wrappers travel
+# along under html_annotator/_skill/, so `install-skill` also works from a
+# pip/pipx install instead of only from a checkout.
+[tool.hatch.build.targets.wheel.force-include]
+"references" = "html_annotator/snippets"
+"SKILL.md" = "html_annotator/_skill/SKILL.md"
+"bin" = "html_annotator/_skill/bin"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "html_annotator",
+  "bin",
+  "references",
+  "docs",
+  "tests",
+  "SKILL.md",
+  "README.md",
+  "INSTALL.md",
+  "CRITERIA.md",
+  "CHANGELOG.md",
+  "LICENSE",
+]

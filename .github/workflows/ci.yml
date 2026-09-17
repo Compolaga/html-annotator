@@ -29,16 +29,27 @@ jobs:
       - name: Python tests
         run: |
           python -m compileall -q html_annotator bin
+          python -m html_annotator --version
           python tests/test_record.py
           python tests/test_bridge_contract.py
           python tests/test_toon.py
           python tests/test_layout.py
+
+      - name: Packaging (pip install + console script)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+          html-annotator --version
+          # outside the checkout, so the installed package is the one under test
+          (cd "$HOME" && python -c "from html_annotator import config; p = config.snippet_path(); print(p); assert p.is_file(), p; assert not config.is_checkout()")
+          python -m pip uninstall -y html-annotator
 
       - name: Start bridge (detached, via the CLI)
         run: |
           python -m html_annotator ensure
           python -m html_annotator ensure | grep -q "already running"
           python -m html_annotator status | grep -q '"ok": true'
+          python -m html_annotator status | grep -q '"bridge": "html-annotator"'
 
       - name: Real /save with a snippet page
         run: |

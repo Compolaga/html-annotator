@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-"""Past losse blokken uit een bewerking toe op de pagina waar ze bij horen.
+"""Applies single blocks of an edit to the page they belong to.
 
-Zo hoef je een bewerking niet als geheel over te nemen: is blok 1 goed en blok 2
-iets waar je nog een vraag over hebt, dan voer je alleen blok 1 door.
+That way an edit does not have to be taken over as a whole: if block 1 is fine
+and block 2 still raises a question, only block 1 goes in.
 
-  python -m html_annotator apply-hunk <json> --nr 1               alle open blokken
-  python -m html_annotator apply-hunk <json> --nr 1 --hunks 2,3   alleen deze
-  python -m html_annotator apply-hunk <json> --nr 1 --dry-run     alleen tonen
-  python -m html_annotator apply-hunk <json> --nr 1 --resolve     en meteen resolven
+  python -m html_annotator apply-hunk <json> --nr 1               all open blocks
+  python -m html_annotator apply-hunk <json> --nr 1 --hunks 2,3   only these
+  python -m html_annotator apply-hunk <json> --nr 1 --dry-run     show only
+  python -m html_annotator apply-hunk <json> --nr 1 --resolve     and resolve them
 
-Plaatsen gebeurt op de tekst eromheen, niet op een positie. Een teken- of
-regelnummer klopt niet meer zodra er iets bóven de wijziging verandert; de
-omringende woorden vinden het blok ook in een gewijzigd document terug. Dat is
-dezelfde reden waarom `patch` een hunk met een verschoven regelnummer alsnog plaatst.
+Placing happens on the surrounding text, not on a position. A character or line
+number stops being true as soon as anything above the change moves; the words
+around the block find it back in a changed document too. That is the same reason
+`patch` still places a hunk whose line number shifted.
 
-Drie pogingen per blok, van streng naar soepel, en de gebruikte manier staat in de
-uitvoer zodat je kunt zien hoe zeker de plaatsing was:
-  1. voor + verwijderd + na   — volledige context, geen twijfel mogelijk
-  2. voor + verwijderd        — alleen de linkerkant; genoeg als die uniek is
-  3. verwijderd               — kaal, en alleen als het precies één keer voorkomt
-Lukt geen van drieën, dan gebeurt er niets voor dat blok en zegt het script waarom.
+Three attempts per block, strict to lenient, and the attempt that worked is in
+the output so you can see how certain the placement was:
+  1. before + removed + after  — full context, no doubt possible
+  2. before + removed          — left side only; enough when it is unique
+  3. removed                   — bare, and only when it occurs exactly once
+If none of the three works, nothing happens for that block and the script says why.
 """
 
 import argparse
@@ -35,24 +35,24 @@ from . import config
 def laad(pad):
     p = Path(os.path.expanduser(pad))
     if not p.is_file():
-        sys.exit("niet gevonden: %s" % p)
+        sys.exit("not found: %s" % p)
     with p.open(encoding="utf-8") as f:
         return str(p), json.load(f)
 
 
 def plaats(tekst, hunk):
-    """Geeft (nieuwe_tekst, manier) of (None, reden)."""
+    """Returns (new_text, how) or (None, reason)."""
     voor = hunk.get("voor") or ""
     na = hunk.get("na") or ""
     weg = hunk.get("verwijderd") or ""
     erbij = hunk.get("toegevoegd") or ""
 
     pogingen = [
-        ("volledige context", voor + weg + na, voor + erbij + na),
-        ("linkercontext", voor + weg, voor + erbij),
+        ("full context", voor + weg + na, voor + erbij + na),
+        ("left context", voor + weg, voor + erbij),
     ]
     if weg:
-        pogingen.append(("kaal", weg, erbij))
+        pogingen.append(("bare", weg, erbij))
 
     for manier, zoek, vervang in pogingen:
         if not zoek:
@@ -60,50 +60,50 @@ def plaats(tekst, hunk):
         aantal = tekst.count(zoek)
         if aantal == 1:
             return tekst.replace(zoek, vervang, 1), manier
-        if aantal > 1 and manier != "kaal":
-            # meerdere treffers met context is verdacht; probeer de volgende poging
+        if aantal > 1 and manier != "bare":
+            # several hits with context is suspicious; try the next attempt
             continue
     if not weg and not voor and not na:
-        return None, "blok heeft geen anker en geen tekst"
-    return None, "anker niet teruggevonden (of niet uniek) in de pagina"
+        return None, "block has no anchor and no text"
+    return None, "anchor not found back (or not unique) in the page"
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m html_annotator apply-hunk")
     ap.add_argument("json")
-    ap.add_argument("--nr", type=int, required=True, help="annotatienummer")
-    ap.add_argument("--hunks", default="", help="komma-gescheiden blokken; leeg = alle open")
+    ap.add_argument("--nr", type=int, required=True, help="annotation number")
+    ap.add_argument("--hunks", default="", help="comma separated blocks; empty = all open")
     ap.add_argument("--file", dest="file", default="",
-                    help="doelbestand; standaard pageFile uit de ronde")
+                    help="target file; defaults to pageFile from the round")
     ap.add_argument("--dry-run", dest="dry_run", action="store_true",
-                    help="niets wegschrijven")
+                    help="write nothing")
     ap.add_argument("--resolve", action="store_true",
-                    help="geplaatste blokken meteen resolven")
+                    help="resolve the blocks that were placed")
     ap.add_argument("--port", type=int, default=config.port())
     a = ap.parse_args(argv)
 
     json_pad, data = laad(a.json)
     ann = next((x for x in data.get("annotations", []) if x.get("nr") == a.nr), None)
     if not ann:
-        sys.exit("annotatie %d niet gevonden in %s" % (a.nr, json_pad))
+        sys.exit("annotation %d not found in %s" % (a.nr, json_pad))
     if ann.get("type") != "edit":
-        sys.exit("annotatie %d is geen bewerking maar '%s'" % (a.nr, ann.get("type")))
+        sys.exit("annotation %d is not an edit but '%s'" % (a.nr, ann.get("type")))
 
     alle = ann.get("hunks") or []
     if not alle:
-        sys.exit("annotatie %d heeft geen blokken; dit is een oudere bewerking "
-                 "zonder hunks — neem 'nieuw' als geheel over" % a.nr)
+        sys.exit("annotation %d has no blocks; this is an older edit without "
+                 "hunks — take 'nieuw' over as a whole" % a.nr)
 
     gevraagd = [int(x) for x in a.hunks.split(",") if x.strip()] if a.hunks else None
     doel_hunks = [h for h in alle
                   if (gevraagd is None and not h.get("resolved")) or
                      (gevraagd is not None and h.get("n") in gevraagd)]
     if not doel_hunks:
-        sys.exit("geen blokken om toe te passen (alles al afgevinkt?)")
+        sys.exit("no blocks to apply (everything resolved already?)")
 
     bestand = os.path.expanduser(a.file or data.get("pageFile") or "")
     if not bestand or not os.path.isfile(bestand):
-        sys.exit("doelbestand niet gevonden: %s" % (bestand or "(geen pageFile in de ronde)"))
+        sys.exit("target file not found: %s" % (bestand or "(no pageFile in the round)"))
 
     with open(bestand, encoding="utf-8") as f:
         tekst = f.read()
@@ -111,37 +111,37 @@ def main(argv=None):
     gelukt, mislukt = [], []
     for h in doel_hunks:
         if h.get("soort") == "opmaak":
-            # Een opmaakwijziging staat niet in de tekst en is dus niet met zoek-en-
-            # vervang te plaatsen: de vorm van een regel zit in de HTML eromheen. Het
-            # script raakt hem daarom niet aan en zegt wat er moet gebeuren.
-            print("  blok %s  OVERGESLAGEN  opmaak: %s"
-                  % (h.get("n"), h.get("omschrijving") or "gewijzigd"))
-            print("            neem de opmaak over uit 'nieuwHtml' van annotatie %d" % a.nr)
+            # A formatting change is not in the text, so search-and-replace cannot
+            # place it: the shape of a line lives in the HTML around it. The script
+            # leaves it alone and says what has to happen.
+            print("  block %s  SKIPPED  formatting: %s"
+                  % (h.get("n"), h.get("omschrijving") or "changed"))
+            print("            take the formatting from 'nieuwHtml' on annotation %d" % a.nr)
             mislukt.append(h.get("n"))
             continue
         nieuw, manier = plaats(tekst, h)
         label = "%s -> %s" % (
-            (h.get("verwijderd") or "(niets)").replace("\n", "\\n")[:45],
-            (h.get("toegevoegd") or "(niets)").replace("\n", "\\n")[:45])
+            (h.get("verwijderd") or "(nothing)").replace("\n", "\\n")[:45],
+            (h.get("toegevoegd") or "(nothing)").replace("\n", "\\n")[:45])
         if nieuw is None:
-            print("  blok %s  MISLUKT   %s  [%s]" % (h.get("n"), label, manier))
+            print("  block %s  FAILED   %s  [%s]" % (h.get("n"), label, manier))
             mislukt.append(h.get("n"))
         else:
             tekst = nieuw
-            print("  blok %s  geplaatst  %s  [via %s, alinea %s]"
+            print("  block %s  placed  %s  [via %s, paragraph %s]"
                   % (h.get("n"), label, manier, h.get("alinea")))
             gelukt.append(h.get("n"))
 
     if a.dry_run:
-        print("\ndroog gedraaid; %s wordt niet aangepast" % bestand)
+        print("\ndry run; %s is not changed" % bestand)
         return 0
 
     if gelukt:
         with open(bestand, "w", encoding="utf-8") as f:
             f.write(tekst)
-        print("\n%d van %d blokken doorgevoerd in %s" % (len(gelukt), len(doel_hunks), bestand))
+        print("\n%d of %d blocks applied in %s" % (len(gelukt), len(doel_hunks), bestand))
     if mislukt:
-        print("niet geplaatst: %s — kijk zelf of de tekst intussen veranderd is"
+        print("not placed: %s — check whether the text changed in the meantime"
               % ", ".join(str(x) for x in mislukt))
 
     if a.resolve and gelukt:
@@ -151,9 +151,9 @@ def main(argv=None):
         try:
             with urllib.request.urlopen(req, timeout=5) as r:
                 uit = json.load(r)
-            print("afgevinkt: blokken %s; nog open in deze ronde: %s annotaties, %s blokken"
+            print("resolved: blocks %s; still open in this round: %s annotations, %s blocks"
                   % (uit.get("hunksResolved"), uit.get("open"), uit.get("hunksOpen")))
         except Exception as e:
-            print("afvinken mislukte (%s); doe het met POST /resolve" % e)
+            print("resolving failed (%s); do it with POST /resolve" % e)
 
     return 1 if mislukt else 0

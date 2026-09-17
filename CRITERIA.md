@@ -29,10 +29,14 @@ Every criterion below carries two labels:
   pass: their CSS and JS still ship inside the snippet, their criteria
   sit in `extras/CRITERIA-extras.md` (B13, B15, B24, B25) and their
   cases in `extras/tests/`. See `docs/SCOPE.md`.
-- Identifiers stay: `window.LucAnnotator`, `<!-- LUC-ANNOTATOR -->`,
-  bridge identity `luc-annotator`, localStorage `luc-annotaties`,
-  `LUC_ANNOTATOR_*`. Renaming them orphans existing pages unless a
-  migration ships with the rename.
+- Public names as of 1.0.0rc1: `window.HtmlAnnotator`, the markers
+  `<!-- HTML-ANNOTATOR v3 -->` … `<!-- /HTML-ANNOTATOR -->`, bridge
+  identity `html-annotator`, env `HTML_ANNOTATOR_*`. The previous
+  generation stays readable and is kept as a deprecated alias until 1.1:
+  the old page-global, `<!-- LUC-ANNOTATOR -->` blocks (content hash and
+  hooks still recognise them), `LUC_ANNOTATOR_*`, and the localStorage
+  prefix `luc-annotaties`, which does not change at all. Migration table:
+  `CHANGELOG.md`.
 
 ## Functional requirements
 
@@ -410,9 +414,9 @@ idempotent, `--print` writing nothing.
 
 *TESTED · platform: all*
 
-*Expected behaviour:* allowlist (behaviour): `LucAnnotator`,
-`LucAnnotatorBridge`, `LUC-ANNOTATOR`, `luc-annotator`,
-`luc-annotaties`, `LUC_ANNOTATOR_*`. Exempt: `docs/DECISIONS.md` and
+*Expected behaviour:* the allowlist covers identifiers that carry
+behaviour: the deprecated page-global alias, `LUC-ANNOTATOR` markers,
+`luc-annotaties` and `LUC_ANNOTATOR_*`. Exempt: `docs/DECISIONS.md` and
 `extras/`.
 
 *Evidence:* `tests/test_layout.py` · `tests/mutate-layout.sh`.
@@ -434,9 +438,11 @@ header prints `git rev-parse --short HEAD` and a dirty-tree count.
 *TESTED · platform: all*
 
 *Expected behaviour:* `SKILL.md`, `README.md`, `INSTALL.md` and
-`CRITERIA.md` have no Dutch function-word leftovers. The handbook and
-the CLI work-rule stay Dutch until a dedicated pass
-(`docs/DECISIONS.md`, 2026-08-23).
+`CRITERIA.md` have no Dutch function-word leftovers. Since 1.0.0rc1 the
+snippet UI, the bridge log lines, the CLI output and the work-rule box
+printed by `show` are English too (`docs/DECISIONS.md`, 2026-09-17).
+`references/agent-handbook.md` is still Dutch and is the one remaining
+surface waiting for a dedicated translation pass.
 
 *Evidence:* `tests/test_layout.py` · `tests/mutate-layout.sh`.
 
@@ -456,6 +462,46 @@ nor jq.
 
 </details>
 
+<details><summary><strong>A10 — The package installs, reports its version, and carries the snippet.</strong></summary>
+
+*TESTED · platform: all*
+
+*Expected behaviour:* `pyproject.toml` builds the distribution
+`html-annotator` with the console script `html-annotator` and no runtime
+dependencies (`[crops]` adds Pillow). The version sits in exactly one
+place, `html_annotator/__init__.py`; `pyproject.toml` reads it
+dynamically, `html-annotator --version` and `python -m html_annotator
+--version` print it, and `/ping` returns it as `release`. `pip install
+-e .` into a fresh venv gives a working console script, and
+`install-skill` also works from an installed package instead of only
+from a checkout. `LICENSE` and `CHANGELOG.md` exist and the changelog
+names this version.
+
+*Evidence:* `tests/test_layout.py` (A10 checks, including the venv
+install; it prints SKIP instead of PASS when no venv or no network is
+available) · `tests/test_bridge_contract.py` (B1 `release`).
+
+*Gap:* a published wheel from PyPI is not exercised; the venv case
+installs from the working tree.
+
+</details>
+
+<details><summary><strong>A11 — One source for the snippets.</strong></summary>
+
+*TESTED · platform: all*
+
+*Expected behaviour:* `references/` is the only copy of
+`annotator-snippet.html`, `checklist-snippet.html` and
+`suggest-snippet.html` in the repo. The build maps that directory into
+the wheel as `html_annotator/snippets/`, so the snippet is importable at
+runtime (`html_annotator.config.snippet_path()`), and a second copy in
+the tree is only allowed when it is byte-identical — a drifting copy
+fails.
+
+*Evidence:* `tests/test_layout.py` (A11 checks).
+
+</details>
+
 ## Seams
 
 Tests only touch these edges: the bridge HTTP API, the CLI
@@ -467,6 +513,8 @@ No tests against internal helpers, no snapshots of whole JSON dumps.
 
 ## Release gate
 
+0. `html-annotator --version` matches `html_annotator/__init__.py`, and
+   `CHANGELOG.md` has an entry for it.
 1. `python -m compileall -q html_annotator bin`
 2. `python tests/test_record.py test_bridge_contract.py test_toon.py
    test_layout.py` — all four green, on the three-OS matrix.

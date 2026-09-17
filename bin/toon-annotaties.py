@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Thin wrapper: `python -m html_annotator show`."""
+"""Deprecated alias of bin/show-annotations.py (kept until 1.1).
+
+Thin wrapper: `python -m html_annotator show`.
+"""
 
 import sys
 from pathlib import Path

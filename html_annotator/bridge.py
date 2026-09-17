@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Local bridge for the HTML annotator (LUC-ANNOTATOR v2).
+"""Local bridge for the HTML annotator (HTML-ANNOTATOR v3).
+
+New embeds carry the ``<!-- HTML-ANNOTATOR v3 -->`` marker; the older
+``LUC-ANNOTATOR`` v1/v2 blocks stay recognised everywhere (content hash, hooks),
+so pages that already exist keep working.
 
 Runs on 127.0.0.1:8791 (macOS, Linux, Windows) and writes annotations straight
 to <root>/<page-slug>/ronde-NN/annotations.json, screenshot crops included in
@@ -30,7 +34,7 @@ import socketserver
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import config
+from . import __version__, config
 from .record import schoon_locator, zet_ref_velden
 from .refs import expand_comment
 
@@ -94,7 +98,7 @@ def run_chrome(args, timeout=90):
     except subprocess.CalledProcessError as e:
         staart = (e.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-3:]
         raise RuntimeError("chrome exit %d: %s" % (e.returncode, " | ".join(staart)[:400]))
-CACHE = os.path.join(tempfile.gettempdir(), "luc-annotator-shots")
+CACHE = os.path.join(tempfile.gettempdir(), "html-annotator-shots")
 MARGE = 12
 LOCK = threading.Lock()
 
@@ -133,8 +137,12 @@ def pad_van_page(page, page_file):
     return None
 
 
+# Both marker generations: new embeds write HTML-ANNOTATOR, existing pages
+# carry LUC-ANNOTATOR v1/v2 and must keep hashing the same way.
 ANNOTATOR_BLOK = re.compile(
-    r"<!--\s*LUC-ANNOTATOR.*?<!--\s*/LUC-ANNOTATOR\s*-->", re.S | re.I)
+    r"<!--\s*(?:HTML|LUC)-ANNOTATOR.*?<!--\s*/(?:HTML|LUC)-ANNOTATOR\s*-->",
+    re.S | re.I)
+MARKER_START = re.compile(r"<!--\s*(?:HTML|LUC)-ANNOTATOR", re.I)
 
 
 def content_hash(bestand, dom_hash):
@@ -145,7 +153,8 @@ def content_hash(bestand, dom_hash):
                 bron = f.read()
             bron = ANNOTATOR_BLOK.sub("", bron)
             # ook een niet-afgesloten v1-blok wegknippen
-            i = bron.find("<!-- LUC-ANNOTATOR")
+            m = MARKER_START.search(bron)
+            i = m.start() if m else -1
             if i >= 0:
                 bron = bron[:i]
             return "sha256:" + hashlib.sha256(bron.encode("utf-8")).hexdigest()[:32]
@@ -288,9 +297,9 @@ def eis_chrome():
     """Geen Chrome/Edge: crop overslaan. h_save vangt dit en bewaart de annotatie
     zonder afbeelding (imageError), zodat opslaan nooit van een browser afhangt."""
     if not CHROME:
-        print("geen Chrome/Edge gevonden: crop overgeslagen, annotatie wel bewaard "
-              "(zet ANNOTATOR_CHROME om een browser aan te wijzen)", flush=True)
-        raise RuntimeError("geen Chrome/Edge gevonden (ANNOTATOR_CHROME)")
+        print("no Chrome/Edge found: crop skipped, annotation still stored "
+              "(set HTML_ANNOTATOR_CHROME to point at a browser)", flush=True)
+        raise RuntimeError("no Chrome/Edge found (HTML_ANNOTATOR_CHROME)")
 
 
 def maak_crop(bestand, page_url, doc, rect, uit_pad):
@@ -686,7 +695,7 @@ ROUTES = {"/session": h_session, "/save": h_save, "/delete": h_delete,
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LucAnnotatorBridge/2.0"
+    server_version = "HtmlAnnotatorBridge/%s" % __version__
 
     def log_message(self, fmt, *args):
         # Origin/Referer meeloggen: dat is de enige manier om vast te stellen vanaf welke
@@ -741,7 +750,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         pad = self.path.split("?")[0]
         if pad == "/ping":
-            return self._json(200, {"ok": True, "bridge": "luc-annotator", "version": 2,
+            # "version" is the wire protocol the snippet talks; "release" is
+            # the package version (html_annotator.__version__).
+            return self._json(200, {"ok": True, "bridge": "html-annotator",
+                                    "version": 2, "release": __version__,
                                     "root": ROOT, "pillow": HEEFT_PILLOW})
         # /p/<pad-vanaf-home> serveert een lokale pagina same-origin met de bridge.
         # Voorbeeld: http://127.0.0.1:8791/p/Desktop/todos.html
@@ -793,12 +805,12 @@ def main():
         srv = BridgeServer((HOST, PORT), Handler)
     except Exception:
         import traceback
-        print("annotator bridge failed to start on http://%s:%d" % (HOST, PORT), flush=True)
+        print("html-annotator bridge failed to start on http://%s:%d" % (HOST, PORT), flush=True)
         traceback.print_exc()
         sys.stderr.flush()
         raise
-    print("annotator bridge listening on http://%s:%d (root: %s, pillow: %s)"
-          % (HOST, PORT, ROOT, HEEFT_PILLOW), flush=True)
+    print("html-annotator %s listening on http://%s:%d (root: %s, pillow: %s)"
+          % (__version__, HOST, PORT, ROOT, HEEFT_PILLOW), flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
