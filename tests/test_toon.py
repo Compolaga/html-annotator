@@ -8,7 +8,6 @@ import sys
 import tempfile
 
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOON = os.path.join(SKILL, "bin", "toon-annotaties.py")
 
 
 def check(naam, conditie):
@@ -21,9 +20,9 @@ def check(naam, conditie):
 
 def draai(root, *args):
     env = os.environ.copy()
-    env["LUC_ANNOTATOR_ROOT"] = root
+    env["HTML_ANNOTATOR_ROOT"] = root
     return subprocess.run(
-        [sys.executable, TOON, *args],
+        [sys.executable, "-m", "html_annotator", "show", *args],
         cwd=SKILL, env=env, capture_output=True, text=True,
     )
 

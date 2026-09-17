@@ -3,6 +3,35 @@
 Choices a later cleanup must not reopen without the owner.
 Changing behaviour is a new decision, not an edit here.
 
+## 2026-09-17 — One Python CLI, no bash, no jq (F1)
+
+`install.sh`, `bin/ensure-bridge.sh` and `bin/hook-ensure-bridge.sh` are
+gone. Everything runs through `python -m html_annotator` (package
+`html_annotator/`, renamed from `annotator/`): `serve`, `ensure`, `stop`,
+`status`, `show`, `resolve`, `apply-hunk`, `url`, `install-skill`,
+`install-hooks`. Reason: a Windows user needed Git Bash plus jq for
+install and hooks, which is a second toolchain for a stdlib-only skill.
+`bin/*.py` stay as thin wrappers so older hooks and shortcuts keep
+working. Pid file and log moved out of the checkout into a per-user
+state directory, because a symlinked skill is read-only in spirit and a
+copy would have carried them along.
+
+## 2026-09-17 — Default annotation root `~/annotations`, old location wins if present
+
+New installs write to `~/annotations`; a machine that already has the
+older `annotaties` folder on the Desktop and no `~/annotations` keeps
+using it. Env: `HTML_ANNOTATOR_ROOT` / `HTML_ANNOTATOR_PORT`, with the
+`LUC_ANNOTATOR_*` names still accepted. Renaming the env vars without a
+fallback would have broken running setups mid-session.
+
+## 2026-09-17 — Scope: core versus extras (F0)
+
+Core is snippet + bridge + CLI + handbook, plus the checklist and
+suggest layers. Out: todo-list spawning (script deleted), the draft
+message card and `la-sub` (docs and tests to `extras/`, code stays in
+the snippet because the paste block is one file by the 2026-08-23
+decision). `apply-hunk` stays core. Full reasoning: `docs/SCOPE.md`.
+
 ## 2026-08-18 — SessionStart hook always on
 
 The bridge hook runs at user level on every agent session (empty
@@ -52,8 +81,8 @@ No client page in the suite — case-08 is the reduced form.
 ## 2026-08-23 — Root is a port, CLIs in bin/
 
 CLIs and hooks live in `bin/`. Python library in `annotator/`
-(snake_case). `ensure-bridge.sh` and `hook-ensure-bridge.sh` are
-location-relative. Agent-facing docs name no person;
+(snake_case; renamed to `html_annotator/` on 2026-09-17). The ensure and
+hook entry points are location-relative. Agent-facing docs name no person;
 `window.LucAnnotator` and the `LUC-ANNOTATOR` marker stay (public API).
 
 ## 2026-08-23 — Criteria at root, decisions in docs
@@ -67,11 +96,11 @@ Root ports a stranger opens first — `SKILL.md`, `README.md`,
 `INSTALL.md`, `CRITERIA.md`, `install.sh` — are English (A8).
 `references/agent-handbook.md` and the work-rule block printed by
 `bin/toon-annotaties.py` stay Dutch until a dedicated translation.
-CLI filenames (`toon-annotaties.py`, `vind-todolijst.sh`,
-`pas-hunk-toe.py`) stay: they are the same class of identifier as
-`LUC_ANNOTATOR_*`. `annotator/` stays an importable package;
-`install.sh` stays at root; `INSTALL.md` stays a port, not a file
-in `bin/`.
+The Dutch CLI filenames in `bin/` stay: they are the same class of
+identifier as `LUC_ANNOTATOR_*`. (Superseded in part on 2026-09-17: the
+CLI itself is `python -m html_annotator`, the `bin/` files are wrappers,
+and the todo-list script was deleted with the scope pass.) `INSTALL.md`
+stays a port, not a file in `bin/`.
 
 ## 2026-08-28 — Draft cards are rich text; the diff stays on the plain-text projection
 

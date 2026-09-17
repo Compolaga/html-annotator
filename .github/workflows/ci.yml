@@ -27,23 +27,17 @@ jobs:
 
       - name: Python tests
         run: |
-          python -m compileall -q annotator bin
+          python -m compileall -q html_annotator bin
           python tests/test_record.py
           python tests/test_bridge_contract.py
           python tests/test_toon.py
           python tests/test_layout.py
 
-      - name: Start bridge
+      - name: Start bridge (detached, via the CLI)
         run: |
-          mkdir -p "$HOME/Desktop"
-          export LUC_ANNOTATOR_ROOT="$HOME/Desktop/annotaties"
-          python bin/annotator-bridge.py > bridge.log 2>&1 &
-          for i in $(seq 1 50); do
-            curl -fsS http://127.0.0.1:8791/ping && break
-            sleep 0.2
-          done
-          curl -fsS http://127.0.0.1:8791/ping | grep -q '"ok": true'
-          cat bridge.log
+          python -m html_annotator ensure
+          python -m html_annotator ensure | grep -q "already running"
+          python -m html_annotator status | grep -q '"ok": true'
 
       - name: Real /save with a snippet page
         run: |
@@ -52,21 +46,22 @@ jobs:
             echo '<!doctype html><meta charset="utf-8"><title>CI: page?*</title>'
             echo '<h1 id="kop">CI smoke</h1><p>tekst met ünïcode</p>'
             cat references/annotator-snippet.html
-          } > "$HOME/Desktop/ci-page.html"
-          curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8791/p/Desktop/ci-page.html | grep -q 200
+          } > "$HOME/ci-page.html"
+          python -m html_annotator url "$HOME/ci-page.html" | grep -q '/p/ci-page.html'
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8791/p/ci-page.html | grep -q 200
           # outside home must be refused
           curl -s --path-as-is -o /dev/null -w '%{http_code}\n' 'http://127.0.0.1:8791/p/../../etc/passwd' | grep -q 403
           curl -fsS -X POST http://127.0.0.1:8791/save -H 'Content-Type: application/json' -d '{
-            "page": "http://127.0.0.1:8791/p/Desktop/ci-page.html",
-            "pageFile": "~/Desktop/ci-page.html",
+            "page": "http://127.0.0.1:8791/p/ci-page.html",
+            "pageFile": "~/ci-page.html",
             "doc": {"w": 800, "h": 600},
             "annotation": {"id": "ci-1", "type": "text", "selectedText": "CI smoke", "comment": "ünïcode ok"}
           }' | tee save.json
           grep -q '"ok": true' save.json
           # region annotation: crop may fail (no display), the record must still land
           curl -fsS -X POST http://127.0.0.1:8791/save -H 'Content-Type: application/json' -d '{
-            "page": "http://127.0.0.1:8791/p/Desktop/ci-page.html",
-            "pageFile": "~/Desktop/ci-page.html",
+            "page": "http://127.0.0.1:8791/p/ci-page.html",
+            "pageFile": "~/ci-page.html",
             "doc": {"w": 800, "h": 600},
             "annotation": {"id": "ci-2", "type": "region", "rect": {"x": 10, "y": 10, "w": 100, "h": 40}, "comment": "regio"}
           }' | grep -q '"ok": true'
@@ -76,13 +71,12 @@ jobs:
             "title": "CI: page?*<>|",
             "annotation": {"id": "ci-3", "type": "text", "selectedText": "x", "comment": "slug"}
           }' | grep -q '"ok": true'
-          cat bridge.log
 
       - name: annotations.json on disk
         run: |
           python - <<'PY'
           import glob, json, os
-          root = os.path.expanduser("~/Desktop/annotaties")
+          root = os.path.expanduser("~/annotations")
           hits = glob.glob(os.path.join(root, "*", "ronde-*", "annotations.json"))
           print("\n".join(hits))
           assert len(hits) == 2, hits
@@ -113,4 +107,8 @@ jobs:
       - name: Install playwright-core
         run: cd tests && npm i --no-save playwright-core
       - name: Run suite
-        run: tests/run.sh 00 09 11 02 05 06 07 08 12 13 14 15 16 17
+        run: tests/run.sh 00 09 11 02 06 08 12 14 15 16 17
+
+      - name: Stop bridge
+        if: always()
+        run: python -m html_annotator stop || true

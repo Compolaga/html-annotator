@@ -3,7 +3,7 @@
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$TESTS_DIR/.." && pwd)"
-PORT="${LUC_ANNOTATOR_PORT:-8791}"
+PORT="${HTML_ANNOTATOR_PORT:-${LUC_ANNOTATOR_PORT:-8791}}"
 BRIDGE_URL="http://127.0.0.1:$PORT"
 
 ping_bridge() { curl -fsS --max-time 2 "$BRIDGE_URL/ping" 2>/dev/null; }
@@ -25,7 +25,7 @@ bridge_down() {
   return 1
 }
 
-bridge_up() { "$SKILL_DIR/bin/ensure-bridge.sh" >/dev/null 2>&1; [ -n "$(ping_bridge)" ]; }
+bridge_up() { (cd "$SKILL_DIR" && python3 -m html_annotator ensure) >/dev/null 2>&1; [ -n "$(ping_bridge)" ]; }
 
 # Wacht tot de bridge antwoordt. $1 = seconden (default 5).
 wait_for_bridge() {
@@ -42,7 +42,9 @@ snippet() { cat "$SKILL_DIR/references/annotator-snippet.html"; }
 
 # Pad naar de rondemap van een slug, of leeg als die niet bestaat.
 laatste_ronde_json() {
-  local slug="$1" dir="$HOME/Desktop/annotaties/$slug"
+  local wortel
+  wortel=$(cd "$SKILL_DIR" && python3 -c 'from html_annotator import config; print(config.root())')
+  local slug="$1" dir="$wortel/$slug"
   [ -d "$dir" ] || return 1
   local r
   r=$(ls -1 "$dir" 2>/dev/null | grep -E '^ronde-[0-9]+$' | sort | tail -1)
@@ -51,7 +53,7 @@ laatste_ronde_json() {
 }
 
 # Testpagina's krijgen een eigen slug per run, zodat een test nooit op de rondes van
-# een echte pagina van Luc gaat zitten en nooit op resten van een vorige run.
+# een echte pagina gaat zitten en nooit op resten van een vorige run.
 test_slug() { echo "zz-test-$1-$(date +%s)-$$"; }
 
 pass() { echo "  PASS  $*"; }

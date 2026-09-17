@@ -103,7 +103,7 @@ fi
 TIJDELIJK=$(mktemp "${TMPDIR:-/tmp}/annotator-case04.XXXXXX.html")
 printf '<p>test</p>\n<!-- LUC-ANNOTATOR v2 -->\n' >"$TIJDELIJK"
 printf '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TIJDELIJK" \
-  | "$SKILL_DIR/bin/hook-ensure-bridge.sh" >/dev/null 2>&1
+  | python3 "$SKILL_DIR/bin/hook-ensure-bridge.py" >/dev/null 2>&1
 if wait_for_bridge 8; then
   pass "PostToolUse-tak (Write) brengt de bridge nog steeds omhoog"
 else

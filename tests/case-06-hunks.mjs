@@ -101,7 +101,7 @@ await browser.close();
 
 /* Nu het punt van de hele exercitie: alleen blok 2 toepassen, de rest laten staan. */
 const uit = execFileSync('python3', [join(SKILL, 'bin/pas-hunk-toe.py'), jsonPath,
-  '--nr', String(ann.nr), '--hunks', '2', '--afvinken'], { encoding: 'utf8' });
+  '--nr', String(ann.nr), '--hunks', '2', '--resolve'], { encoding: 'utf8' });
 const naToepassen = readFileSync(bestand, 'utf8');
 const kaart = naToepassen.slice(naToepassen.indexOf('la-draft-txt'), naToepassen.indexOf('</div>\n</div>'));
 zeg(/vrijdag/.test(kaart), 'blok 2 is doorgevoerd in de pagina');

@@ -1,5 +1,5 @@
 #!/bin/bash
-# AC-3: ensure-bridge.sh mag nooit met exitcode 0 eindigen terwijl er geen bridge
+# AC-3: `ensure` mag nooit met exitcode 0 eindigen terwijl er geen bridge
 # antwoordt. Aanleiding: bridge.log bevat "OSError: [Errno 48] Address already in use"
 # tracebacks terwijl bridge-hook.log op dezelfde momenten succes meldt.
 #
@@ -9,7 +9,7 @@
 set -uo pipefail
 source "$(dirname "$0")/lib.sh"
 
-echo "case-03: ensure-bridge.sh liegt niet over een bezette poort"
+echo "case-03: ensure liegt niet over een bezette poort"
 
 if ! bridge_down; then
   fail "kon de bridge niet omlaag krijgen; test zegt niets"
@@ -17,7 +17,7 @@ if ! bridge_down; then
 fi
 
 # Kale TCP-luisteraar: sluit connecties meteen (geen HTTP). Zonder accept()
-# duurt elke curl --max-time 2 de volle 2s; ensure-bridge doet dat tot 26×
+# duurt elke ping de volle timeout; ensure doet dat tot 26x
 # en de oude sleep(60)-bezetter was dan dood voor de assert.
 python3 - "$PORT" <<'PY' &
 import socket, sys
@@ -41,7 +41,7 @@ if [ "$(bridge_pid)" != "$BEZETTER" ]; then
   exit 2
 fi
 
-"$SKILL_DIR/bin/ensure-bridge.sh" >/dev/null 2>&1
+(cd "$SKILL_DIR" && python3 -m html_annotator ensure) >/dev/null 2>&1
 EXIT_CODE=$?
 ANTWOORD=$(ping_bridge)
 
@@ -52,10 +52,10 @@ fi
 
 RC=0
 if echo "$ANTWOORD" | grep -q luc-annotator; then
-  fail "ensure-bridge startte een echte bridge terwijl de poort bezet hoorde (exit $EXIT_CODE, lsof: $(bridge_pid))"
+  fail "ensure startte een echte bridge terwijl de poort bezet hoorde (exit $EXIT_CODE, lsof: $(bridge_pid))"
   RC=1
 elif [ "$EXIT_CODE" -eq 0 ]; then
-  fail "ensure-bridge.sh exit 0 op een niet-bridge-bezetter (ping: ${ANTWOORD:-leeg})"
+  fail "ensure exit 0 op een niet-bridge-bezetter (ping: ${ANTWOORD:-leeg})"
   RC=1
 else
   pass "exit $EXIT_CODE, bezetter leeft, ping is geen luc-annotator (lsof: $(bridge_pid))"

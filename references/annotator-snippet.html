@@ -1,4 +1,4 @@
-<!-- LUC-ANNOTATOR v2 · standaard feedback-component; plak dit blok onderaan elke HTML (voor </body> of aan het einde). Self-contained, geen dependencies. Schrijft via de lokale bridge (annotator-bridge.py, 127.0.0.1:8791) naar ~/Desktop/annotaties/<slug>/ronde-NN/. -->
+<!-- LUC-ANNOTATOR v2 · standaard feedback-component; plak dit blok onderaan elke HTML (voor </body> of aan het einde). Self-contained, geen dependencies. Schrijft via de lokale bridge (python -m html_annotator serve, 127.0.0.1:8791) naar <annotatie-root>/<slug>/ronde-NN/. -->
 <style>
   /* CSS-seams: bar/status · overlay/ghost · badges · weeslijst · selknop
      · popup/refs · draft · sessie · la-sub. Geen bundler; één blok. */
@@ -310,7 +310,7 @@
     }).catch(function () {
       brug.ok = false; brug.jsonPath = null;
       zetStatus(false, "bridge off - localStorage only",
-        "Start the bridge: python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py");
+        "Start the bridge: python3 -m html_annotator ensure");
       return null;
     });
   }
@@ -1445,10 +1445,10 @@
     }).catch(function (e) {
       brug.ok = false;
       zetStatus(false, "bridge off - localStorage only",
-        "Start the bridge: python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py");
+        "Start the bridge: python3 -m html_annotator ensure");
       alert("The bridge is not running, so nothing was written to disk.\n" +
         "Your annotation is only in localStorage. Start the bridge with:\n" +
-        "python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py");
+        "python3 -m html_annotator ensure");
       throw e;
     });
   }
@@ -1467,7 +1467,7 @@
   function markeerVerwerkt(a) {
     if (!brug.ok) {
       alert("The bridge is not running, so check-off cannot be written.\n" +
-        "Start it with: ~/.claude/skills/html-annotator/bin/ensure-bridge.sh");
+        "Start it with: python3 -m html_annotator ensure");
       return Promise.resolve(null);
     }
     return post("/resolve", Object.assign(basis(), { ids: [a.id], nrs: [a.nr] }))

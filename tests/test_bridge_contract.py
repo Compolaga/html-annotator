@@ -2,7 +2,6 @@
 """B1–B7: bridge-HTTP en ronde-gedrag, zonder de live poort 8791."""
 
 import hashlib
-import importlib.util
 import json
 import os
 import socket
@@ -14,7 +13,7 @@ import urllib.error
 import urllib.request
 
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BRIDGE = os.path.join(SKILL, "bin", "annotator-bridge.py")
+sys.path.insert(0, SKILL)
 
 
 def check(naam, conditie):
@@ -34,10 +33,8 @@ def vrije_poort():
 
 
 def laad_bridge_mod():
-    spec = importlib.util.spec_from_file_location("annbridge", BRIDGE)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    from html_annotator import bridge
+    return bridge
 
 
 def http(method, url, body=None, headers=None):
@@ -58,11 +55,11 @@ def http(method, url, body=None, headers=None):
 
 def start_bridge(root, poort):
     env = os.environ.copy()
-    env["LUC_ANNOTATOR_PORT"] = str(poort)
-    env["LUC_ANNOTATOR_ROOT"] = root
+    env["HTML_ANNOTATOR_PORT"] = str(poort)
+    env["HTML_ANNOTATOR_ROOT"] = root
     log = open(os.path.join(root, "bridge-test.log"), "w+", encoding="utf-8")
     proc = subprocess.Popen(
-        [sys.executable, BRIDGE],
+        [sys.executable, "-m", "html_annotator", "serve"],
         cwd=SKILL,
         env=env,
         stdout=log,

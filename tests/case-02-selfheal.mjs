@@ -51,7 +51,7 @@ async function bridgeDown() {
   return false;
 }
 function bridgeUp() {
-  try { execFileSync(join(SKILL, 'bin/ensure-bridge.sh'), { stdio: 'ignore' }); } catch {}
+  try { execFileSync('python3', ['-m', 'html_annotator', 'ensure'], { cwd: SKILL, stdio: 'ignore' }); } catch {}
   return !!bridgePid();
 }
 
@@ -187,7 +187,7 @@ for (const origin of ORIGINS) {
   // 2. bridge komt omhoog terwijl de pagina open blijft staan
   const opgestart = bridgeUp();
   if (!opgestart) {
-    console.log(`  FAIL  ${label}: ensure-bridge.sh kreeg de bridge niet omhoog`);
+    console.log(`  FAIL  ${label}: ensure kreeg de bridge niet omhoog`);
     falen++; await page.close(); continue;
   }
 

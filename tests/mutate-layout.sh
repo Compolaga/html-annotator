@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# C6: A1/A2/A6 moeten rood worden als de layout-eis stuk is.
+# C6: A1–A9 moeten rood worden als de layout-eis stuk is. Elke mutant breekt
+# precies één eis in een wegwerpkopie van de repo; blijft test_layout.py dan
+# groen, dan bewijst die eis niets.
 set -euo pipefail
 ORIG="$(cd "$(dirname "$0")/.." && pwd)"
 werk=$(mktemp -d)
@@ -20,8 +22,8 @@ set +e
 python3 ./test_layout.py >/tmp/ann-mut-layout-ok.txt 2>&1
 rc=$?
 set -e
-if [ "$rc" -eq 0 ]; then zeg 0 "ongemutileerd A1–A6 groen"
-else zeg 1 "ongemutileerd A1–A6 niet groen"
+if [ "$rc" -eq 0 ]; then zeg 0 "ongemutileerd A1–A9 groen"
+else zeg 1 "ongemutileerd A1–A9 niet groen"; cat /tmp/ann-mut-layout-ok.txt
 fi
 
 echo 'los.py' > "$werk/repo/los.py"
@@ -43,54 +45,79 @@ rm -rf "$werk/repo/memories"
 
 printf '\nLuc wil dit zo.\n' >> "$werk/repo/SKILL.md"
 if python3 ./test_layout.py >/tmp/ann-mut-layout-a6.txt 2>&1; then
-  zeg 1 "A6 blijft groen met Luc in SKILL.md"
+  zeg 1 "A6 blijft groen met een persoonsnaam in SKILL.md"
 else
   zeg 0 "A6 wordt rood door een persoonsnaam"
 fi
-# herstel SKILL voor de install-mutanten
 rsync -a "$ORIG/SKILL.md" "$werk/repo/SKILL.md"
 
-python3 - <<'PY' "$werk/repo/install.sh"
+# A3: extras/ mag bestaan, maar moet uitgelegd zijn en niet meegeïnstalleerd worden.
+mv "$werk/repo/extras/README.md" "$werk/repo/extras/LEESMIJ.md"
+if python3 ./test_layout.py >/tmp/ann-mut-layout-a3.txt 2>&1; then
+  zeg 1 "A3 blijft groen zonder extras/README.md"
+else
+  zeg 0 "A3 wordt rood als extras/ niet uitgelegd is"
+fi
+mv "$werk/repo/extras/LEESMIJ.md" "$werk/repo/extras/README.md"
+
+python3 - <<'PY' "$werk/repo/html_annotator/install.py"
 import sys
 p = sys.argv[1]
 t = open(p).read()
-oud = "      --exclude=bridge.log --exclude=bridge.pid --exclude=bridge-hook.log \\"
-nieuw = "      --exclude=tests/node_modules \\"
+oud = 'EXCLUDE_DIRS = {".git", "node_modules", "__pycache__", "extras"}'
+nieuw = 'EXCLUDE_DIRS = {".git", "node_modules"}'
 if oud not in t:
-    raise SystemExit("anker voor tar-exclude ontbreekt")
+    raise SystemExit("anker voor de exclude-lijst ontbreekt")
 open(p, "w").write(t.replace(oud, nieuw, 1))
 PY
-# zorg dat er iets is om mee te kopiëren
 : >> "$werk/repo/bridge.log"
 if python3 ./test_layout.py >/tmp/ann-mut-layout-copy.txt 2>&1; then
-  zeg 1 "A1 blijft groen als install.sh runtime meeneemt"
+  zeg 1 "A1/A3 blijven groen als install-skill runtime en extras meeneemt"
 else
-  zeg 0 "A1-install wordt rood als bridge.log meegekopieerd wordt"
+  zeg 0 "A1/A3 worden rood als install-skill te veel kopieert"
 fi
-rsync -a "$ORIG/install.sh" "$werk/repo/install.sh"
+rsync -a "$ORIG/html_annotator/install.py" "$werk/repo/html_annotator/install.py"
+rm -f "$werk/repo/bridge.log"
 
-python3 - <<'PY' "$werk/repo/install.sh"
+python3 - <<'PY' "$werk/repo/html_annotator/install.py"
 import sys
 p = sys.argv[1]
 t = open(p).read()
-oud = 'HOOK="$DOEL/bin/hook-ensure-bridge.sh"'
-nieuw = 'HOOK="$DOEL/hook-ensure-bridge.sh"'
+oud = 'HOOK_SCRIPT = "bin/hook-ensure-bridge.py"'
+nieuw = 'HOOK_SCRIPT = "hook-ensure-bridge.py"'
 if oud not in t:
-    raise SystemExit("anker voor hook-pad ontbreekt")
+    raise SystemExit("anker voor het hook-pad ontbreekt")
 open(p, "w").write(t.replace(oud, nieuw, 1))
 PY
 if python3 ./test_layout.py >/tmp/ann-mut-layout-hook.txt 2>&1; then
   zeg 1 "A4 blijft groen als de hook buiten bin/ wijst"
 else
-  zeg 0 "A4 wordt rood als de geïnstalleerde hook niet bestaat"
+  zeg 0 "A4 wordt rood als de geregistreerde hook niet bestaat"
 fi
-rsync -a "$ORIG/install.sh" "$werk/repo/install.sh"
+rsync -a "$ORIG/html_annotator/install.py" "$werk/repo/html_annotator/install.py"
 
-printf '\nDraai python3 ~/.claude/skills/html-annotator/annotator_record.py\n' >> "$werk/repo/SKILL.md"
+python3 - <<'PY' "$werk/repo/html_annotator/install.py"
+import sys
+p = sys.argv[1]
+t = open(p).read()
+oud = '''        hooks[event] = _zonder_annotator(hooks.get(event)) + [entry]'''
+nieuw = '''        hooks[event] = list(hooks.get(event) or []) + [entry]'''
+if oud not in t:
+    raise SystemExit("anker voor de hook-dedup ontbreekt")
+open(p, "w").write(t.replace(oud, nieuw, 1))
+PY
+if python3 ./test_layout.py >/tmp/ann-mut-layout-dubbel.txt 2>&1; then
+  zeg 1 "A4 blijft groen als install-hooks zichzelf stapelt"
+else
+  zeg 0 "A4 wordt rood als install-hooks niet idempotent is"
+fi
+rsync -a "$ORIG/html_annotator/install.py" "$werk/repo/html_annotator/install.py"
+
+printf '\nDraai python3 ~/.claude/skills/html-annotator/install.sh\n' >> "$werk/repo/SKILL.md"
 if python3 ./test_layout.py >/tmp/ann-mut-layout-oud.txt 2>&1; then
   zeg 1 "A4 blijft groen met een pre-bin pad"
 else
-  zeg 0 "A4 wordt rood door een pre-bin pad"
+  zeg 0 "A4 wordt rood door een pad uit de bash-tijd"
 fi
 rsync -a "$ORIG/SKILL.md" "$werk/repo/SKILL.md"
 
@@ -107,22 +134,21 @@ else
 fi
 rsync -a "$ORIG/.gitignore" "$werk/repo/.gitignore"
 
-mkdir -p "$werk/repo/extras"
-echo x > "$werk/repo/extras/x.md"
-if python3 ./test_layout.py >/tmp/ann-mut-layout-a3.txt 2>&1; then
-  zeg 1 "A3 blijft groen met extras/"
-else
-  zeg 0 "A3 wordt rood als extras/ terugkomt"
-fi
-rm -rf "$werk/repo/extras"
-
-echo 'x = 1' > "$werk/repo/annotator/foo-bar.py"
+echo 'x = 1' > "$werk/repo/html_annotator/foo-bar.py"
 if python3 ./test_layout.py >/tmp/ann-mut-layout-a5.txt 2>&1; then
   zeg 1 "A5 blijft groen met een hyphen-module"
 else
   zeg 0 "A5 wordt rood door een hyphen-modulenaam"
 fi
-rm -f "$werk/repo/annotator/foo-bar.py"
+rm -f "$werk/repo/html_annotator/foo-bar.py"
+
+printf '#!/bin/bash\necho hoi\n' > "$werk/repo/bin/doe-iets.sh"
+if python3 ./test_layout.py >/tmp/ann-mut-layout-a9.txt 2>&1; then
+  zeg 1 "A9 blijft groen met bash in bin/"
+else
+  zeg 0 "A9 wordt rood door een shellscript in de core"
+fi
+rm -f "$werk/repo/bin/doe-iets.sh"
 
 python3 - <<'PY' "$werk/repo/SKILL.md"
 import sys
@@ -142,9 +168,9 @@ python3 - <<'PY' "$werk/repo/SKILL.md"
 import sys
 p = sys.argv[1]
 t = open(p).read()
-oud = "bin/toon-annotaties.py"
+oud = "bin/hook-ensure-bridge.py"
 if oud not in t:
-    raise SystemExit("anker voor toon-annotaties ontbreekt")
+    raise SystemExit("anker voor de hook-verwijzing ontbreekt")
 open(p, "w").write(t.replace(oud, "bin/show-annotations.py"))
 PY
 if python3 ./test_layout.py >/tmp/ann-mut-layout-binref.txt 2>&1; then

@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SKILL = process.env.LUC_ANNOTATOR_SKILL_DIR
-  || join(fileURLToPath(new URL('..', import.meta.url)));
+  || join(fileURLToPath(new URL('../..', import.meta.url)));
 const PORT = process.env.LUC_ANNOTATOR_PORT || '8791';
 const sh = (c, a) => { try { return execFileSync(c, a, { encoding: 'utf8' }).trim(); } catch { return ''; } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
