@@ -1,7 +1,9 @@
 #!/bin/bash
 # Runner voor de annotator-bridge-suite.
 #
-#   tests/run.sh                # A7: 00 02–09 11–17 (geen case-01 spend, geen mutate)
+#   tests/run.sh                # A7: 00 02–04 06 08–09 11–12 14–17
+#                               (geen case-01 spend, geen mutate)
+#   tests/run.sh 00 09 11       # de drie cases zonder browser (ook de CI-set)
 #   tests/run.sh 02 03          # alleen deze cases
 #   tests/run.sh 01 10          # verse-agent + mutatie, expliciet
 #   CASE01_RUNS=1 tests/run.sh 01
@@ -21,7 +23,7 @@ CASE01_RUNS="${CASE01_RUNS:-3}"
 GEVRAAGD=("$@")
 # Default = wat A7 van iedereen eist. case-01 (spend) en case-10 (mutatie,
 # bewust traag + eigen boom) alleen als je ze noemt.
-DEFAULT="00 02 03 04 05 06 07 08 09 11 12 13 14 15 16 17"
+DEFAULT="00 02 03 04 06 08 09 11 12 14 15 16 17"
 wil() {
   if [ ${#GEVRAAGD[@]} -eq 0 ]; then
     for g in $DEFAULT; do [ "$g" = "$1" ] && return 0; done
@@ -40,12 +42,12 @@ if git -C .. rev-parse --short HEAD >/dev/null 2>&1; then
 else
   echo "commit: unknown  dirty: n/a"
 fi
-echo "snippet: $(shasum -a 256 ../references/annotator-snippet.html | cut -c1-12)  hook: $(shasum -a 256 ../bin/hook-ensure-bridge.sh | cut -c1-12)  ensure: $(shasum -a 256 ../bin/ensure-bridge.sh | cut -c1-12)"
+echo "snippet: $(shasum -a 256 ../references/annotator-snippet.html | cut -c1-12)  hook: $(shasum -a 256 ../bin/hook-ensure-bridge.py | cut -c1-12)  cli: $(shasum -a 256 ../html_annotator/cli.py | cut -c1-12)"
 echo
 
 if wil 00 || wil record; then
   echo "case-00: annotation-record (geen browser)"
-  python3 -m compileall -q ../annotator ../bin || FALEN=$((FALEN + 1))
+  python3 -m compileall -q ../html_annotator ../bin || FALEN=$((FALEN + 1))
   python3 ./test_record.py
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
   echo
@@ -55,7 +57,7 @@ if wil 09 || wil contract; then
   echo "case-09: bridge-contract B1–B7"
   python3 ./test_bridge_contract.py
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
-  echo "case-09b: toon-annotaties B8–B9"
+  echo "case-09b: show B8–B9"
   python3 ./test_toon.py
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
   echo
@@ -128,36 +130,17 @@ if wil 01; then
   echo
 fi
 
-if wil 05; then
-  echo "case-05: tracked changes op een conceptbericht"
-  node ./case-05-tracked-changes.mjs
-  [ $? -ne 0 ] && FALEN=$((FALEN + 1))
-  echo
-fi
-
 if wil 06; then
   echo "case-06: losse blokken binnen één bewerking"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-06-hunks.mjs
-  [ $? -ne 0 ] && FALEN=$((FALEN + 1))
-  echo
-fi
-
-if wil 07; then
-  echo "case-07: inspringing van geneste subpunten"
-  node ./case-07-subindentatie.mjs
-  [ $? -ne 0 ] && FALEN=$((FALEN + 1))
-  echo
-fi
-
-if wil 13; then
-  echo "case-13: rijke concepten — opmaak naast tracked changes"
-  node ./case-13-rijke-concepten.mjs
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
   echo
 fi
 
 if wil 14; then
   echo "case-14: change-suggestie bewerken in plaats van overschrijven"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-14-suggest-change-bewerken.mjs
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
   echo
@@ -165,6 +148,7 @@ fi
 
 if wil 15; then
   echo "case-15: suggestie die pas later zichtbaar wordt"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-15-suggest-zichtbaar.mjs
   rc=$?
   [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
@@ -174,6 +158,7 @@ fi
 
 if wil 16; then
   echo "case-16: gedeelde suggest-key is één suggestie met één pill"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-16-suggest-gedeelde-key.mjs
   rc=$?
   [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
@@ -183,6 +168,7 @@ fi
 
 if wil 17; then
   echo "case-17: losse suggest-keys beslissen onafhankelijk"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-17-suggest-losse-keys.mjs
   rc=$?
   [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
@@ -192,6 +178,7 @@ fi
 
 if wil 12; then
   echo "case-12: boxes scrollen mee met de HTML"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-12-scroll-mee.mjs
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
   echo
@@ -201,8 +188,8 @@ if wil 08; then
   echo "case-08: locator blijft op de tabelrij na insert"
   c08_poort=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
   c08_root=$(mktemp -d)
-  LUC_ANNOTATOR_PORT="$c08_poort" LUC_ANNOTATOR_ROOT="$c08_root" \
-    python3 "$SKILL_DIR/bin/annotator-bridge.py" >/tmp/ann-c08-bridge.log 2>&1 &
+  HTML_ANNOTATOR_PORT="$c08_poort" HTML_ANNOTATOR_ROOT="$c08_root" \
+    python3 -m html_annotator serve >/tmp/ann-c08-bridge.log 2>&1 &
   c08_pid=$!
   c08_ok=0
   for _ in $(seq 1 25); do
@@ -216,7 +203,7 @@ if wil 08; then
     echo "BLOKKED case-08: ephemeral bridge op $c08_poort kwam niet omhoog"
     BLOKKED=$((BLOKKED + 1))
   else
-    LUC_ANNOTATOR_PORT="$c08_poort" node ./case-08-locator-tabel.mjs
+    LUC_ANNOTATOR_PORT="$c08_poort" HTML_ANNOTATOR_PORT="$c08_poort" node ./case-08-locator-tabel.mjs
     rc=$?
     [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
     [ $rc -eq 1 ] && FALEN=$((FALEN + 1))
@@ -227,6 +214,9 @@ if wil 08; then
   echo
 fi
 
+echo "NIET IN DE SUITE: case-05, case-07 en case-13 dekken de la-draft-kaart en"
+echo "la-sub. Die zijn uit de scope (docs/SCOPE.md) en staan in extras/tests/."
+echo
 echo "NIET GEAUTOMATISEERD — de echte Claude Desktop sideviewer. Case-02 draait in"
 echo "systeem-Chrome; Electron heeft eigen CSP en flags. Handmatig gemeten 18-08-2026"
 echo "(CRITERIA.md B17): opening as a FILE does not work there and does not self-heal; via"

@@ -8,19 +8,22 @@
    Draait in systeem-Chrome via de bridge (/p/), net als case-16. */
 
 import { chromium } from 'playwright-core';
-import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+const TESTDIR = join(homedir(), 'html-annotator-tests');
+mkdirSync(TESTDIR, { recursive: true });
+const ROOT = process.env.HTML_ANNOTATOR_ROOT || process.env.LUC_ANNOTATOR_ROOT || join(homedir(), 'annotations');
 
-const SKILL = process.env.LUC_ANNOTATOR_SKILL_DIR
+const SKILL = process.env.HTML_ANNOTATOR_SKILL_DIR || process.env.LUC_ANNOTATOR_SKILL_DIR
   || join(fileURLToPath(new URL('..', import.meta.url)));
-const PORT = process.env.LUC_ANNOTATOR_PORT || '8791';
+const PORT = process.env.HTML_ANNOTATOR_PORT || process.env.LUC_ANNOTATOR_PORT || '8791';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const slug = `zz-test-losse-keys-${Date.now()}`;
-const bestand = join(homedir(), 'Desktop', `${slug}.html`);
-const stateDir = join(homedir(), 'Desktop', 'annotaties', slug);
+const bestand = join(TESTDIR, `${slug}.html`);
+const stateDir = join(ROOT, slug);
 const statePad = join(stateDir, 'state.json');
 
 writeFileSync(bestand, `<!doctype html><meta charset="utf-8"><title>${slug}</title>
@@ -42,7 +45,7 @@ try {
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage({ viewport: { width: 900, height: 600 } });
   try {
-    await page.goto(`http://127.0.0.1:${PORT}/p/Desktop/${slug}.html`, {
+    await page.goto(`http://127.0.0.1:${PORT}/p/html-annotator-tests/${slug}.html`, {
       waitUntil: 'load', timeout: 8000,
     });
     await page.waitForSelector('.la-badge.la-sug', { timeout: 5000 });

@@ -2,10 +2,10 @@
 """B1–B7: bridge-HTTP en ronde-gedrag, zonder de live poort 8791."""
 
 import hashlib
-import importlib.util
 import json
 import os
 import socket
+import signal
 import subprocess
 import sys
 import tempfile
@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BRIDGE = os.path.join(SKILL, "bin", "annotator-bridge.py")
+sys.path.insert(0, SKILL)
 
 
 def check(naam, conditie):
@@ -34,10 +34,8 @@ def vrije_poort():
 
 
 def laad_bridge_mod():
-    spec = importlib.util.spec_from_file_location("annbridge", BRIDGE)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    from html_annotator import bridge
+    return bridge
 
 
 def http(method, url, body=None, headers=None):
@@ -58,17 +56,20 @@ def http(method, url, body=None, headers=None):
 
 def start_bridge(root, poort):
     env = os.environ.copy()
-    env["LUC_ANNOTATOR_PORT"] = str(poort)
-    env["LUC_ANNOTATOR_ROOT"] = root
+    env["HTML_ANNOTATOR_PORT"] = str(poort)
+    env["HTML_ANNOTATOR_ROOT"] = root
+    env["PYTHONPATH"] = SKILL + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    log = open(os.path.join(root, "bridge-test.log"), "w+", encoding="utf-8")
     proc = subprocess.Popen(
-        [sys.executable, BRIDGE],
+        [sys.executable, "-m", "html_annotator", "serve"],
         cwd=SKILL,
         env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=log,
+        stderr=subprocess.STDOUT,
     )
     basis = "http://127.0.0.1:%d" % poort
-    deadline = time.time() + 5
+    # ruim: een koude CI-runner (macOS) heeft soms >5s nodig voor de eerste start
+    deadline = time.time() + 30
     while time.time() < deadline:
         try:
             code, _, _ = http("GET", basis + "/ping")
@@ -76,15 +77,25 @@ def start_bridge(root, poort):
                 return proc, basis
         except OSError:
             time.sleep(0.05)
-    proc.kill()
-    raise RuntimeError("bridge kwam niet omhoog op poort %s" % poort)
+    # Diagnose: waar hangt het kind? SIGINT geeft een KeyboardInterrupt-traceback in de log.
+    rc = proc.poll()
+    try:
+        if rc is None:
+            proc.send_signal(signal.SIGINT)
+            proc.wait(timeout=5)
+    except Exception:
+        proc.kill()
+    log.seek(0)
+    raise RuntimeError("bridge kwam niet omhoog op poort %s (rc=%s, exe=%s); log:\n%s"
+                       % (poort, rc, sys.executable, log.read()))
 
 
 def main():
     n = 0
     root = tempfile.mkdtemp(prefix="ann-root-")
     pagina = os.path.join(tempfile.mkdtemp(prefix="ann-page-"), "demo.html")
-    blok = "<!-- LUC-ANNOTATOR v2 -->\n<script>var x=1;</script>\n<!-- /LUC-ANNOTATOR -->"
+    blok = "<!-- HTML-ANNOTATOR v3 -->\n<script>var x=1;</script>\n<!-- /HTML-ANNOTATOR -->"
+    oud_blok = "<!-- LUC-ANNOTATOR v2 -->\n<script>var x=1;</script>\n<!-- /LUC-ANNOTATOR -->"
     with open(pagina, "w", encoding="utf-8") as f:
         f.write("<!doctype html><title>demo</title><p>inhoud</p>\n" + blok + "\n")
 
@@ -99,6 +110,12 @@ def main():
         f.write("<p>gewijzigd</p>\n")
     h3 = mod.content_hash(pagina, "abc")
     n += check("B5 hash ziet echte wijziging", h1 != h3)
+    # Een pagina met het oude LUC-ANNOTATOR-blok moet dezelfde hash houden.
+    oud = tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8")
+    oud.write("<!doctype html><title>demo</title><p>inhoud</p>\n" + oud_blok + "\n")
+    oud.close()
+    n += check("B5 hash negeert ook een LUC-ANNOTATOR v2-blok",
+               mod.content_hash(oud.name, "abc") == h1)
 
     poort = vrije_poort()
     proc, basis = start_bridge(root, poort)
@@ -106,7 +123,9 @@ def main():
         code, hdr, raw = http("GET", basis + "/ping")
         ping = json.loads(raw.decode("utf-8"))
         n += check("B1 ping 200", code == 200 and ping.get("ok") is True)
-        n += check("B1 ping identiteit", ping.get("bridge") == "luc-annotator")
+        n += check("B1 ping identiteit", ping.get("bridge") == "html-annotator")
+        from html_annotator import __version__
+        n += check("B1 ping release", ping.get("release") == __version__)
         n += check("B1 CORS *", hdr.get("Access-Control-Allow-Origin") == "*")
 
         code, _, _ = http("OPTIONS", basis + "/save")

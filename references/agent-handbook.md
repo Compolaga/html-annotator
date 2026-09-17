@@ -1,52 +1,60 @@
-# Agent-handbook (html-annotator)
+# Agent handbook (html-annotator)
 
-Lees dit bestand wanneer `SKILL.md` dat vraagt — vóór opleveren van HTML met conceptkaarten/`la-sub`, en vóór het verwerken van annotaties. Dit is de voormalige SKILL.md deel 2–7. Gedrag ongewijzigd.
+Read this file when `SKILL.md` asks you to — before delivering HTML and before processing annotations. Part 1 (embedding) lives in `SKILL.md`; what used to be here about spawning tasks, draft cards and `la-sub` has moved to `extras/agent-handbook-extras.md` (see `docs/SCOPE.md`).
 
-## Deel 2: de bridge
+## Part 2: the bridge
 
-Een browserpagina kan zelf niet naar schijf schrijven. `annotator-bridge.py`
-(stdlib only) lost dat op: hij luistert op **127.0.0.1:8791** (niet 0.0.0.0,
-en niet 8080 want dat is van Docker), beheert de rondemappen, schrijft de JSON
-en snijdt de screenshot-crops uit.
+A browser page cannot write to disk on its own. The bridge
+(`html_annotator/bridge.py`, stdlib only) solves that: it listens on
+**127.0.0.1:8791** (not 0.0.0.0, and not 8080 because that belongs to Docker),
+manages the round directories, writes the JSON and cuts out the screenshot
+crops.
 
-Starten gaat via `bin/ensure-bridge.sh` (zie deel 1), niet handmatig. Dat script
-checkt eerst of hij al luistert, start hem anders met nohup, schrijft de pid
-naar `bridge.pid` en de output naar `bridge.log` in de skill-map. Rechtstreeks
-starten kan ook, voor debuggen in de voorgrond:
+All commands below run as `python -m html_annotator <command>`;
+after a pip/pipx install, `html-annotator <command>` is exactly the same.
+`python -m html_annotator --version` tells you which version you have in front of you.
+
+Starting goes through `python -m html_annotator ensure` (see part 1), not
+by hand. That command first checks whether it is already listening, otherwise starts it
+detached from your shell, and writes pid and log to a per-user state
+directory (`~/.local/state/html-annotator`, on Windows `%LOCALAPPDATA%`).
+Running it in the foreground is possible too, for debugging:
 
 ```bash
-python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py
+python -m html_annotator serve
 ```
 
-Draait hij? `curl -s http://127.0.0.1:8791/ping` geeft
-`{"ok": true, "bridge": "luc-annotator", "version": 2, ...}`. In de pagina zelf
-is het te zien aan de groene statuspil ("X saved"). Staat die pil
-oranje op "bridge off - localStorage only", dan is er niets weggeschreven;
-de pagina valt dan terug op localStorage en zegt dat ook bij elke Save.
+Is it running? `curl -s http://127.0.0.1:8791/ping` gives
+`{"ok": true, "bridge": "html-annotator", "version": 2, "release": "...", ...}`
+(`version` is the protocol the snippet speaks, `release` the package version).
+In the page itself
+you can see it from the green status pill ("X saved"). If that pill is
+orange and says "bridge off - localStorage only", nothing has been written to disk;
+the page then falls back to localStorage and says so on every Save.
 
-Croppen doet de bridge met headless Chrome (`--headless=new --screenshot
---window-size=<doc.w>,<doc.h>`) plus Pillow als dat geïnstalleerd is; zonder
-Pillow rendert Chrome het gebied zelf via een iframe-clip. Beide routes zijn
-getest. Volledige paginascreenshots worden gecached in
-`$TMPDIR/luc-annotator-shots`.
+The bridge crops with headless Chrome (`--headless=new --screenshot
+--window-size=<doc.w>,<doc.h>`) plus Pillow if it is installed; without
+Pillow, Chrome renders the region itself through an iframe clip. Both routes are
+tested. Full-page screenshots are cached in
+`$TMPDIR/html-annotator-shots`.
 
-Endpoints: `GET /ping`, `GET /p/<pad>`, `POST /session`, `/save`, `/delete`,
+Endpoints: `GET /ping`, `GET /p/<path-from-home>` (forward slashes in the URL, on Windows too), `POST /session`, `/save`, `/delete`,
 `/remove-all`, `/resolve`, `/state`, `/state-save`, `/sessie`.
 
-`/session` geeft naast de tellingen ook de openstaande annotaties terug (nr, id,
-type, rect, comment, selectedText, `stale`), zodat de pagina weet wat hij moet
-tekenen.
+`/session` returns, besides the counts, the open annotations as well (nr, id,
+type, rect, comment, selectedText, `stale`), so the page knows what to
+draw.
 
-`POST /sessie` opent een nieuwe Claude Code-sessie met een voorgeladen prompt:
-geef `{"prompt": "..."}` of een kant-en-klare `{"url": "claude://code/new?q=..."}`
-mee. Alleen het claude-scheme wordt geaccepteerd, zodat dit geen algemene
-URL-opener wordt. Dit bestaat omdat een ingebedde browser custom schemes niet
-doorgeeft; zie de skill `nieuwe-sessie`.
+`POST /sessie` opens a new Claude Code session with a preloaded prompt:
+pass `{"prompt": "..."}` or a ready-made `{"url": "claude://code/new?q=..."}`.
+Only the claude scheme is accepted, so this does not become a general
+URL opener. It exists because an embedded browser does not pass custom schemes
+through; see the skill `nieuwe-sessie`.
 
-## Deel 3: rondes en mapstructuur
+## Part 3: rounds and directory structure
 
 ```
-~/Desktop/annotaties/<pagina-slug>/
+<annotation-root>/<page-slug>/
   ronde-01/
     annotations.json
     screenshots/annotatie-01.png
@@ -54,25 +62,28 @@ doorgeeft; zie de skill `nieuwe-sessie`.
     ...
 ```
 
-De slug komt van de bestandsnaam van de pagina (file://) of anders van de
-paginatitel. Oude rondes worden nooit overschreven.
+The annotation root is `~/annotations` (or `HTML_ANNOTATOR_ROOT`; the old
+`LUC_ANNOTATOR_*` names still work as a deprecated alias. On a machine that already
+uses the old annotation folder on the desktop, that one stays). The slug comes from the
+filename of the page (file://) or otherwise from the page title, and is a valid
+directory name on every operating system. Old rounds are never overwritten.
 
-Een nieuwe ronde begint **alleen** als de lopende ronde via `POST /remove-all`
-wordt afgesloten: die ronde wordt leeggemaakt en op `"closed": true` gezet, en
-de volgende annotatie opent ronde+1. In de pagina zelf zit daar geen knop meer
-voor. De lopende ronde is altijd de hoogste bestaande ronde die niet gesloten is.
+A new round starts **only** when the current round is closed through
+`POST /remove-all`: that round is emptied and set to `"closed": true`, and
+the next annotation opens round+1. There is no button for it in the page itself
+any more. The current round is always the highest existing round that is not closed.
 
-Een gewijzigde pagina-inhoud opent **geen** nieuwe ronde meer. Pas jij de HTML
-aan naar aanleiding van feedback, dan blijft de ronde staan met de annotaties die
-nog niet verwerkt zijn. De `contentHash` (hash van het HTML-bestand zonder het
-annotator-blok; voor niet-schijf-pagina's een DOM-hash) wordt nog wel
-weggeschreven, per ronde en per annotatie, puur als context bij welke
-paginaversie die feedback hoorde, plus `lastContentHash` op rondeniveau.
+Changed page content no longer opens a new round. If you edit the HTML
+in response to feedback, the round stays as it is, with the annotations that
+have not been processed yet. The `contentHash` (hash of the HTML file without the
+annotator block; for non-disk pages a DOM hash) is still
+written, per round and per annotation, purely as context for which
+page version that feedback belonged to, plus `lastContentHash` at round level.
 
-## Deel 4: feedback verwerken
+## Part 4: processing feedback
 
-**Triggers.** Lees en verwerk openstaande annotaties zodra de reviewer een van deze
-berichten stuurt (geen extra bevestiging vragen of hij het meent):
+**Triggers.** Read and process open annotations as soon as the reviewer sends one of these
+messages (do not ask for extra confirmation that he means it):
 
 - a bare **`.`** (period only, surrounding whitespace is fine) — that is
   the short "process my annotations";
@@ -80,15 +91,15 @@ berichten stuurt (geen extra bevestiging vragen of hij het meent):
   `annotations.json` / an annotation round.
 
 On a bare `.` find the open round yourself (via
-`bin/toon-annotaties.py --open` or the bridge), instead of waiting for an
+`python -m html_annotator show --open` or the bridge), instead of waiting for an
 explicit path. Check on the same trigger whether the page's `state.json`
-holds unprocessed LA-SUGGEST decisions (component `suggest`, deel 9) — the
+holds unprocessed LA-SUGGEST decisions (component `suggest`, part 6) — the
 reviewer uses one `.` for both channels.
 
-de reviewer plakt soms ook een berichtje in de trant van "Kijk, hier staan de annotaties:
-`<pad>/ronde-NN/annotations.json`. Het zijn er X." Lees dat bestand.
+The reviewer sometimes also pastes a message along the lines of "Look, here are the annotations:
+`<path>/ronde-NN/annotations.json`. There are X of them." Read that file.
 
-Per annotatie:
+Per annotation:
 
 ```json
 { "nr": 1, "type": "region", "target": "kop van de kaart",
@@ -101,297 +112,130 @@ Per annotatie:
   "refs": [{ "id": "r1", "selectedText": "andere tekst op de pagina" }] }
 ```
 
-- `locator` (bij `type: "text"`): de plek op de pagina, niet alleen de tekst. `path`
-  is het gemeenschappelijke element, `start`/`end` de exacte range, `nth` welk
-  voorkomen als dezelfde tekst vaker staat, `label` de context (rij/kaart). Gebruik
-  dit om te weten wélk "checken" of welke rij de reviewer bedoelde. Geen locator + tekst
-  die vaker voorkomt: vraag door, kies niet de eerste hit.
-- `refs` (optioneel): andere tekstfragmenten die de reviewer in de comment heeft gekoppeld.
-  In `comment` staan ze als `⟦r1⟧`, `⟦r2⟧`, …; `refs` geeft per id de volledige
-  `selectedText`. Gebruik dit voor "hetzelfde als …"-feedback.
-- Bij verwerken: lees **`commentExpanded`** (refs ingevuld als `"tekst"`) of
-  `bin/toon-annotaties.py` — die expandeert markers en waarschuwt als `refs` ontbreekt.
-  Staat er `refsIncomplete`, vraag de reviewer opnieuw te saven; gok niet welke tekst r1/r2 was.
-- Veelvoorkomende bedoelingen: **"Maak ⟦r1⟧ hetzelfde als ⟦r2⟧"** → pas de tekst
-  van r1 (of de geannoteerde `selectedText`) aan naar r2; **"veranderen naar"** =
-  vervangen door de ref-tekst. `selectedText` is het primaire anker; refs zijn
-  vergelijkingstekst elders op de pagina.
+- `locator` (on `type: "text"`): the place on the page, not just the text. `path`
+  is the common element, `start`/`end` the exact range, `nth` which
+  occurrence if the same text appears more than once, `label` the context (row/card). Use
+  this to know *which* "check" or which row the reviewer meant. No locator plus text
+  that occurs more than once: ask, do not pick the first hit.
+- `refs` (optional): other text fragments the reviewer linked in the comment.
+  In `comment` they appear as `⟦r1⟧`, `⟦r2⟧`, …; `refs` gives the full
+  `selectedText` per id. Use this for "same as …" feedback.
+- When processing: read **`commentExpanded`** (refs filled in as `"text"`) or
+  `python -m html_annotator show` — that expands markers and warns when `refs` is missing.
+  If it says `refsIncomplete`, ask the reviewer to save again; do not guess which text r1/r2 was.
+- Common intentions: **"Make ⟦r1⟧ the same as ⟦r2⟧"** → change the text
+  of r1 (or the annotated `selectedText`) to match r2; **"change to"** =
+  replace with the ref text. `selectedText` is the primary anchor; refs are
+  comparison text elsewhere on the page.
 
-- `type: "region"` → open `image` (pad is relatief aan de rondemap) met de
-  Read-tool en lees de crop naast de comment. Zelf croppen hoeft niet meer, dat
-  is al gebeurd op het moment van opslaan. `_rect` is intern, negeer het.
-- `type: "text"` → gebruik `selectedText`; er is geen screenshot.
-- `type: "edit"` → de reviewer heeft de tekst van een conceptbericht zelf herschreven. `hunks`
-  geeft de wijzigingen als losse blokken, elk met de omringende tekst als anker
-  (`voor`/`na`), het `alinea`-nummer om naar te verwijzen, en `verwijderd`/`toegevoegd`.
-  `diff` is dezelfde informatie als platte reeks, `origineel` en `nieuw` de twee volledige
-  versies. Blokken zijn los toe te passen en los af te vinken:
+- `type: "region"` → open `image` (the path is relative to the round directory) with the
+  Read tool and read the crop alongside the comment. You no longer have to crop yourself, that
+  already happened at save time. `_rect` is internal, ignore it.
+- `type: "text"` → use `selectedText`; there is no screenshot.
+- `type: "edit"` → the reviewer rewrote the text of a draft message himself. `hunks`
+  gives the changes as separate blocks, each with the surrounding text as an anchor
+  (`voor`/`na`), the `alinea` number to refer to, and `verwijderd`/`toegevoegd`.
+  `diff` is the same information as a flat sequence, `origineel` and `nieuw` the two full
+  versions. Blocks can be applied and ticked off one by one:
 
   ```bash
-  ~/.claude/skills/html-annotator/bin/pas-hunk-toe.py <json> --nr 1 --hunks 2 --afvinken
+  python -m html_annotator apply-hunk <json> --nr 1 --hunks 2 --resolve
   ```
 
-  Het anker is de tekst, niet de positie — een blok blijft dus plaatsbaar als de pagina
-  intussen elders veranderd is. Vind je een blok niet terug, verzin dan geen plek: meld
-  het en vraag. Neem `nieuw` over als de tekst van dat concept; er valt hier niets te
-  interpreteren, hij heeft het al opgeschreven zoals hij het wil. Vraag alleen door als
-  zijn herschrijving iets aanraakt dat elders in de pagina ook staat.
-  `bin/toon-annotaties.py` drukt dit af als een leesbare diff.
-- `attachment` staat er als de reviewer zelf een afbeelding plakte of bijvoegde; ook
-  die met de Read-tool bekijken.
+  The anchor is the text, not the position — so a block stays placeable even if the page
+  has changed elsewhere in the meantime. If you cannot find a block, do not invent a spot: report
+  it and ask. Take `nieuw` over as the text of that draft; there is nothing to
+  interpret here, he has already written it down the way he wants it. Only ask further if
+  his rewrite touches something that also appears elsewhere in the page.
+  `python -m html_annotator show` prints this as a readable diff.
+- `attachment` is there when the reviewer pasted or attached an image himself; view
+  that one with the Read tool as well.
 
-**Eerst begrijpen, dan pas verwerken.** Dit is geen formaliteit: de reviewer dicteert
-zijn annotaties vaak, waardoor zinnen soms doodlopen en context die voor hem
-vanzelfsprekend is niet op papier staat. Loop ze één voor één na en leg voor wat
-je niet zeker weet, in plaats van het in te vullen. Vraag door als iets te vaag
-is om op te handelen, benoem het als je het er niet mee eens bent of een gevolg
-ziet dat hij niet noemt, en zeg het als een punt iets tegenspreekt dat hij eerder
-zei. Zitten er keuzes in, stel de vraag dan klikbaar met `AskUserQuestion`.
-Twijfel je of je moet vragen: vragen. Verkeerd raden kost hem meer tijd dan een
-vraag.
+**Understand first, process second.** This is not a formality: the reviewer often dictates
+his annotations, which makes sentences run dead now and then and leaves context that is
+obvious to him off the page. Go through them one by one and put what
+you are unsure about to him, instead of filling it in yourself. Ask when something is too vague
+to act on, say so when you disagree or see a consequence
+he does not mention, and say it when a point contradicts something he said
+earlier. If there are choices in it, ask the question clickably with `AskUserQuestion`.
+In doubt about whether to ask: ask. Guessing wrong costs him more time than a
+question.
 
-`bin/toon-annotaties.py` drukt deze werkregel zelf af zodra er open annotaties zijn,
-zodat hij ook meekomt in een sessie die deze skill niet gelezen heeft.
+`python -m html_annotator show` prints this working rule itself as soon as there are open annotations,
+so it also reaches a session that has not read this skill.
 
-Bij veel annotaties mag je subagents inzetten (één per annotatie of per groepje)
-of er stapsgewijs doorheen gaan. Verwerk punt voor punt.
+With many annotations you may bring in subagents (one per annotation or per small group)
+or work through them step by step. Process point by point.
 
-Ga voor de context van een oudere ronde naar de bijbehorende `ronde-NN`-map; de
-`contentHash` en `capturedAt` vertellen bij welke versie van de pagina die
-feedback hoorde.
+For the context of an older round, go to the matching `ronde-NN` directory; the
+`contentHash` and `capturedAt` tell you which version of the page that
+feedback belonged to.
 
-### VERPLICHT: verwerkte annotaties resolved markeren
+### MANDATORY: mark processed annotations as resolved
 
-Dit is de stap die het vaakst vergeten wordt, en precies daar loopt het mis: een
-verwerkte annotatie waarvan je de vlag niet zet, verliest zijn anker (je hebt de
-tekst immers aangepast), belandt in de lijst "likely processed" en komt
-elke ronde terug. Verwerken zonder afvinken is dus **niet af**.
+This is the step that gets forgotten most often, and that is exactly where it goes wrong: a
+processed annotation whose flag you do not set loses its anchor (after all, you changed the
+text), ends up in the "likely processed" list and comes back
+every round. So processing without ticking off is **not done**.
 
-Heb je een annotatie verwerkt in de pagina, meld hem dan direct af bij de bridge.
-Hij blijft als historie in de JSON staan (met `"resolved": true` en
-`"resolvedAt"`), maar verdwijnt van de pagina, zodat de reviewer na een refresh alleen
-nog ziet wat nog open staat. Doe dit per verwerkte batch, niet pas aan het eind:
+Once you have processed an annotation in the page, report it to the bridge right away.
+It stays in the JSON as history (with `"resolved": true` and
+`"resolvedAt"`), but disappears from the page, so that after a refresh the reviewer only
+sees what is still open. Do this per processed batch, not only at the end:
 
 ```bash
 curl -s -X POST http://127.0.0.1:8791/resolve \
   -H 'Content-Type: application/json' \
-  -d '{"jsonPath":"~/Desktop/annotaties/todos/ronde-09/annotations.json","nrs":[1,3,4]}'
+  -d '{"jsonPath":"~/annotations/todos/ronde-09/annotations.json","nrs":[1,3,4]}'
 ```
 
-Antwoord: `{"ok":true,"round":9,"resolved":[1,3,4],"notFound":[],"open":2,"total":5}`.
-Check `notFound` en `open`: dat is je eigen controle dat je de goede nummers had
-en hoeveel er nog openstaan.
+Response: `{"ok":true,"round":9,"resolved":[1,3,4],"notFound":[],"open":2,"total":5}`.
+Check `notFound` and `open`: that is your own check that you had the right numbers
+and how many are still open.
 
-- `nrs` zijn de annotatienummers uit die ronde; `ids` mag ook.
-- `jsonPath` is het pad dat de reviewer je stuurde (`~` mag). Laat je het weg, dan pakt
-  de bridge de lopende ronde van de pagina (`pageFile`/`page`/`slug`, net als de
-  andere routes).
-- Terugdraaien kan met `"resolved": false`.
-- Zeg er in je antwoord bij welke nummers je hebt afgevinkt en wat er nog
-  openstaat.
+- `nrs` are the annotation numbers from that round; `ids` is allowed too.
+- `jsonPath` is the path the reviewer sent you (`~` is fine). If you leave it out,
+  the bridge takes the current round of the page (`pageFile`/`page`/`slug`, just like the
+  other routes).
+- Undoing is possible with `"resolved": false`.
+- Say in your answer which numbers you ticked off and what is still
+  open.
 
-Positionering na een pagina-wijziging: tekstannotaties zoekt het snippet
-opnieuw op via hun `locator` (pad, start-rij-label, daarna `selectedText` + nth).
-Alleen als die tekst nergens meer op de pagina staat, verschijnt de annotatie in
-het kaartje "likely processed" linksonder. Regio-annotaties van een oudere
-paginaversie worden niet op mogelijk verkeerde coördinaten getekend en komen
-in datzelfde kaartje. Verwerk je zo'n annotatie, dan verdwijnt hij daaruit
-zodra je hem resolved zet; de reviewer kan hem daar ook zelf afvinken met het ✓.
+Positioning after a page change: the snippet looks up text annotations
+again through their `locator` (path, start row label, then `selectedText` + nth).
+Only when that text is nowhere on the page any more does the annotation appear in
+the "likely processed" card at the bottom left. Region annotations from an older
+page version are not drawn at possibly wrong coordinates and land
+in that same card. If you process such an annotation, it disappears from there
+as soon as you set it resolved; the reviewer can also tick it off there himself with the ✓.
 
-## Deel 5: taken spawnen vanaf de todolijst
+## Part 5: the checklist component (LA-CHECKLIST)
 
-Vraagt de reviewer om een taak te spawnen (`spawn_task`), dan hangt die altijd aan een punt op
-zijn HTML-todolijst, en het nummer van dat punt hoort in de sessietitel. De volledige
-conventie staat in de skill **`task-spawnen`** — lees die voordat je spawnt; hier staat
-alleen wat je moet weten om er te komen.
+For every HTML with tickable items or rows (todo lists, test case tables,
+review rows). The component is a separate block, `<!-- LA-CHECKLIST v1` through
+`<!-- /LA-CHECKLIST -->`, canonical in `references/checklist-snippet.html`.
+Self-contained, no dependencies, just like the annotator snippet.
 
-**Zoek de lijst, onthoud hem niet.** Het bestand verhuist en wordt hernoemd, dus nooit
-een pad uit je hoofd of uit een eerder gesprek:
+**Embedding:**
 
-```bash
-~/.claude/skills/html-annotator/bin/vind-todolijst.sh        # pad
-~/.claude/skills/html-annotator/bin/vind-todolijst.sh -v     # met hoogste nummer erbij
-```
+1. Paste the full block from `references/checklist-snippet.html` right before
+   the HTML-ANNOTATOR block (on older pages the LUC-ANNOTATOR block).
+2. Put `data-la-check="<unique-key>"` on every tickable element. The key is the
+   lasting anchor in the state — pick something stable (e.g. the item number,
+   `"#74"`), not a sequence number that shifts.
+3. Optionally `data-la-label="..."` for an explicit label; otherwise the script takes
+   the text of `.what` or of the element itself (max 140 characters).
 
-Het script kiest de meest recent gewijzigde HTML op het bureaublad die genummerde punten
-heeft (`<span class="num">`) én zich als todolijst laat herkennen. Vindt hij niets, dan
-verzin je er geen: vraag het de reviewer.
+The script injects a Notion-style checkbox — into `.la-check-slot` if there
+is one, otherwise into the first `summary`, otherwise at the front of the element — loads the
+stored state at page load through `POST /state`, and writes every change
+through `POST /state-save` with `{component:"checklist", key, value:{checked,
+label}}`. A ticked element gets the class `la-checked` (title
+struck through and dimmed; the CSS targets `.what`, inside a `summary` too).
 
-Daarna, in het kort — de details en de reden erachter staan in `task-spawnen`:
-
-1. Zoek het punt waar de taak bij hoort en pak zijn nummer. Bestaat het nog niet, maak
-   het dan eerst aan op de lijst, met een nummer dat één hoger is dan het hoogste in het
-   **hele** bestand (de prioriteitsbanden delen één doorlopende reeks).
-2. Noem de sessie `XX.YY-kebab-case-naam`, met twee cijfers per segment.
-3. Zet in de meegegeven prompt dat de gespawnde sessie zichzelf aan het eind hernoemt
-   naar `[DONE]-<titel>`.
-
-## Deel 6: de concept-berichtkaart
-
-Een conceptbericht (mail, Teams, WhatsApp) dat nog niet verstuurd is, hoort niet
-als platte tekst in de chat maar als kaart in de HTML. Dan kan de reviewer de tekst zien
-zoals de ontvanger hem krijgt, en er met de annotator per zin op reageren.
-
-De CSS zit in `references/annotator-snippet.html`, dus elke pagina met het snippet kan het
-component gebruiken zonder eigen opmaak. Klassen hebben de `la-`-prefix, net als
-de rest van de annotator, en zijn vlak (`la-draft-hdr` in plaats van
-`.la-draft .hdr`) zodat een pagina-eigen `.hdr`, `.txt` of `.na` er niet mee
-botst. `--ink` en `--muted` worden gebruikt als de pagina ze definieert, met een
-fallback als dat niet zo is.
-
-```html
-<h2>Mail-concepten <span class="count">1</span></h2>
-<p class="lead">Nog niet verstuurd. Annoteer gerust in de tekst zelf, dan pas ik aan.</p>
-
-<div class="la-draft">
-  <div class="la-draft-hdr"><b>Aan:</b> Anne Dijkstra &nbsp;·&nbsp; <b>Cc:</b> Marco Bonsink &nbsp;·&nbsp; <b>Onderwerp:</b> Even bijpraten over security</div>
-  <div class="la-draft-txt">
-    <p>Hi Anne,</p>
-    <p>Eerste alinea van het bericht.</p>
-    <ul>
-      <li>Anne: schiet het issue in bij <a href="https://…/pbi/1234">PBI 1234</a></li>
-      <li>Ik: stuur de opzet door</li>
-    </ul>
-    <p>Groet,<br>de reviewer</p>
-  </div>
-  <div class="la-draft-na">Openstaand: welk issue heb je ingeschoten? Zodra je dat zegt maak ik de eerste zin concreet.</div>
-</div>
-```
-
-**Rich text.** De kaart toont het bericht zoals de ontvanger het krijgt: alinea's,
-opsommingen, vet, cursief en links. Het toegestane setje is klein en mail-veilig —
-`p`, `ul`, `ol`, `li`, `b`, `i`, `a`, `br` — precies de doorsnede die Outlook, Gmail en
-Teams zonder eigen interpretatie renderen. Wat je er verder in zet wordt bij het inlezen
-platgeslagen tot tekst; plakken gaat altijd als platte tekst. Er is geen bibliotheek en
-geen CDN in het spel: het snippet blijft één bestand.
-
-De reviewer heeft onder elke kaart een balkje met **B**, *I*, link, • en 1. (en ⌘B / ⌘I /
-⌘K). Een kaart die je als platte tekst schreef blijft platte tekst — pre-wrap,
-`plaintext-only` — tot hij zelf een opmaakknop gebruikt; dan gaat de héle kaart in één
-keer over op blokken. Half omschakelen zou de overgebleven harde regelovergangen op één
-hoop gooien.
-
-**Tracked changes.** Elke `la-draft-txt` is direct bewerkbaar: de reviewer klikt in de tekst,
-de cursor staat waar hij klikte, en hij typt. Er is bewust geen knop om "de bewerkmodus
-aan te zetten" — dat was een drempel voor iets wat hij gewoon wil kunnen doen. Klikt hij
-eruit, dan verschijnt het verschil met de oorspronkelijke tekst als doorhaling en
-onderstreping — in de opgemaakte kaart, dus een gewijzigde bullet blijft een bullet — en
-gaat het als annotatie van `type: "edit"` naar de bridge. Dat is vaak sneller dan een
-comment: in plaats van uitleggen wat er anders moet, schrijft hij het gewoon anders op.
-"↺ Herstel origineel" zet de kaart terug en verwijdert de bewerking.
-
-Er wordt **niet op de HTML gedift maar op de platte-tekstprojectie** ervan: precies de
-tekst die in een plain-text mail zou staan, zonder opmaakmarkeringen erin. Opmaak is een
-eigen kanaal. Dat levert twee soorten blokken op:
-
-- `soort: "tekst"` — de vertrouwde hunk met `voor` / `na` / `verwijderd` / `toegevoegd`.
-  Het anker blijft binnen zijn eigen blok, want tussen twee blokken staat in de bron een
-  tag. `pas-hunk-toe.py` plaatst deze blokken gewoon.
-- `soort: "opmaak"` — "alinea werd opsomming", `vet aan op "issue"`. Die staan per
-  definitie niet in de tekst, dus `pas-hunk-toe.py` raakt ze niet aan en zegt dat ook:
-  die neem je over uit `nieuwHtml`.
-
-Wijzigden tekst én opmaak in hetzelfde blok, dan zie je alleen het tekstblok.
-`nieuwHtml` op de annotatie is dan de grondwaarheid: dat is de volledige nieuwe versie,
-mail-veilig, klaar om als body te gebruiken.
-
-Meerdere wijzigingen in dezelfde kaart worden losse blokken, genummerd in de tekst (¹ ² ³)
-zodat de reviewer en jij hetzelfde blok bedoelen. Je kunt ze los doorvoeren en los afvinken; wat
-nog openstaat blijft na een reload zichtbaar, herplaatst op zijn anker in de tekst zoals
-die dan is.
-
-Klikt hij terug in een tekst waar de opmaak zichtbaar is, dan wordt de klikpositie
-omgerekend naar de kale tekst voordat de cursor gezet wordt. Zonder dat sprong de cursor,
-want de doorgehaalde tekst verdwijnt bij het terugschakelen en de regel loopt dan anders.
-
-Een bewerking krijgt bewust géén badge en komt niet in de weeslijst: hij is al zichtbaar
-in de kaart zelf. Na een reload wordt hij teruggezet, gekoppeld op de kop van de kaart.
-Is de concepttekst zelf ongewijzigd, dan komt de bewerkte versie compleet terug, opmaak
-incluis. Is de tekst wél veranderd sinds de bewerking, dan worden alleen de openstaande
-blokken op hun anker herplaatst en meldt het snippet wat het niet meer terugvond.
-
-Regels bij het gebruik:
-
-- Schrijf de berichttekst in blokken: `<p>` per alinea, `<ul>`/`<ol>` met `<li>` voor
-  opsommingen, `<br>` voor een harde regelovergang binnen een alinea. Alleen die tags,
-  plus `<b>`, `<i>` en `<a href>`. Geen `style`, geen `<div>`, geen tabellen.
-- Streepjes-als-bullet (`- Anne: …` als gewone tekstregel) zijn geen opsomming meer.
-  Wil je een opsomming, schrijf er dan één.
-- Kortere kaarten mogen nog steeds platte tekst zijn: laat je de blokken weg, dan
-  gedraagt de kaart zich als voorheen (echte regelafbrekingen, `white-space: pre-wrap`,
-  geen `<br>` of `<p>`). Bedoel je opmaak, gebruik dan blokken — niet allebei door elkaar.
-- `la-draft-na` is jouw notitie, niet die van de ontvanger: wat nog open staat,
-  welke vraag beantwoord moet worden, of wat er gebeurt zodra het verstuurd is.
-- De concepten staan bovenaan de pagina, met een lead-regel die duidelijk maakt
-  dat er nog niets verstuurd is.
-- Een concept in de pagina zetten is geen goedkeuring. De verzendregel uit
-  CLAUDE.md en de skill `bericht-sturen` blijft onverkort gelden.
-
-## Deel 7: geneste subpunten (`la-sub`)
-
-Heeft een punt subtaken, dan wil de reviewer die visueel onder hun ouder zien hangen: hoe
-dieper genest, hoe verder ingesprongen. Een platte lijst waarin de hiërarchie
-alleen uit de tekst blijkt kost hem leeswerk dat de opmaak gratis kan doen.
-
-De CSS zit in `references/annotator-snippet.html`, dus elke pagina met het snippet heeft het
-al. Zet de klasse op het blok zelf, naast wat de pagina er verder aan geeft:
-
-```html
-<div class="card">34 · Ouderpunt</div>
-<div class="card la-sub">34a · Subtaak</div>
-<div class="card la-sub2">34a1 · Sub-subtaak</div>
-<div class="card la-sub3">34a1a · Nog een niveau dieper</div>
-```
-
-`la-sub` = niveau 1, `la-sub2` t/m `la-sub4` = dieper. Vier niveaus omdat daaronder
-de inspringing meer leesbaarheid kost dan hij oplevert; heb je toch een vijfde nodig,
-dan is dat één regel bij in het snippet (`--la-diepte: 5`).
-
-Waarom klassen en geen `data-diepte`: `attr()` is in CSS niet in `calc()` te gebruiken,
-dus een attribuut vraagt evengoed één selector per niveau. Dan zijn klassen korter,
-en ze sluiten aan op wat er al op de todolijst stond.
-
-Punten om op te letten:
-
-- De klassen hangen bewust aan niets anders dan zichzelf — geen `.card` of andere
-  pagina-klasse — zodat ze op elk blok-element werken: een kaart, een `<li>`, een
-  losse `<div>` in een analyse of vergelijkingspagina.
-- Het snippet zet zelf `position: relative` op het element, want het haakje is een
-  `::before` die daaraan hangt. Positioneer zo'n element dus niet zelf absoluut.
-- De lijnkleur volgt `--line` als de pagina die definieert, met een lichte grijze
-  fallback. Zo is het haakje ook zichtbaar op een pagina zonder kleurtokens.
-- De inspringstap is 30px en te overschrijven met `--la-stap` op een ouder-element,
-  bijvoorbeeld `20px` op een smalle pagina. Het haakje rekent mee.
-- Nesting is puur visueel: de blokken blijven zussen in de HTML. Dat is bewust —
-  echte nesting zou de annotator, de banden en de tellingen op de todolijst raken.
-
-## Deel 8: het checklist-component (LA-CHECKLIST)
-
-Voor elke HTML met afvinkbare items of rijen (todolijsten, testcase-tabellen,
-reviewrijen). Het component is een los blok, `<!-- LA-CHECKLIST v1` t/m
-`<!-- /LA-CHECKLIST -->`, canoniek in `references/checklist-snippet.html`.
-Self-contained, geen dependencies, net als het annotator-snippet.
-
-**Inbouwen:**
-
-1. Plak het volledige blok uit `references/checklist-snippet.html` vlak vóór
-   het LUC-ANNOTATOR-blok.
-2. Zet `data-la-check="<unieke-key>"` op elk afvinkbaar element. De key is het
-   blijvende anker in de state — kies iets stabiels (bv. het itemnummer,
-   `"#74"`), geen volgnummer dat verschuift.
-3. Optioneel `data-la-label="..."` voor een expliciet label; anders pakt het
-   script de tekst van `.what` of van het element zelf (max 140 tekens).
-
-Het script injecteert een Notion-stijl checkbox — in `.la-check-slot` als die
-er is, anders in de eerste `summary`, anders vooraan het element — laadt de
-opgeslagen state bij page load via `POST /state`, en schrijft elke wijziging
-via `POST /state-save` met `{component:"checklist", key, value:{checked,
-label}}`. Een aangevinkt element krijgt de class `la-checked` (titel
-doorgestreept en gedimd; de CSS mikt op `.what`, ook binnen een `summary`).
-
-**State, los van de rondes.** De vinkjes zijn blijvende status, geen
-feedbackronde: ze leven per pagina in `~/Desktop/annotaties/<slug>/state.json`,
-naast de `ronde-NN`-mappen. Formaat:
+**State, separate from the rounds.** The ticks are lasting status, not a
+feedback round: they live per page in `<annotation-root>/<slug>/state.json`,
+next to the `ronde-NN` directories. Format:
 
 ```json
 { "components": { "checklist": {
@@ -399,98 +243,99 @@ naast de `ronde-NN`-mappen. Formaat:
   "updatedAt": "2026-08-28T…" }
 ```
 
-**Uitlezen als agent:** lees `state.json` direct, of vraag het de bridge met
-`POST /state` en `{"page": "..."}` (of `pageFile`/`slug`, zoals de andere
-routes). Gebruik `changedAt` per key en `updatedAt` op het geheel om te zien
-wat er sinds de vorige keer veranderd is — analoog aan hoe je
-`annotations.json` leest. Er valt niets te resolven: een vinkje ís de status.
+**Reading it as an agent:** read `state.json` directly, or ask the bridge with
+`POST /state` and `{"page": "..."}` (or `pageFile`/`slug`, like the other
+routes). Use `changedAt` per key and `updatedAt` on the whole to see
+what has changed since last time — analogous to how you read
+`annotations.json`. There is nothing to resolve: a tick *is* the status.
 
-`/state-save` merget de meegegeven `value` over de bestaande entry en zet
-`changedAt`; andere componenten dan `checklist` kunnen dezelfde twee routes
-gebruiken met een eigen `component`-naam.
+`/state-save` merges the given `value` over the existing entry and sets
+`changedAt`; components other than `checklist` can use the same two routes
+with their own `component` name.
 
-## Deel 9: voorgestelde wijzigingen (LA-SUGGEST-laag)
+## Part 6: suggested changes (LA-SUGGEST layer)
 
-Voor wijzigingen die jij als agent in een bestaande HTML aanbrengt en die de
-reviewer per stuk wil kunnen accepteren of terugdraaien — zoals suggested
-changes in code. Sinds v5 is dit **geen apart snippet meer**: de laag zit in
-het gewone annotator-snippet en activeert zichzelf zodra er elementen met
-`data-la-suggest` op de pagina staan. Een pagina met het LUC-ANNOTATOR-blok
-heeft dus alles al; `references/suggest-snippet.html` is vervallen.
+For changes that you as an agent make in an existing HTML and that the
+reviewer wants to be able to accept or revert one by one — like suggested
+changes in code. Since v5 this is **no longer a separate snippet**: the layer sits in
+the ordinary annotator snippet and activates itself as soon as there are elements with
+`data-la-suggest` on the page. So a page with the HTML-ANNOTATOR block
+(or the older LUC-ANNOTATOR block) already has everything;
+`references/suggest-snippet.html` is obsolete.
 
-**Markeren (bij het maken van de wijziging):** zet op elk gewijzigd element
+**Marking (while making the change):** put on every changed element
 
-- `data-la-suggest="<unieke-key>"` — stabiele key (bv. `"wi-29119"`), verplicht;
-- `data-la-suggest-desc="..."` — één zin die zegt wát je veranderd hebt; dit
-  wordt het quote-blok in de popup;
-- `data-la-suggest-old="..."` — de oorspronkelijke tekst, zodat een afwijzing
-  exact terug te draaien is. Verplicht bij `kind="edit"`;
-- `data-la-suggest-kind` — `"edit"` (default), `"add"` (nieuw; afwijzen =
-  weghalen), `"del"` (voorstel tot verwijderen; afwijzen = laten staan);
-- `data-la-suggest-mode` — meestal weglaten: tekst krijgt vanzelf
-  tekstregel-selecties en visuals (`figure`/`svg`/`img`/`canvas`/`video`/
-  `table`, of iets dat die bevat) één regiokader. Zet hem alleen expliciet
-  (`"text"` of `"region"`) als die autodetectie verkeerd kiest.
+- `data-la-suggest="<unique-key>"` — stable key (e.g. `"wi-29119"`), mandatory;
+- `data-la-suggest-desc="..."` — one sentence saying *what* you changed; this
+  becomes the quote block in the popup;
+- `data-la-suggest-old="..."` — the original text, so that a rejection is
+  exactly revertible. Mandatory with `kind="edit"`;
+- `data-la-suggest-kind` — `"edit"` (default), `"add"` (new; rejecting =
+  removing), `"del"` (proposal to delete; rejecting = leaving it in place);
+- `data-la-suggest-mode` — usually leave it out: text automatically gets
+  text-line selections and visuals (`figure`/`svg`/`img`/`canvas`/`video`/
+  `table`, or something containing those) one region frame. Only set it explicitly
+  (`"text"` or `"region"`) when that autodetection picks wrong.
 
-**Eén key = één suggestie = één pill.** De beslissing wordt per key opgeslagen,
-dus zet dezelfde `data-la-suggest` alleen op meerdere elementen als het écht
-één beslissing is. Doe je dat, dan tekent de laag alle rects van die elementen
-als één visuele groep met precies één pill erbij — wat je ziet is dan wat er
-gebeurt. Wil de reviewer per rij kunnen beslissen (een work-item-rij met zijn
-subtaakrijen bijvoorbeeld), geef elke rij dan een eigen key: parent `wi-<id>`,
-subtaken `wi-<parentid>-<subid>`, elk met een eigen `data-la-suggest-desc`.
-(Tot 31-08-2026 tekende de laag per element een pill op een gedeelde key: vijf
-knoppen die stiekem samen één beslissing waren.)
+**One key = one suggestion = one pill.** The decision is stored per key,
+so only put the same `data-la-suggest` on several elements when it really is
+one decision. If you do, the layer draws all rects of those elements
+as one visual group with exactly one pill next to it — what you see is then what
+happens. If the reviewer should be able to decide per row (a work item row with its
+subtask rows, for instance), give every row its own key: parent `wi-<id>`,
+subtasks `wi-<parentid>-<subid>`, each with its own `data-la-suggest-desc`.
+(Until 31-08-2026 the layer drew a pill per element on a shared key: five
+buttons that were secretly one decision together.)
 
-**Verborgen bij het laden mag.** Suggesties in een ingeklapte tabelgroep, achter
-een filter of in later ingevoegde DOM krijgen hun pill zodra ze zichtbaar
-worden: de laag hertekent op DOM- en zichtbaarheidswijzigingen. Je hoeft dus
-niets extra's te doen om inklapbare secties te ondersteunen. Wat de laag daarvoor
-ziet: DOM die erbij komt of weggaat, en de attributen `class`, `style`,
-`hidden` en `open`. Klapt jouw pagina puur in CSS in of uit (een
-`input:checked ~ tabel`-truc, of een stylesheet die wisselt), dan verandert er
-geen attribuut en blijft de pill weg — laat zo'n toggle dan ook een class of
-een style zetten.
+**Hidden at load time is fine.** Suggestions in a collapsed table group, behind
+a filter or in DOM inserted later get their pill as soon as they become
+visible: the layer redraws on DOM and visibility changes. So you do not have to
+do anything extra to support collapsible sections. What the layer watches for:
+DOM being added or removed, and the attributes `class`, `style`,
+`hidden` and `open`. If your page collapses or expands purely in CSS (an
+`input:checked ~ table` trick, or a stylesheet that swaps), then no attribute
+changes and the pill stays away — so have such a toggle set a class or
+a style as well.
 
-**Wat de reviewer ziet:** exact de annotatie-mechaniek. Elke suggestie krijgt
-de vertrouwde selectie-rects (blauw) over de gewijzigde tekst, met aan het
-einde de badge breed uitgetrokken tot een pill met de drie acties erin:
-**✕ afwijzen · ✓ accepteren · ✎ anders**. Bij ✎ opent de gewone
-annotator-popup, met het voorstel als quote en het volledige commentveld
-(inclusief tekst-chips via het kettingicoon); Save = "anders, namelijk zó".
-Na een beslissing krimpt de pill tot één gekleurd badge (groen ✓ / rood ✕ /
-oranje ✎); daarop klikken draait de keuze terug naar pending. Bij een
-change-beslissing blijft de getypte tekst daarbij bewaard: kiest de reviewer
-opnieuw ✎, dan staat zijn eigen zin (chips incluis) weer in de popup en kan
-hij hem bijschaven in plaats van overtypen. Dat werkt ook na een reload — de
-voorvulling komt uit de geladen state, niet uit een variabele. Accepteren of
-afwijzen laat de tekst juist vallen, zodat jij geen dode change-comment op
-een accepted key vindt.
+**What the reviewer sees:** exactly the annotation mechanics. Every suggestion gets
+the familiar selection rects (blue) over the changed text, with at the
+end the badge stretched out into a pill with the three actions in it:
+**✕ reject · ✓ accept · ✎ otherwise**. On ✎ the ordinary
+annotator popup opens, with the proposal as a quote and the full comment field
+(including text chips through the chain icon); Save = "otherwise, namely like this".
+After a decision the pill shrinks to one coloured badge (green ✓ / red ✕ /
+orange ✎); clicking it turns the choice back to pending. With a
+change decision the typed text is kept along the way: if the reviewer picks
+✎ again, his own sentence (chips included) is back in the popup and he
+can polish it instead of retyping. That works after a reload too — the
+prefill comes from the loaded state, not from a variable. Accepting or
+rejecting drops the text on purpose, so that you do not find a dead change comment on
+an accepted key.
 
-**State.** Beslissingen zijn blijvende status, geen feedbackronde: ze staan in
-`~/Desktop/annotaties/<slug>/state.json` onder component `suggest`
-(`POST /state-save`), met per key `decision` (`"accepted"`, `"rejected"`,
-`"change"`, `"pending"`), `comment`, en bij chips ook `refs` (id +
-selectedText + locator) en `commentExpanded` (chips inline uitgeschreven).
+**State.** Decisions are lasting status, not a feedback round: they sit in
+`<annotation-root>/<slug>/state.json` under component `suggest`
+(`POST /state-save`), with per key `decision` (`"accepted"`, `"rejected"`,
+`"change"`, `"pending"`), `comment`, and with chips also `refs` (id +
+selectedText + locator) and `commentExpanded` (chips written out inline).
 
-**Verwerken als agent.** Zelfde triggers als annotaties (kale `.`, "verwerk").
-Lees de state (`state.json` of `POST /state`) en handel per key af:
+**Processing as an agent.** Same triggers as annotations (bare `.`, "process").
+Read the state (`state.json` or `POST /state`) and handle it per key:
 
-- `accepted` → de wijziging blijft. Haal de `data-la-suggest*`-attributen weg.
-- `rejected` → draai exact terug: bij `kind="edit"` zet je
-  `data-la-suggest-old` terug, bij `"add"` verwijder je het element, bij
-  `"del"` laat je het staan. Daarna de attributen weghalen.
-- `change` → voer `commentExpanded` uit; gebruik `refs[].locator` als de
-  bedoelde tekst vaker op de pagina staat. Onduidelijk: vragen, niet gokken.
-- `pending` of geen entry → laten staan. Een pending entry kan nog een
-  `comment` dragen (tekst van een teruggeklikte change): dat is een concept
-  van de reviewer, geen opdracht — niet uitvoeren.
+- `accepted` → the change stays. Remove the `data-la-suggest*` attributes.
+- `rejected` → revert exactly: with `kind="edit"` you put
+  `data-la-suggest-old` back, with `"add"` you delete the element, with
+  `"del"` you leave it in place. Then remove the attributes.
+- `change` → carry out `commentExpanded`; use `refs[].locator` when the
+  intended text occurs more than once on the page. Unclear: ask, do not guess.
+- `pending` or no entry → leave it. A pending entry can still carry a
+  `comment` (text from a change that was clicked back): that is a draft
+  by the reviewer, not an instruction — do not carry it out.
 
-Meld elke afgehandelde key af met `POST /state-save` en
-`{"component":"suggest","key":"...","value":{"processed":true}}` — de laag
-slaat entries met `processed` over bij het herladen. Zeg in je antwoord wat
-je geaccepteerd gelaten, teruggedraaid en gewijzigd hebt.
+Report every handled key with `POST /state-save` and
+`{"component":"suggest","key":"...","value":{"processed":true}}` — the layer
+skips entries with `processed` when reloading. Say in your answer what
+you left accepted, reverted and changed.
 
-Een LA-SUGGEST-beslissing is status (zoals een vinkje), géén annotatie: hij
-komt niet in `annotations.json` en hoeft niet via `/resolve`. Gewone
-annotaties op dezelfde pagina blijven gewoon werken.
+An LA-SUGGEST decision is status (like a tick), *not* an annotation: it
+does not end up in `annotations.json` and does not need `/resolve`. Ordinary
+annotations on the same page keep working as usual.

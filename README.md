@@ -1,24 +1,157 @@
 # html-annotator
 
-Visual HTML annotation skill for fast iteration in agentic work. Every
-HTML page an agent ships becomes annotatable. Feedback lands as JSON
-plus crops on disk.
+Visual HTML annotation for agentic work. Paste one self-contained block at the
+bottom of any HTML page and the page becomes annotatable: drag a region, select
+text, link one passage to another, type a comment, Save. The feedback lands on
+disk as JSON plus screenshot crops, next to the page it belongs to — not in a
+chat log that the next session has to reconstruct.
 
-No libraries, no CDN. One pasteable snippet and a local Python bridge
-(stdlib).
+The other half is a local bridge: a stdlib-only Python HTTP server on
+127.0.0.1 that receives what the page saves, keeps rounds, cuts the crops and
+serves the page itself so the browser and the bridge share an origin. An agent
+starts it with one idempotent command, hands the reviewer a link, and processes
+the round later with `show` → edit → `resolve`. No libraries, no CDN, no
+bundler; macOS, Linux and Windows run the same commands.
 
-## Start here
+## Quick start (5 minutes)
 
-1. Read [INSTALL.md](INSTALL.md) and run `./install.sh` (or `--copy`).
-2. Start the bridge: `~/.claude/skills/html-annotator/bin/ensure-bridge.sh`.
-3. Check: `curl -s http://127.0.0.1:8791/ping`.
-4. Open pages only via `http://127.0.0.1:8791/p/<path-from-home>`.
-5. Agent behaviour: [SKILL.md](SKILL.md) + required [references/agent-handbook.md](references/agent-handbook.md).
-6. Criteria and what green means: [CRITERIA.md](CRITERIA.md) · `tests/run.sh`.
-7. Why something is that way: [docs/DECISIONS.md](docs/DECISIONS.md).
+**1. Install** (any OS, needs Python 3.9+):
 
-Teardown: hooks live in `~/.claude/settings.local.json` (backup next to
-the file). Skill symlink: `~/.claude/skills/html-annotator`.
+```bash
+pipx install git+https://github.com/your-online/html-annotator
+html-annotator install-skill
+html-annotator install-hooks
+```
+
+Per OS, if you prefer a checkout over pipx:
+
+<table>
+<tr><th>macOS / Linux</th><th>Windows (PowerShell)</th><th>Windows (Git Bash)</th></tr>
+<tr><td>
+
+```bash
+git clone https://github.com/your-online/html-annotator \
+  ~/repos/html-annotator
+cd ~/repos/html-annotator
+python3 -m html_annotator install-skill
+python3 -m html_annotator install-hooks
+```
+
+</td><td>
+
+```powershell
+git clone https://github.com/your-online/html-annotator `
+  $HOME\repos\html-annotator
+cd $HOME\repos\html-annotator
+py -3 -m html_annotator install-skill --copy
+py -3 -m html_annotator install-hooks
+```
+
+</td><td>
+
+```bash
+git clone https://github.com/your-online/html-annotator \
+  ~/repos/html-annotator
+cd ~/repos/html-annotator
+python -m html_annotator install-skill --copy
+python -m html_annotator install-hooks
+```
+
+</td></tr>
+</table>
+
+**2. Start the bridge and check it.**
+
+```bash
+html-annotator ensure       # idempotent: does nothing if it is already up
+html-annotator status       # {"ok": true, "bridge": "html-annotator", ...}
+```
+
+**3. Make a page annotatable.** Paste the whole of
+`references/annotator-snippet.html` just before the **last** `</body>` (see
+`SKILL.md` for why the last one).
+
+**4. Open it through the bridge**, never as `file://` and never in a preview
+pane:
+
+```bash
+html-annotator url ~/Desktop/plan.html
+# http://127.0.0.1:8791/p/Desktop/plan.html
+```
+
+**5. Annotate and process.** Drag, comment, Save. Then, in the agent session,
+`html-annotator show --open` prints the open round, and
+`html-annotator resolve <slug> --nrs 1,3` checks items off.
+
+## The `/p/` rule
+
+Pages open on `http://127.0.0.1:8791/p/<path-from-home>`. Take the absolute
+path, strip the home directory, append the rest with forward slashes on every
+OS. Anything outside the home directory is refused with 403.
+
+This is not a preference. A page opened as `file://` or rendered in a preview
+pane as a `data:` document sits on an origin that cannot reach loopback
+(Private Network Access), so every Save fails silently into localStorage.
+Through `/p/` the page is same-origin with the bridge and everything works,
+including the self-heal that flips the status pill when the bridge comes up
+later. `html-annotator url <file>` builds the link for you; hand it over as a
+clickable markdown link, not inside backticks.
+
+## The agent workflow
+
+```
+embed snippet ──► ensure ──► hand over /p/ link ──► reviewer annotates
+                                                          │
+   resolve ◄──── apply the feedback ◄──── show --open ◄────┘
+```
+
+- **`.`** — a bare period from the reviewer means "process my feedback". No
+  confirmation question; find the open round yourself.
+- **show** — `html-annotator show --open` picks the most recently annotated
+  page with open items (7-day window; `--list`, `--search`, `--since` widen
+  it) and reprints the work rule: understand first, ask when a comment is
+  ambiguous, then edit.
+- **process** — region annotations carry a crop to read, text annotations carry
+  `selectedText` plus a locator, `edit` annotations carry hunks that
+  `html-annotator apply-hunk` places one by one.
+- **resolve** — `html-annotator resolve <slug> --nrs 1,3` (or `POST /resolve`).
+  Processing without resolving is not done: the annotation loses its anchor and
+  comes back every round.
+
+Full rules: [SKILL.md](SKILL.md) (the thin port) and
+[references/agent-handbook.md](references/agent-handbook.md) (the source of
+truth).
+
+## Commands
+
+| command | role |
+|---|---|
+| `serve` | bridge in the foreground |
+| `ensure` | start it detached if it is not answering (idempotent) |
+| `stop` · `status` | stop it · print `/ping` |
+| `show [page] [--open\|--list\|--search X\|--since N]` | open annotations |
+| `resolve <slug\|json> --nrs 1,2` | mark annotations as processed |
+| `apply-hunk <json> --nr 1 --hunks 2` | apply one block of a draft edit |
+| `url <file>` | the `/p/` link for a local file |
+| `install-skill` · `install-hooks` | install, both idempotent |
+| `--version` | print the version |
+
+`html-annotator <command>` and `python -m html_annotator <command>` are the
+same thing.
+
+## File map
+
+| path | role |
+|---|---|
+| `SKILL.md` | agent port (embed, `/p/`, `.`) |
+| `references/` | handbook, snippets, record schema — the single source of the paste blocks |
+| `html_annotator/` | Python package: CLI, bridge, config, show, hunks |
+| `bin/` | thin wrappers for the hooks and older shortcuts |
+| `pyproject.toml` | packaging; the version lives in `html_annotator/__init__.py` |
+| `CRITERIA.md` · `tests/` | acceptance criteria and the suite that proves them |
+| `docs/` | `SCOPE.md` (core vs extra), `DECISIONS.md` (dated choices) |
+| `CHANGELOG.md` | releases and the migration from LUC-ANNOTATOR v2 |
+| `extras/` | not part of the skill install (see `extras/README.md`) |
 
 ## How it works
 
@@ -26,37 +159,23 @@ the file). Skill symlink: `~/.claude/skills/html-annotator`.
 HTML page  ──►  references/annotator-snippet.html
                    fetch 127.0.0.1:8791
                         ▼
-                bin/annotator-bridge.py
+                html-annotator serve
                         ▼
-      ~/Desktop/annotaties/<page>/ronde-NN/annotations.json
+      ~/annotations/<page>/ronde-NN/annotations.json
 ```
-
-Open pages via `http://127.0.0.1:8791/p/<path-from-home>`, not via
-`file://` or a preview pane. A `data:` origin cannot reach loopback.
-
-## Install
-
-```bash
-git clone https://github.com/Compolaga/html-annotator.git ~/repos/html-annotator
-~/repos/html-annotator/install.sh
-```
-
-The script links the skill and registers the hooks. Details:
-[INSTALL.md](INSTALL.md).
-
-## What's in here
-
-| path | role |
-|---|---|
-| `SKILL.md` | agent port (embed, `/p/`, `.`) |
-| `CRITERIA.md` | acceptance criteria |
-| `references/` | handbook, snippet, record schema |
-| `annotator/` | Python library (config, record, refs) |
-| `bin/` | bridge, ensure/hook, show, hunks, todo list |
-| `tests/` | suite |
 
 ## Limits
 
-- macOS is the tested environment.
-- `~/Desktop/annotaties` and `bin/vind-todolijst.sh` → Desktop stay the default.
-- Two blind spots in the suite: see CRITERIA.md (B18, B19) / INSTALL.md step 4.
+- Python tests run on macOS, Linux and Windows in CI; the Playwright suite is
+  only exercised on macOS and Linux.
+- Default annotation root: `~/annotations`. A machine that already uses the
+  older annotation folder on the desktop keeps it, so an upgrade orphans
+  nothing.
+- Two blind spots in the suite: see CRITERIA.md (B18, B19).
+
+## Links
+
+[Install](INSTALL.md) · [Agent handbook](references/agent-handbook.md) ·
+[Criteria](CRITERIA.md) · [Scope](docs/SCOPE.md) ·
+[Decisions](docs/DECISIONS.md) · [Changelog](CHANGELOG.md) ·
+[License](LICENSE) (MIT)

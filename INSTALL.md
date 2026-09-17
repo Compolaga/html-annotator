@@ -1,89 +1,95 @@
 # INSTALL
 
-Install this skill so it behaves the same as on the machine it came
-from: files, hooks, and the deliver rule. Do not skip steps 2 and 3;
-those are what make "the skill is there" into "the skill works".
+Install this skill so it behaves the same on any machine: files, hooks, and
+the deliver rule. Do not skip steps 2 and 3; those turn "the skill is there"
+into "the skill works".
+
+Everything runs through one CLI. No bash, no jq, so the steps are the same on
+macOS, Linux and Windows.
 
 ## Fast path
 
+As a package (recommended — nothing to clone, the CLI lands on your PATH):
+
 ```bash
-git clone https://github.com/Compolaga/html-annotator.git ~/repos/html-annotator
-~/repos/html-annotator/install.sh
+pipx install git+https://github.com/your-online/html-annotator
+html-annotator install-skill
+html-annotator install-hooks
 ```
 
-`install.sh` does steps 1–3 and is idempotent. Still do step 4 by hand.
-If the script fails (for example no `jq`), follow the steps yourself.
+`pip install html-annotator` works too, and `pip install "html-annotator[crops]"`
+adds Pillow for faster screenshot crops. From a checkout, `pip install -e .`
+gives the same CLI against your working tree.
+
+From a checkout without installing anything:
+
+```bash
+git clone https://github.com/your-online/html-annotator ~/repos/html-annotator
+cd ~/repos/html-annotator
+python -m html_annotator install-skill      # --copy on Windows
+python -m html_annotator install-hooks
+```
+
+`html-annotator <command>` and `python -m html_annotator <command>` are the
+same entry point; the rest of this file uses the second form because it also
+works straight from a checkout.
+
+Both install commands are idempotent. Still do step 3 and step 4 by hand.
 
 Agent rules live in `SKILL.md` and `references/`. No memories are copied.
 
 ## Step 1 — skill on disk
 
-The skill must be reachable as `~/.claude/skills/html-annotator/`. A
-symlink to the clone is preferred: an update is one `git pull`.
+The skill must be reachable as `~/.claude/skills/html-annotator/`.
 
 ```bash
-ln -s ~/repos/html-annotator ~/.claude/skills/html-annotator
-chmod +x ~/.claude/skills/html-annotator/bin/*.sh ~/.claude/skills/html-annotator/bin/*.py
+python -m html_annotator install-skill          # symlink to this checkout
+python -m html_annotator install-skill --copy   # copy instead
 ```
 
-If something already sits on that path, do not overwrite it without asking.
+A symlink is preferred: an update is one `git pull`. On Windows a symlink
+needs Developer Mode or admin rights, so `--copy` is the default there. If
+something else already sits on that path, the command says so and leaves it
+alone.
+
+From a pip/pipx install there is no checkout to link to, so the command copies
+the skill files that ship inside the package — `SKILL.md`, `references/` and
+the `bin/` wrappers — into that directory. Updating means `pipx upgrade
+html-annotator` followed by `html-annotator install-skill` again.
 
 ## Step 2 — register the two hooks
 
 These keep the bridge up. Without them, someone has to run
-`ensure-bridge.sh` by hand, and "why did nothing save" is almost always
-"the bridge was down".
+`python -m html_annotator ensure` by hand, and "why did nothing save" is
+almost always "the bridge was down".
 
-In `~/.claude/settings.local.json`, under `hooks`:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "<HOME>/.claude/skills/html-annotator/bin/hook-ensure-bridge.sh",
-            "timeout": 15,
-            "statusMessage": "annotator-bridge check"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "<HOME>/.claude/skills/html-annotator/bin/hook-ensure-bridge.sh",
-            "timeout": 15,
-            "statusMessage": "annotator-bridge check"
-          }
-        ]
-      }
-    ]
-  }
-}
+```bash
+python -m html_annotator install-hooks           # writes the two hooks
+python -m html_annotator install-hooks --print   # show, change nothing
 ```
 
-Replace `<HOME>` with the real home path; the hook field does not accept
-`~`. If other hooks already sit under `PostToolUse` or `SessionStart`,
-append these instead of replacing them.
+That writes into `~/.claude/settings.local.json` (a timestamped backup lands
+next to it) two entries that both call `bin/hook-ensure-bridge.py` with the
+same Python that ran the command:
 
-The empty-matcher SessionStart hook runs on every agent session on the
-machine, including sessions that never touch annotations. That is
-intentional: one curl per session, and the PostToolUse layer misses an
-agent that writes HTML via Bash. If the owner wants it narrower, that
-is their choice — do not narrow it unasked.
+- **SessionStart**, empty matcher — one call per session, whatever route that
+  session later uses to write HTML. This is the layer that counts: the
+  PostToolUse layer misses an agent that writes the file through Bash, and in
+  auto-mode Bash is the prescribed route.
+- **PostToolUse on `Edit|Write`** — starts the bridge when the written file is
+  `.html`/`.htm` and carries an annotator marker (`HTML-ANNOTATOR`, or the
+  older `LUC-ANNOTATOR` on pages embedded before the rename).
+
+Other hooks under those events stay; only an earlier annotator hook is
+replaced. The empty-matcher SessionStart hook fires on every agent session on
+the machine, including sessions that never touch annotations. That is on
+purpose: one ping per session. If the owner wants it narrower, that is their
+call — do not narrow it unasked.
 
 ## Step 3 — deliver rule in the global instructions
 
-The strongest trigger is not in the skill but in the global instructions.
-Put a rule like this in `~/.claude/CLAUDE.md`, adapted to how the owner
-wants it:
+The strongest trigger is not in the skill but in the global instructions. Put
+a rule like this in `~/.claude/CLAUDE.md`, adapted to how the owner wants it:
 
 ```markdown
 ## Deliverables
@@ -95,64 +101,114 @@ selection comments.
 
 Ask before writing that — it touches every project.
 
-## Upgrading from an older install
-
-Re-run `./install.sh` (or `./install.sh --copy` if the skill is a copy,
-not a symlink). `--copy` refreshes `$DOEL`. Without `--copy`, an
-existing directory that is not this clone is left alone, and the script
-does not register a hook it cannot see.
-
-The old installer placed memories. Those are no longer in this skill.
-If they still sit under `~/.claude/projects/*/memory/`, they are:
-
-- `annotator-bridge-autostart.md`
-- `html-annotator-standaard.md`
-
-Do not delete them automatically — they are project rules. Remove them
-by hand if `references/agent-handbook.md` replaces them.
-
-The hook must point at `bin/hook-ensure-bridge.sh`, not
-`hook-ensure-bridge.sh` in the skill root.
-
 ## Step 4 — verify
 
 ```bash
-~/.claude/skills/html-annotator/bin/ensure-bridge.sh
-curl -s http://127.0.0.1:8791/ping
+python -m html_annotator --version
+python -m html_annotator ensure
+python -m html_annotator status
 ```
 
-Expected: `{"ok": true, "bridge": "luc-annotator", "version": 2, ...}`.
+Expected: `{"ok": true, "bridge": "html-annotator", "version": 2, "release":
+"1.0.0rc1", ...}`. `version` is the wire protocol the snippet speaks;
+`release` is the package version.
 
 Run the suite (Node + Playwright; install once):
 
 ```bash
-(cd ~/.claude/skills/html-annotator/tests && npm i --no-save playwright-core)
-~/.claude/skills/html-annotator/tests/run.sh
+cd tests && npm i --no-save playwright-core && cd ..
+tests/run.sh
 ```
 
 Two limits, also in `CRITERIA.md`: the fresh-agent case has never been
 verified in practice (it reports BLOCKED, not pass), and the hidden-panel
-variant emulates `document.hidden` so it tests branch logic, not Chrome
+variant emulates `document.hidden`, so it tests branch logic, not Chrome
 throttling.
 
 The test that counts: make an HTML file with the snippet, open it via
-`http://127.0.0.1:8791/p/<path-from-home>`, drag a rectangle, type a
-comment, Save. There should now be an `annotations.json` plus a crop
-under `~/Desktop/annotaties/<slug>/ronde-01/`.
+`python -m html_annotator url <that file>`, drag a rectangle, type a comment,
+Save. There should now be an `annotations.json` plus a crop under
+`~/annotations/<slug>/ronde-01/`.
+
+## Configuration
+
+| variable | meaning | default |
+|---|---|---|
+| `HTML_ANNOTATOR_PORT` | port of the bridge | `8791` |
+| `HTML_ANNOTATOR_ROOT` | where rounds are written | `~/annotations` |
+| `HTML_ANNOTATOR_CHROME` | browser used for crops | auto-detected |
+
+The `LUC_ANNOTATOR_PORT`, `LUC_ANNOTATOR_ROOT` and `LUC_ANNOTATOR_CHROME`
+names are **deprecated aliases**. They are still read, so a running setup does
+not break mid-session, and they go away in 1.1.
+
+On a machine that already uses the older annotation folder on the desktop and
+has no `~/annotations`, that old directory stays the default, so an upgrade
+orphans nothing. Pid file and log live in a per-user state directory
+(`~/.local/state/html-annotator`, `%LOCALAPPDATA%\html-annotator` on Windows),
+never inside the checkout.
+
+## Deprecated names kept until 1.1
+
+| deprecated | use instead |
+|---|---|
+| `bin/toon-annotaties.py` | `bin/show-annotations.py` · `html-annotator show` |
+| `bin/pas-hunk-toe.py` | `bin/apply-hunk.py` · `html-annotator apply-hunk` |
+| the old page-global annotator object | `window.HtmlAnnotator` (the snippet still assigns the old name as an alias) |
+| `LUC_ANNOTATOR_*` | `HTML_ANNOTATOR_*` |
+| `<!-- LUC-ANNOTATOR v2 -->` blocks | `<!-- HTML-ANNOTATOR v3 -->`; old blocks stay recognised |
+
+The full table, including what to change in your own scripts, is the
+migration section of `CHANGELOG.md`.
+
+## Upgrading from an older install
+
+Re-run `install-skill` and `install-hooks`. The hook entries from the bash era
+are replaced, not duplicated. The four shell scripts (`ensure-bridge`,
+`hook-ensure-bridge`, `install`, the todo-list finder) are gone; the `bin/*.py`
+files that remain are thin wrappers around the CLI.
+
+Pages that already carry a `LUC-ANNOTATOR` block keep working: the bridge, the
+hooks and the content hash still recognise both marker generations. Re-embed a
+page only when you want the new markers, and never leave two blocks in one
+page.
+
+The old installer placed memories. Those are no longer in this skill. If they
+still sit under `~/.claude/projects/*/memory/`, they are
+`annotator-bridge-autostart.md` and `html-annotator-standaard.md`. Do not
+delete them automatically — they are project rules.
 
 ## Requirements
 
-- **python3** (stdlib is enough) — the bridge runs on it.
-- **Chrome** — for screenshot crops. Without Chrome, region annotations
-  store without a crop.
-- **Pillow** (optional) — faster crops.
-- **jq** (optional) — only for automatic hook registration.
-- **Node** (optional) — only for the test suite.
+- **python3** (3.9+, stdlib is enough) — the bridge runs on it.
+- **Chrome or Edge** — for screenshot crops. Found via
+  `HTML_ANNOTATOR_CHROME`, then PATH, then the usual install paths. Without
+  either, region annotations store without a crop.
+- **Pillow** (optional) — faster crops; `pip install "html-annotator[crops]"`.
+- **Node** (optional) — only for the Playwright suite.
 - Port **8791** must be free. Chosen on purpose: 8080 is often Docker.
+
+## Windows
+
+The bridge, the CLI and the hooks are plain Python and run natively: Chrome or
+Edge is found in the usual places, `claude://` links open through the shell,
+`/p/<path-from-home>` takes forward slashes in the URL and maps them to
+backslashes on disk, and page slugs stay filesystem-safe. CI runs the Python
+tests and a real `/save` on `windows-latest`.
+
+In PowerShell use `py -3 -m html_annotator …` (or `html-annotator …` after a
+pip/pipx install) and pass `--copy` to `install-skill`, because a symlink
+needs Developer Mode. In Git Bash the macOS/Linux commands work as written,
+with `--copy` for the same reason.
+
+What is not covered there: the Playwright suite (`tests/run.sh`) is only
+exercised on macOS and Linux, and if the Microsoft Store `python3` alias gets
+in the way, disable it.
 
 ## What this repo deliberately does not ship
 
-- `~/Desktop/annotaties/` — user data, created on first save.
-- Skills that `SKILL.md` mentions but that are not in this repo:
-  `task-spawnen`, `nieuwe-sessie` (`POST /sessie`), `bericht-sturen`.
-  The annotator works without them; say so instead of failing silently.
+- The annotation root (`~/annotations`) — user data, created on first save.
+- Skills that the handbook mentions but that are not in this repo:
+  `nieuwe-sessie` (`POST /sessie`), `bericht-sturen`. The annotator works
+  without them; say so instead of failing silently.
+- The owner's personal glue — see `extras/README.md` and `docs/SCOPE.md`.

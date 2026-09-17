@@ -1,4 +1,4 @@
-<!-- LUC-ANNOTATOR v2 · standaard feedback-component; plak dit blok onderaan elke HTML (voor </body> of aan het einde). Self-contained, geen dependencies. Schrijft via de lokale bridge (annotator-bridge.py, 127.0.0.1:8791) naar ~/Desktop/annotaties/<slug>/ronde-NN/. -->
+<!-- HTML-ANNOTATOR v3 · standard feedback component; paste this block at the bottom of every HTML page (before </body> or at the end of the file). Self-contained, no dependencies. Writes through the local bridge (python -m html_annotator serve, 127.0.0.1:8791) to <annotation-root>/<slug>/ronde-NN/. Older pages carry the LUC-ANNOTATOR v1/v2 marker; the bridge and the hooks still recognise those. -->
 <style>
   /* CSS-seams: bar/status · overlay/ghost · badges · weeslijst · selknop
      · popup/refs · draft · sessie · la-sub. Geen bundler; één blok. */
@@ -209,7 +209,7 @@
 <script>
 /* Secties in dit IIFE (één paste-blok, geen bundler):
    bridge-poller · locators/anker · render/wezen · popup/refs · save
-   regio-snip · tekstselectie · draft/hunks · LucAnnotator · sessie-links */
+   regio-snip · tekstselectie · draft/hunks · HtmlAnnotator · sessie-links */
 (function () {
   "use strict";
   var BRIDGE = (location.protocol.indexOf("http") === 0 && location.pathname.indexOf("/p/") === 0)
@@ -310,7 +310,7 @@
     }).catch(function () {
       brug.ok = false; brug.jsonPath = null;
       zetStatus(false, "bridge off - localStorage only",
-        "Start the bridge: python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py");
+        "Start the bridge: python -m html_annotator ensure");
       return null;
     });
   }
@@ -1296,9 +1296,9 @@
          die acties levert en verdwijnen anders */
       popup.querySelector(".la-attach").style.display = "none";
       var delBtn = popup.querySelector(".la-del"), doneBtn = popup.querySelector(".la-done");
-      if (a._composer.onReject) { delBtn.textContent = "\u2715"; delBtn.title = "Afwijzen \u2014 de wijziging wordt teruggedraaid"; }
+      if (a._composer.onReject) { delBtn.textContent = "\u2715"; delBtn.title = "Reject \u2014 the change is rolled back"; }
       else delBtn.style.display = "none";
-      if (a._composer.onAccept) { doneBtn.title = "Accepteren \u2014 de wijziging blijft staan"; }
+      if (a._composer.onAccept) { doneBtn.title = "Accept \u2014 the change stays"; }
       else doneBtn.style.display = "none";
       if (a._composer.saveLabel) popup.querySelector(".la-save").textContent = a._composer.saveLabel;
     }
@@ -1445,10 +1445,10 @@
     }).catch(function (e) {
       brug.ok = false;
       zetStatus(false, "bridge off - localStorage only",
-        "Start the bridge: python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py");
+        "Start the bridge: python -m html_annotator ensure");
       alert("The bridge is not running, so nothing was written to disk.\n" +
         "Your annotation is only in localStorage. Start the bridge with:\n" +
-        "python3 ~/.claude/skills/html-annotator/bin/annotator-bridge.py");
+        "python -m html_annotator ensure");
       throw e;
     });
   }
@@ -1467,7 +1467,7 @@
   function markeerVerwerkt(a) {
     if (!brug.ok) {
       alert("The bridge is not running, so check-off cannot be written.\n" +
-        "Start it with: ~/.claude/skills/html-annotator/bin/ensure-bridge.sh");
+        "Start it with: python -m html_annotator ensure");
       return Promise.resolve(null);
     }
     return post("/resolve", Object.assign(basis(), { ids: [a.id], nrs: [a.nr] }))
@@ -2311,6 +2311,11 @@
       var scheiding = document.createElement("span");
       scheiding.className = "la-draft-scheiding";
       bar.appendChild(scheiding);
+      var bDiff = document.createElement("button");
+      bDiff.type = "button";
+      bDiff.className = "la-draft-diff";
+      bDiff.textContent = "Show changes";
+      bDiff.style.display = "none";
       var bHerstel = document.createElement("button");
       bHerstel.type = "button";
       bHerstel.textContent = "↺ Restore original";
@@ -2318,32 +2323,46 @@
       var meld = document.createElement("span");
       meld.className = "la-draft-meld";
       meld.textContent = "click the text to edit";
-      bar.appendChild(bHerstel); bar.appendChild(meld);
+      bar.appendChild(bDiff); bar.appendChild(bHerstel); bar.appendChild(meld);
       box.parentNode.insertBefore(bar, box.nextSibling);
-      box.__bar = { herstel: bHerstel, meld: meld, fmt: knoppen };
+      box.__bar = { diff: bDiff, herstel: bHerstel, meld: meld, fmt: knoppen };
 
-      /* De opgemaakte weergave (doorhaling + onderstreping) is alleen te zien als de
-         cursor er niet in staat. Zodra de reviewer erin klikt gaat hij terug naar de kale
-         kaart, anders zou hij in zijn eigen doorhalingen zitten typen. */
-      function toonMarkup() {
-        if (box.__actief) return null;
+      function laBerekenWijziging() {
         var ops = laDiff(box.__origineel, box.__nieuw);
         var tekstGewijzigd = ops.some(function (o) { return o.op !== "="; });
         var opmaak = laOpmaakHunks(box.__origBlokken, box.__blokken,
           tekstGewijzigd ? laHunks(ops, box.__nieuw, box.__blokken).length : 0);
-        var gewijzigd = tekstGewijzigd || opmaak.length > 0;
-        if (gewijzigd) {
-          laTekenBlokken(box, box.__blokken, ops, box.__rijk, opmaak);
+        return { ops: ops, opmaak: opmaak, gewijzigd: tekstGewijzigd || opmaak.length > 0 };
+      }
+
+      /* Status in de bar: knoppen en melding volgen of er iets gewijzigd is, los van
+         de vraag of de doorhalingen nu getoond worden. */
+      function toonStatus(gewijzigd) {
+        bDiff.style.display = gewijzigd ? "" : "none";
+        bDiff.textContent = box.__markup ? "Hide changes" : "Show changes";
+        bDiff.classList.toggle("la-actief", !!box.__markup);
+        bHerstel.style.display = gewijzigd ? "" : "none";
+        meld.textContent = gewijzigd
+          ? (box.__nr ? "saved as annotation " + box.__nr : "edit not saved yet")
+          : "click the text to edit";
+      }
+
+      /* De opgemaakte weergave (doorhaling + onderstreping) komt alleen op verzoek, via
+         de knop "Show changes". Niet automatisch bij het eruit klikken: dat springt in
+         het gezicht van iemand die gewoon aan het herschrijven is. En alleen als de
+         cursor er niet in staat, anders zou hij in zijn eigen doorhalingen zitten typen. */
+      function toonMarkup() {
+        if (box.__actief) return null;
+        var w = laBerekenWijziging();
+        if (w.gewijzigd) {
+          laTekenBlokken(box, box.__blokken, w.ops, box.__rijk, w.opmaak);
           box.__markup = true;
         } else {
           laToonKaal(box);
           box.__markup = false;
         }
-        bHerstel.style.display = gewijzigd ? "" : "none";
-        meld.textContent = gewijzigd
-          ? (box.__nr ? "saved as annotation " + box.__nr : "edit not saved yet")
-          : "click the text to edit";
-        return ops;
+        toonStatus(w.gewijzigd);
+        return w.ops;
       }
       box.__toonMarkup = toonMarkup;
 
@@ -2351,8 +2370,27 @@
         if (!box.__markup) return;
         laToonKaal(box);
         box.__markup = false;
+        toonStatus(laBerekenWijziging().gewijzigd);
       }
       box.__toonPlat = toonPlat;
+
+      /* Kale kaart, maar wel de status bijwerken: dit is wat er na blur en na reload
+         gebeurt in plaats van de automatische diff. */
+      function toonKaalMetStatus() {
+        laToonKaal(box);
+        box.__markup = false;
+        toonStatus(laBerekenWijziging().gewijzigd);
+      }
+      box.__toonKaalMetStatus = toonKaalMetStatus;
+
+      bDiff.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+      bDiff.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (box.__markup) { toonPlat(); return; }
+        if (box.__actief) { box.blur(); }
+        box.__actief = false;
+        toonMarkup();
+      });
 
       /* Klikken terwijl de opmaak zichtbaar is, is het lastige geval. De doorgehaalde
          tekst verdwijnt bij het terugschakelen naar kale tekst, dus de regel loopt anders
@@ -2406,7 +2444,7 @@
         clearTimeout(timer);
         box.__actief = false;
         bewaarNu();
-        toonMarkup();
+        toonKaalMetStatus();
       });
 
       box.addEventListener("keydown", function (ev) {
@@ -2425,6 +2463,7 @@
         box.__markup = false;
         laToonKaal(box);
         laVerwijderBewerking(box);
+        bDiff.style.display = "none";
         bHerstel.style.display = "none";
         meld.textContent = "original restored";
       });
@@ -2623,7 +2662,7 @@
     anns.forEach(function (a) { if (a.type === "edit" && a.veld) { perVeld[a.veld] = a; } });
     Array.prototype.forEach.call(document.querySelectorAll(".la-draft-txt"), function (box) {
       var a = perVeld[box.__veld];
-      if (!a || !box.__toonMarkup) return;
+      if (!a || !box.__toonKaalMetStatus) return;
       var alle = a.hunks || [];
       var open = alle.filter(function (h) { return !h.resolved; });
       var tekstHunks = open.filter(function (h) { return h.soort !== "opmaak"; });
@@ -2642,7 +2681,7 @@
           box.classList.add("la-rijk");
           box.setAttribute("contenteditable", "true");
         }
-        box.__toonMarkup();
+        box.__toonKaalMetStatus();
         return;
       }
 
@@ -2655,7 +2694,7 @@
         }
         box.__annId = a.id; box.__nr = a.nr; box.__nieuw = a.nieuw || box.__origineel;
         box.__blokken = laBlokkenVanProjectie(box.__nieuw);
-        box.__toonMarkup();
+        box.__toonKaalMetStatus();
         return;
       }
 
@@ -2687,7 +2726,7 @@
         box.classList.add("la-rijk");
         box.setAttribute("contenteditable", "true");
       }
-      box.__toonMarkup();
+      box.__toonKaalMetStatus();
       if (kwijt.length) {
         box.__bar.meld.textContent = "annotation " + a.nr + ": hunk " + kwijt.join(", ") +
           " no longer found in the text";
@@ -2696,7 +2735,7 @@
   }
 
   /* ---- test/debug-API -------------------------------------------- */
-  window.LucAnnotator = {
+  window.HtmlAnnotator = {
     anns: function () { return anns; },
     bridge: function () { return brug; },
     session: verversSessie,
@@ -2738,6 +2777,8 @@
       return bewaarAnnotatie(a);
     }
   };
+  /* Deprecated alias for pages embedded before the rename; kept until 1.1. */
+  window.LucAnnotator = window.HtmlAnnotator;
   /* ---- knoppen naar een nieuwe Claude-sessie ---------------------- */
   /* Een ingebedde browser (zoals de preview-pane) geeft custom schemes als
      claude:// niet door aan het OS: de klik doet dan stilzwijgend niets.
@@ -2812,4 +2853,4 @@
   });
 })();
 </script>
-<!-- /LUC-ANNOTATOR -->
+<!-- /HTML-ANNOTATOR -->

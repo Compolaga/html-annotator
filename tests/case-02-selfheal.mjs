@@ -26,9 +26,9 @@ import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SKILL = process.env.LUC_ANNOTATOR_SKILL_DIR
+const SKILL = process.env.HTML_ANNOTATOR_SKILL_DIR || process.env.LUC_ANNOTATOR_SKILL_DIR
   || join(fileURLToPath(new URL('..', import.meta.url)));
-const PORT = process.env.LUC_ANNOTATOR_PORT || '8791';
+const PORT = process.env.HTML_ANNOTATOR_PORT || process.env.LUC_ANNOTATOR_PORT || '8791';
 const PILL_TIMEOUT_MS = 10_000;
 const ORIGINS = (process.env.CASE02_ORIGINS || 'file,data').split(',');
 const VERBORGEN = process.env.CASE02_VERBORGEN === '1';
@@ -51,7 +51,7 @@ async function bridgeDown() {
   return false;
 }
 function bridgeUp() {
-  try { execFileSync(join(SKILL, 'bin/ensure-bridge.sh'), { stdio: 'ignore' }); } catch {}
+  try { execFileSync('python3', ['-m', 'html_annotator', 'ensure'], { cwd: SKILL, stdio: 'ignore' }); } catch {}
   return !!bridgePid();
 }
 
@@ -187,7 +187,7 @@ for (const origin of ORIGINS) {
   // 2. bridge komt omhoog terwijl de pagina open blijft staan
   const opgestart = bridgeUp();
   if (!opgestart) {
-    console.log(`  FAIL  ${label}: ensure-bridge.sh kreeg de bridge niet omhoog`);
+    console.log(`  FAIL  ${label}: ensure kreeg de bridge niet omhoog`);
     falen++; await page.close(); continue;
   }
 

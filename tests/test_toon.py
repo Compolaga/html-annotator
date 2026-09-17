@@ -8,7 +8,6 @@ import sys
 import tempfile
 
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOON = os.path.join(SKILL, "bin", "toon-annotaties.py")
 
 
 def check(naam, conditie):
@@ -21,9 +20,9 @@ def check(naam, conditie):
 
 def draai(root, *args):
     env = os.environ.copy()
-    env["LUC_ANNOTATOR_ROOT"] = root
+    env["HTML_ANNOTATOR_ROOT"] = root
     return subprocess.run(
-        [sys.executable, TOON, *args],
+        [sys.executable, "-m", "html_annotator", "show", *args],
         cwd=SKILL, env=env, capture_output=True, text=True,
     )
 
@@ -61,14 +60,14 @@ def main():
 
     uit = draai(root, "--open")
     n += check("B8 --open slaagt", uit.returncode == 0)
-    n += check("B8 WERKREGEL", "eerst begrijpen, dan pas verwerken" in uit.stdout)
+    n += check("B8 WERKREGEL", "understand first, process second" in uit.stdout)
     n += check("B8 punt-trigger",
-               'Een kaal bericht "." is "verwerk mijn annotaties"' in uit.stdout)
+               'A bare "." message means "process my annotations"' in uit.stdout)
     n += check("B8 locator-pad", "tr:nth-of-type(3) > td.ei" in uit.stdout)
     n += check("B8 locator nth", "nth 1" in uit.stdout)
     n += check("B8 context-label", "2.3 Gamma Backlog" in uit.stdout)
     n += check("B8 ref geëxpandeerd", "cel B" in uit.stdout)
-    n += check("B9 ontbrekende r2", "ONTBREEKT" in uit.stdout and "r2" in uit.stdout)
+    n += check("B9 ontbrekende r2", "MISSING" in uit.stdout and "r2" in uit.stdout)
     n += check("B8 resolve-hint", "/resolve" in uit.stdout)
 
     rec["annotations"][0]["resolved"] = True
@@ -79,8 +78,8 @@ def main():
     n += check("B8 resolved verborgen",
                uit2.returncode == 0
                and "maak" not in uit2.stdout
-               and "(niets open)" in uit2.stdout
-               and "eerst begrijpen" not in uit2.stdout)
+               and "(nothing open)" in uit2.stdout
+               and "understand first" not in uit2.stdout)
     return n
 
 

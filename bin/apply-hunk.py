@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Deprecated alias of bin/apply-hunk.py (kept until 1.1).
-
-Thin wrapper: `python -m html_annotator apply-hunk`.
-"""
+"""Thin wrapper: `python -m html_annotator apply-hunk`."""
 
 import sys
 from pathlib import Path

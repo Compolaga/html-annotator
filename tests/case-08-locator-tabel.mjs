@@ -11,25 +11,28 @@
    start móet op een herhaalde span ("Backlog") staan (anders komt zoekAnker
    nooit bij de fallback die de wees-te-vroeg-bug was). */
 import { chromium } from 'playwright-core';
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+const TESTDIR = join(homedir(), 'html-annotator-tests');
+mkdirSync(TESTDIR, { recursive: true });
+const ROOT = process.env.HTML_ANNOTATOR_ROOT || process.env.LUC_ANNOTATOR_ROOT || join(homedir(), 'annotations');
 
-const SKILL = process.env.LUC_ANNOTATOR_SKILL_DIR
+const SKILL = process.env.HTML_ANNOTATOR_SKILL_DIR || process.env.LUC_ANNOTATOR_SKILL_DIR
   || join(fileURLToPath(new URL('..', import.meta.url)));
-if (!process.env.LUC_ANNOTATOR_PORT) {
-  console.log('  BLOKKED  case-08: LUC_ANNOTATOR_PORT verplicht (anders is de origin-assert tandeloos op 8791)');
+if (!(process.env.HTML_ANNOTATOR_PORT || process.env.LUC_ANNOTATOR_PORT)) {
+  console.log('  BLOKKED  case-08: HTML_ANNOTATOR_PORT verplicht (anders is de origin-assert tandeloos op 8791)');
   process.exit(2);
 }
-const PORT = process.env.LUC_ANNOTATOR_PORT;
+const PORT = process.env.HTML_ANNOTATOR_PORT || process.env.LUC_ANNOTATOR_PORT;
 
 const slug = `zz-test-locator-${Date.now()}`;
-const bestand = join(homedir(), 'Desktop', `${slug}.html`);
+const bestand = join(TESTDIR, `${slug}.html`);
 
 function opruimen() {
   rmSync(bestand, { force: true });
-  rmSync(join(homedir(), 'Desktop', 'annotaties', slug), { recursive: true, force: true });
+  rmSync(join(ROOT, slug), { recursive: true, force: true });
 }
 
 writeFileSync(bestand, `<!doctype html><meta charset="utf-8"><title>${slug}</title>
@@ -53,7 +56,7 @@ try {
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage();
   try {
-    await page.goto(`http://127.0.0.1:${PORT}/p/Desktop/${slug}.html`, {
+    await page.goto(`http://127.0.0.1:${PORT}/p/html-annotator-tests/${slug}.html`, {
       waitUntil: 'load',
       timeout: 8000,
     });

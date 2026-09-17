@@ -5,3 +5,8 @@ tests/package-lock.json
 bridge-hook.log
 __pycache__/
 *.pyc
+tests/red/
+# build artefacts (pip install -e ., python -m build)
+/dist/
+/build/
+/*.egg-info/

@@ -77,6 +77,13 @@ if [ -z "$COMMANDO" ]; then
   exit $((RC == 0 ? 1 : RC))
 fi
 
+# De geregistreerde hook hoort bij déze checkout; wijst hij naar een andere installatie
+# (dev-machine met een live skill elders), dan toetst deze case niet deze code: BLOKKED.
+case "$COMMANDO" in
+  "$SKILL_DIR"/*) ;;
+  *) echo "BLOKKED case-04: geregistreerde hook hoort bij een andere installatie ($COMMANDO)"; exit 2 ;;
+esac
+
 if ! bridge_down; then
   fail "kon de bridge niet omlaag krijgen; gedragsdeel zegt niets"
   exit 2
@@ -103,7 +110,7 @@ fi
 TIJDELIJK=$(mktemp "${TMPDIR:-/tmp}/annotator-case04.XXXXXX.html")
 printf '<p>test</p>\n<!-- LUC-ANNOTATOR v2 -->\n' >"$TIJDELIJK"
 printf '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TIJDELIJK" \
-  | "$SKILL_DIR/bin/hook-ensure-bridge.sh" >/dev/null 2>&1
+  | python3 "$SKILL_DIR/bin/hook-ensure-bridge.py" >/dev/null 2>&1
 if wait_for_bridge 8; then
   pass "PostToolUse-tak (Write) brengt de bridge nog steeds omhoog"
 else

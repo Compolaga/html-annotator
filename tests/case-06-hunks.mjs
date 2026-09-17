@@ -14,21 +14,24 @@
 
 import { chromium } from 'playwright-core';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+const TESTDIR = join(homedir(), 'html-annotator-tests');
+mkdirSync(TESTDIR, { recursive: true });
+const ROOT = process.env.HTML_ANNOTATOR_ROOT || process.env.LUC_ANNOTATOR_ROOT || join(homedir(), 'annotations');
 
-const SKILL = process.env.LUC_ANNOTATOR_SKILL_DIR
+const SKILL = process.env.HTML_ANNOTATOR_SKILL_DIR || process.env.LUC_ANNOTATOR_SKILL_DIR
   || join(fileURLToPath(new URL('..', import.meta.url)));
-const PORT = process.env.LUC_ANNOTATOR_PORT || '8791';
+const PORT = process.env.HTML_ANNOTATOR_PORT || process.env.LUC_ANNOTATOR_PORT || '8791';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* Let op het woord "klaar.": dat staat er twee keer, en alleen de tweede wordt
    gewijzigd. Dat is met opzet. Zonder context om zich op te ankeren kan een blok niet
    weten wélke van de twee bedoeld is — en dát is de eigenschap die hier bewezen moet
    worden. Met een uniek woord bewijst de test niets: de kale tekst volstaat dan al. */
-const ORIGINEEL = `Hoi Laurens,
+const ORIGINEEL = `Hoi Kim,
 
 De coverage-cijfers staan klaar. Ik loop ze donderdag met je door.
 
@@ -44,14 +47,14 @@ Luc`;
    De diff had gelijk en de test niet. */
 const laatste = ORIGINEEL.lastIndexOf('klaar.');
 const NIEUW = (ORIGINEEL.slice(0, laatste) + 'gereed.' + ORIGINEEL.slice(laatste + 'klaar.'.length))
-  .replace('Hoi Laurens,', 'Hallo Laurens,')
+  .replace('Hoi Kim,', 'Hallo Kim,')
   .replace('donderdag', 'vrijdag');
 
 const slug = `zz-test-hunks-${Date.now()}`;
-const bestand = join(homedir(), 'Desktop', `${slug}.html`);
+const bestand = join(TESTDIR, `${slug}.html`);
 writeFileSync(bestand, `<!doctype html><meta charset="utf-8"><title>${slug}</title>
 <div class="la-draft">
-  <div class="la-draft-hdr"><b>Aan:</b> Laurens &nbsp;·&nbsp; <b>Onderwerp:</b> Coverage</div>
+  <div class="la-draft-hdr"><b>Aan:</b> Kim &nbsp;·&nbsp; <b>Onderwerp:</b> Coverage</div>
   <div class="la-draft-txt">${ORIGINEEL}</div>
 </div>
 ${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`);
@@ -61,13 +64,15 @@ const zeg = (ok, tekst) => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  case-06: ${
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage();
-await page.goto(`http://127.0.0.1:${PORT}/p/Desktop/${slug}.html`, { waitUntil: 'load' });
+await page.goto(`http://127.0.0.1:${PORT}/p/html-annotator-tests/${slug}.html`, { waitUntil: 'load' });
 await page.waitForSelector('.la-draft-txt.la-bewerkbaar', { timeout: 5000 });
 
 await page.click('.la-draft-txt');
 await page.evaluate((t) => { document.querySelector('.la-draft-txt').textContent = t; }, NIEUW);
 await page.evaluate(() => document.querySelector('.la-draft-txt').blur());
 await sleep(1500);
+await page.click('.la-draft-diff');
+await sleep(300);
 
 const jsonPath = (await page.evaluate(() => window.LucAnnotator.bridge().jsonPath) || '')
   .replace(/^~/, homedir());
@@ -99,11 +104,11 @@ await browser.close();
 
 /* Nu het punt van de hele exercitie: alleen blok 2 toepassen, de rest laten staan. */
 const uit = execFileSync('python3', [join(SKILL, 'bin/pas-hunk-toe.py'), jsonPath,
-  '--nr', String(ann.nr), '--hunks', '2', '--afvinken'], { encoding: 'utf8' });
+  '--nr', String(ann.nr), '--hunks', '2', '--resolve'], { encoding: 'utf8' });
 const naToepassen = readFileSync(bestand, 'utf8');
 const kaart = naToepassen.slice(naToepassen.indexOf('la-draft-txt'), naToepassen.indexOf('</div>\n</div>'));
 zeg(/vrijdag/.test(kaart), 'blok 2 is doorgevoerd in de pagina');
-zeg(/Hoi Laurens,/.test(kaart) && !/Hallo Laurens,/.test(kaart),
+zeg(/Hoi Kim,/.test(kaart) && !/Hallo Kim,/.test(kaart),
   'blok 1 is ongemoeid gelaten — blokken zijn dus echt onafhankelijk');
 zeg(/staat klaar\./.test(kaart), 'blok 3 is ongemoeid gelaten');
 
@@ -117,7 +122,7 @@ zeg(annNa.resolved !== true,
 /* Twee dingen tegelijk waar een positie op stukloopt: er komt tekst bóven het blok bij,
    én het te wijzigen woord komt twee keer voor. Alleen het anker kan dit nog aanwijzen. */
 writeFileSync(bestand, readFileSync(bestand, 'utf8')
-  .replace('Hoi Laurens,', 'Hoi Laurens,\n\nEven vooraf: dit is een extra alinea.'));
+  .replace('Hoi Kim,', 'Hoi Kim,\n\nEven vooraf: dit is een extra alinea.'));
 let uit3 = '';
 try {
   uit3 = execFileSync('python3', [join(SKILL, 'bin/pas-hunk-toe.py'), jsonPath,
@@ -134,15 +139,17 @@ zeg(/staan klaar\./.test(eind),
    zodra er iets van verwerkt is — precies wanneer overzicht het meest telt. */
 writeFileSync(bestand, `<!doctype html><meta charset="utf-8"><title>${slug}</title>
 <div class="la-draft">
-  <div class="la-draft-hdr"><b>Aan:</b> Laurens &nbsp;·&nbsp; <b>Onderwerp:</b> Coverage</div>
+  <div class="la-draft-hdr"><b>Aan:</b> Kim &nbsp;·&nbsp; <b>Onderwerp:</b> Coverage</div>
   <div class="la-draft-txt">${ORIGINEEL.replace('donderdag', 'vrijdag')}</div>
 </div>
 ${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`);
 
 const browser2 = await chromium.launch({ channel: 'chrome', headless: true });
 const page2 = await browser2.newPage();
-await page2.goto(`http://127.0.0.1:${PORT}/p/Desktop/${slug}.html`, { waitUntil: 'load' });
+await page2.goto(`http://127.0.0.1:${PORT}/p/html-annotator-tests/${slug}.html`, { waitUntil: 'load' });
 await sleep(2500);
+await page2.click('.la-draft-diff');
+await sleep(300);
 const herstel = await page2.evaluate(() => {
   const box = document.querySelector('.la-draft-txt');
   return {
@@ -154,7 +161,7 @@ const herstel = await page2.evaluate(() => {
 await browser2.close();
 // Beide nog openstaande blokken moeten terug zijn: blok 1 ("Hoi"->"Hallo") en blok 3
 // ("klaar."->"gereed."). Alleen het gewijzigde woord is doorgehaald, niet de hele regel —
-// "Laurens," veranderde immers niet.
+// "Kim," veranderde immers niet.
 zeg(/Hoi/.test(herstel.del) && /klaar\./.test(herstel.del),
   `beide open blokken staan er nog, ook nu blok 2 is doorgevoerd (doorgehaald: ${JSON.stringify(herstel.del)})`);
 zeg(!/donderdag/.test(herstel.del),
@@ -165,5 +172,5 @@ zeg(!/gewijzigd sinds annotatie/.test(herstel.melding),
 if (process.env.CASE06_TOON) { console.log(uit.trim(), '\n', uit3.trim()); }
 
 rmSync(bestand, { force: true });
-rmSync(join(homedir(), 'Desktop', 'annotaties', slug), { recursive: true, force: true });
+rmSync(join(ROOT, slug), { recursive: true, force: true });
 process.exit(falen ? 1 : 0);

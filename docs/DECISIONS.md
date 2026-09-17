@@ -3,6 +3,87 @@
 Choices a later cleanup must not reopen without the owner.
 Changing behaviour is a new decision, not an edit here.
 
+## 2026-09-17 — Public names are `html-annotator`, old names stay as aliases (F3)
+
+The skill ships under its own name instead of its author's. Public
+surface: `window.HtmlAnnotator`, the markers `<!-- HTML-ANNOTATOR v3 -->`
+… `<!-- /HTML-ANNOTATOR -->` written by new embeds, bridge identity
+`"bridge": "html-annotator"` in `/ping`, and `HTML_ANNOTATOR_*`
+environment variables. Reason: a distribution on PyPI and a public repo
+cannot carry a personal identifier as its API, and `/ping` is what other
+tooling matches on.
+
+What did **not** change, on purpose: the localStorage prefix
+`luc-annotaties` (renaming it drops unsent local drafts on pages that are
+open right now), and the recognition of the old marker generation. The
+bridge's content hash, the PostToolUse hook and the tests accept
+`LUC-ANNOTATOR` v1/v2 blocks, so an existing page keeps working without
+being re-embedded.
+
+## 2026-09-17 — Alias policy: deprecated, not deleted, until 1.1
+
+Every renamed thing keeps its old name working for one minor version:
+the page-global alias assigned by the snippet, `LUC_ANNOTATOR_*` env
+vars, `bin/toon-annotaties.py` and `bin/pas-hunk-toe.py`, and the old
+markers. They are documented as deprecated in `INSTALL.md` and in the
+migration section of `CHANGELOG.md`, not silently kept. The one thing
+that changed without an alias is the `/ping` identity: a value cannot be
+two strings at once, and a consumer that matched on it gets a clear
+failure rather than a silent wrong branch.
+
+Removal happens in 1.1, with the changelog entry written at that time.
+
+## 2026-09-17 — Packaging: hatchling, one snippet source, skill files in the wheel (F2)
+
+`pyproject.toml` uses hatchling and declares the distribution
+`html-annotator` (checked free on PyPI on 2026-09-17), console script
+`html-annotator = html_annotator.cli:main`, no runtime dependencies, and
+`Pillow` behind the extra `[crops]`. The version has one home,
+`html_annotator/__init__.py`; `[tool.hatch.version]` reads it, so a
+release never has two numbers to keep in sync.
+
+`references/` stays the single source of the paste blocks. The wheel
+force-includes that directory as `html_annotator/snippets/` and
+`SKILL.md` plus `bin/` as `html_annotator/_skill/`, so an installed
+package can serve the snippet (`config.snippet_path()`) and
+`install-skill` can assemble `~/.claude/skills/html-annotator` without a
+checkout. The alternative — keeping a second copy of the snippet inside
+the package directory — was rejected because two copies drift; criterion
+A11 fails a copy that is not byte-identical.
+
+In a checkout (and with `pip install -e .`) `config.is_checkout()` is
+true and everything resolves against the working tree, so editing
+`references/annotator-snippet.html` takes effect immediately.
+
+## 2026-09-17 — One Python CLI, no bash, no jq (F1)
+
+`install.sh`, `bin/ensure-bridge.sh` and `bin/hook-ensure-bridge.sh` are
+gone. Everything runs through `python -m html_annotator` (package
+`html_annotator/`, renamed from `annotator/`): `serve`, `ensure`, `stop`,
+`status`, `show`, `resolve`, `apply-hunk`, `url`, `install-skill`,
+`install-hooks`. Reason: a Windows user needed Git Bash plus jq for
+install and hooks, which is a second toolchain for a stdlib-only skill.
+`bin/*.py` stay as thin wrappers so older hooks and shortcuts keep
+working. Pid file and log moved out of the checkout into a per-user
+state directory, because a symlinked skill is read-only in spirit and a
+copy would have carried them along.
+
+## 2026-09-17 — Default annotation root `~/annotations`, old location wins if present
+
+New installs write to `~/annotations`; a machine that already has the
+older `annotaties` folder on the Desktop and no `~/annotations` keeps
+using it. Env: `HTML_ANNOTATOR_ROOT` / `HTML_ANNOTATOR_PORT`, with the
+`LUC_ANNOTATOR_*` names still accepted. Renaming the env vars without a
+fallback would have broken running setups mid-session.
+
+## 2026-09-17 — Scope: core versus extras (F0)
+
+Core is snippet + bridge + CLI + handbook, plus the checklist and
+suggest layers. Out: todo-list spawning (script deleted), the draft
+message card and `la-sub` (docs and tests to `extras/`, code stays in
+the snippet because the paste block is one file by the 2026-08-23
+decision). `apply-hunk` stays core. Full reasoning: `docs/SCOPE.md`.
+
 ## 2026-08-18 — SessionStart hook always on
 
 The bridge hook runs at user level on every agent session (empty
@@ -52,9 +133,10 @@ No client page in the suite — case-08 is the reduced form.
 ## 2026-08-23 — Root is a port, CLIs in bin/
 
 CLIs and hooks live in `bin/`. Python library in `annotator/`
-(snake_case). `ensure-bridge.sh` and `hook-ensure-bridge.sh` are
-location-relative. Agent-facing docs name no person;
-`window.LucAnnotator` and the `LUC-ANNOTATOR` marker stay (public API).
+(snake_case; renamed to `html_annotator/` on 2026-09-17). The ensure and
+hook entry points are location-relative. Agent-facing docs name no person;
+the page-global object and the `LUC-ANNOTATOR` marker stay (public API;
+superseded on 2026-09-17, see the naming decision at the top).
 
 ## 2026-08-23 — Criteria at root, decisions in docs
 
@@ -67,11 +149,11 @@ Root ports a stranger opens first — `SKILL.md`, `README.md`,
 `INSTALL.md`, `CRITERIA.md`, `install.sh` — are English (A8).
 `references/agent-handbook.md` and the work-rule block printed by
 `bin/toon-annotaties.py` stay Dutch until a dedicated translation.
-CLI filenames (`toon-annotaties.py`, `vind-todolijst.sh`,
-`pas-hunk-toe.py`) stay: they are the same class of identifier as
-`LUC_ANNOTATOR_*`. `annotator/` stays an importable package;
-`install.sh` stays at root; `INSTALL.md` stays a port, not a file
-in `bin/`.
+The Dutch CLI filenames in `bin/` stay: they are the same class of
+identifier as `LUC_ANNOTATOR_*`. (Superseded in part on 2026-09-17: the
+CLI itself is `python -m html_annotator`, the `bin/` files are wrappers,
+and the todo-list script was deleted with the scope pass.) `INSTALL.md`
+stays a port, not a file in `bin/`.
 
 ## 2026-08-28 — Draft cards are rich text; the diff stays on the plain-text projection
 
@@ -123,7 +205,7 @@ die de annotator al lang had opgelost. Besluit: de laag leeft ín
 annotator-snippet.html en hergebruikt letterlijk de annotatie-mechaniek —
 la-rect-selecties (tekstregels voor tekst, één regiokader voor visuals), de
 badge breed uitgetrokken tot pill met ✕ ✓ ✎, en voor ✎ de echte popup via
-`LucAnnotator.openComposer` (chips incluis). Beslissingen zijn status
+`HtmlAnnotator.openComposer` (chips incluis). Beslissingen zijn status
 (state.json, component `suggest`), geen annotaties. `references/
 suggest-snippet.html` is een deprecatie-pointer; niet meer inplakken.
 

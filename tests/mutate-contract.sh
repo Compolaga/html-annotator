@@ -14,8 +14,8 @@ if [ -d "$ORIG/tests/node_modules" ]; then
 fi
 SKILL="$werk/repo"
 cd "$SKILL/tests"
-BRIDGE="$SKILL/bin/annotator-bridge.py"
-TOON="$SKILL/bin/toon-annotaties.py"
+BRIDGE="$SKILL/html_annotator/bridge.py"
+TOON="$SKILL/html_annotator/show.py"
 SNIP="$SKILL/references/annotator-snippet.html"
 
 falen=0
@@ -78,7 +78,7 @@ if python3 ./test_bridge_contract.py >/tmp/ann-mut-p403.txt 2>&1; then
 else
   zeg 0 "B2 wordt rood als /p/ buiten home wordt doorgelaten"
 fi
-rsync -a "$ORIG/bin/annotator-bridge.py" "$BRIDGE"
+rsync -a "$ORIG/html_annotator/bridge.py" "$BRIDGE"
 
 # Hash zonder het annotator-blok te strippen. B5 moet dit vangen.
 python3 - <<'PY' "$BRIDGE"
@@ -96,7 +96,7 @@ if python3 ./test_bridge_contract.py >/tmp/ann-mut-hash.txt 2>&1; then
 else
   zeg 0 "B5 wordt rood als contentHash het blok meetelt"
 fi
-rsync -a "$ORIG/bin/annotator-bridge.py" "$BRIDGE"
+rsync -a "$ORIG/html_annotator/bridge.py" "$BRIDGE"
 
 # Ronde-teller hergebruikt de huidige ronde na remove-all. B4 moet dit vangen.
 python3 - <<'PY' "$BRIDGE"
@@ -114,7 +114,7 @@ if python3 ./test_bridge_contract.py >/tmp/ann-mut-b4.txt 2>&1; then
 else
   zeg 0 "B4 wordt rood als remove-all geen nieuwe ronde opent"
 fi
-rsync -a "$ORIG/bin/annotator-bridge.py" "$BRIDGE"
+rsync -a "$ORIG/html_annotator/bridge.py" "$BRIDGE"
 
 python3 - <<'PY' "$BRIDGE"
 import sys
@@ -135,7 +135,7 @@ if python3 ./test_bridge_contract.py >/tmp/ann-mut-resolve.txt 2>&1; then
 else
   zeg 0 "B3 wordt rood als resolve de JSON niet wijzigt"
 fi
-rsync -a "$ORIG/bin/annotator-bridge.py" "$BRIDGE"
+rsync -a "$ORIG/html_annotator/bridge.py" "$BRIDGE"
 
 python3 - <<'PY' "$BRIDGE"
 import sys
@@ -158,7 +158,7 @@ if python3 ./test_bridge_contract.py >/tmp/ann-mut-tmp.txt 2>&1; then
 else
   zeg 0 "B21 wordt rood als dump-fout het tmp laat liggen"
 fi
-rsync -a "$ORIG/bin/annotator-bridge.py" "$BRIDGE"
+rsync -a "$ORIG/html_annotator/bridge.py" "$BRIDGE"
 
 set +e
 python3 ./test_toon.py >/tmp/ann-mut-toon-ok.txt 2>&1
@@ -183,7 +183,7 @@ if python3 ./test_toon.py >/tmp/ann-mut-toon.txt 2>&1; then
 else
   zeg 0 "B8 wordt rood als de werkregel weg is"
 fi
-rsync -a "$ORIG/bin/toon-annotaties.py" "$TOON"
+rsync -a "$ORIG/html_annotator/show.py" "$TOON"
 
 # B6: crop-except weg → annotatie verdwijnt of de call knalt.
 python3 - <<'PY' "$BRIDGE"
@@ -204,14 +204,14 @@ if python3 ./test_bridge_contract.py >/tmp/ann-mut-b6.txt 2>&1; then
 else
   zeg 0 "B6 wordt rood als crop-falen de annotatie laat vallen"
 fi
-rsync -a "$ORIG/bin/annotator-bridge.py" "$BRIDGE"
+rsync -a "$ORIG/html_annotator/bridge.py" "$BRIDGE"
 
 if [ ! -d node_modules/playwright-core ]; then
   zeg 1 "B16 overgeslagen: playwright-core ontbreekt (geen stilzwijgende pass)"
 else
   poort=$(vrije_poort)
   root=$(mktemp -d)
-  LUC_ANNOTATOR_PORT="$poort" LUC_ANNOTATOR_ROOT="$root" python3 "$BRIDGE" >/tmp/ann-mut-b16-bridge.log 2>&1 &
+  LUC_ANNOTATOR_PORT="$poort" LUC_ANNOTATOR_ROOT="$root" python3 -m html_annotator serve >/tmp/ann-mut-b16-bridge.log 2>&1 &
   bpid=$!
   if ! wacht_bridge "$poort"; then
     zeg 1 "B16-bridge kwam niet omhoog"

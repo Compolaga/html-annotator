@@ -5,9 +5,19 @@ after a restart, a reload, or an edit elsewhere on the page. Pages open
 via `/p/`. The repo is a skill someone else can install, without
 personal workflow files.
 
-Proof is `~/Desktop/annotaties/<slug>/ronde-NN/annotations.json`, not
-the chat. `tests/run.sh` covers a **subset**. A BLOCKED case never
-counts as green. Dated choices: `docs/DECISIONS.md`.
+Proof is `<annotation-root>/<slug>/ronde-NN/annotations.json`, not the
+chat. `tests/run.sh` covers a **subset**. A BLOCKED case never counts as
+green. Dated choices: `docs/DECISIONS.md`. Where the scope line runs:
+`docs/SCOPE.md`.
+
+Every criterion below carries two labels:
+
+- **TESTED** — an automated case fails when the behaviour breaks.
+  **UNTESTED** — believed to hold, but nothing catches a regression.
+- **platform: all / posix / windows** — where the evidence was
+  collected. `all` means the Python tests run on the three-OS CI matrix;
+  `posix` means the evidence is a Playwright or shell case that only
+  runs on macOS and Linux.
 
 ## Out of scope
 
@@ -15,14 +25,24 @@ counts as green. Dated choices: `docs/DECISIONS.md`.
   enforceable by the suite.
 - A sideviewer is allowed, but only via `/p/`, never as `file://`/`data:`.
 - Chrome throttling of a real background tab is untested.
-- Identifiers stay: `window.LucAnnotator`, `<!-- LUC-ANNOTATOR -->`,
-  bridge identity `luc-annotator`, localStorage `luc-annotaties`,
-  `LUC_ANNOTATOR_*`. Renaming them orphans existing pages unless a
-  migration ships with the rename.
+- The draft card (`la-draft`) and `la-sub` left the contract in the F0
+  pass: their CSS and JS still ship inside the snippet, their criteria
+  sit in `extras/CRITERIA-extras.md` (B13, B15, B24, B25) and their
+  cases in `extras/tests/`. See `docs/SCOPE.md`.
+- Public names as of 1.0.0rc1: `window.HtmlAnnotator`, the markers
+  `<!-- HTML-ANNOTATOR v3 -->` … `<!-- /HTML-ANNOTATOR -->`, bridge
+  identity `html-annotator`, env `HTML_ANNOTATOR_*`. The previous
+  generation stays readable and is kept as a deprecated alias until 1.1:
+  the old page-global, `<!-- LUC-ANNOTATOR -->` blocks (content hash and
+  hooks still recognise them), `LUC_ANNOTATOR_*`, and the localStorage
+  prefix `luc-annotaties`, which does not change at all. Migration table:
+  `CHANGELOG.md`.
 
 ## Functional requirements
 
 <details><summary><strong>B1 — <code>/ping</code> returns 200, CORS <code>*</code>, OPTIONS 204.</strong></summary>
+
+*TESTED · platform: all*
 
 *Expected behaviour:* `GET /ping` answers; any origin is allowed; a
 preflight is 204.
@@ -35,6 +55,8 @@ preflight is 204.
 
 <details><summary><strong>B2 — <code>/p/</code> outside home is 403.</strong></summary>
 
+*TESTED · platform: all*
+
 *Expected behaviour:* a path that leaves the home directory is refused.
 
 *Evidence:* `tests/test_bridge_contract.py` · `tests/mutate-contract.sh`.
@@ -42,6 +64,8 @@ preflight is 204.
 </details>
 
 <details><summary><strong>B3 — POST <code>/session</code> <code>/save</code> <code>/delete</code> <code>/remove-all</code> <code>/resolve</code> <code>/sessie</code> exist; <code>/resolve</code> sets <code>resolved</code> on disk.</strong></summary>
+
+*TESTED · platform: all*
 
 *Expected behaviour:* each route answers; resolve writes `resolved` on
 the record.
@@ -54,6 +78,8 @@ the record.
 
 <details><summary><strong>B4 — A round is never overwritten; a new round only after <code>/remove-all</code>.</strong></summary>
 
+*TESTED · platform: all*
+
 *Expected behaviour:* a second save stays in the current round; a new
 `ronde-NN` appears only after remove-all.
 
@@ -63,6 +89,8 @@ the record.
 
 <details><summary><strong>B5 — <code>contentHash</code> ignores the annotator block.</strong></summary>
 
+*TESTED · platform: all*
+
 *Expected behaviour:* editing only the snippet does not change the page hash.
 
 *Evidence:* `tests/test_bridge_contract.py` · `tests/mutate-contract.sh`.
@@ -70,6 +98,8 @@ the record.
 </details>
 
 <details><summary><strong>B6 — A crop failure still stores the annotation.</strong></summary>
+
+*TESTED · platform: all*
 
 *Expected behaviour:* when `maak_crop` raises, the JSON record is still written.
 
@@ -79,13 +109,17 @@ the record.
 
 <details><summary><strong>B7 — JSON write is atomic (tmp + replace); a dump error leaves the original.</strong></summary>
 
+*TESTED · platform: all*
+
 *Expected behaviour:* a failed dump does not truncate `annotations.json`.
 
 *Evidence:* `tests/test_bridge_contract.py` (direct `schrijf`). Tmp cleanup is B21.
 
 </details>
 
-<details><summary><strong>B8 — <code>toon-annotaties.py --open</code> prints the work rule, expands refs, shows locator.</strong></summary>
+<details><summary><strong>B8 — <code>show --open</code> prints the work rule, expands refs, shows locator.</strong></summary>
+
+*TESTED · platform: all*
 
 *Expected behaviour:* open items include the work rule, resolved refs, and the locator.
 
@@ -97,6 +131,8 @@ the record.
 
 <details><summary><strong>B9 — Missing refs: do not guess, do warn.</strong></summary>
 
+*TESTED · platform: all*
+
 *Expected behaviour:* `refsIncomplete` asks to save again; the CLI does not invent a target.
 
 *Evidence:* `tests/test_toon.py` · `tests/test_record.py`.
@@ -106,6 +142,8 @@ the record.
 </details>
 
 <details><summary><strong>B10 — Pill self-heals and a later save lands on disk.</strong></summary>
+
+*TESTED · platform: posix*
 
 *Expected behaviour:* given a page that is already open while the bridge
 is down, when the bridge comes up the pill flips to `X saved` within 10s
@@ -121,8 +159,10 @@ measure Chrome timer throttling (B19).
 
 <details><summary><strong>B11 — SessionStart brings the bridge up.</strong></summary>
 
-*Expected behaviour:* given the hooks in `settings.local.json`, a route
-exists that starts the bridge without depending on how the agent writes
+*TESTED · platform: posix*
+
+*Expected behaviour:* given the hooks written by
+`python -m html_annotator install-hooks`, a route exists that starts the bridge without depending on how the agent writes
 the file, and the `Edit|Write` route still works. SessionStart covers
 Bash writes; the matcher is not widened to every Bash call.
 
@@ -132,11 +172,15 @@ Bash writes; the matcher is not widened to every Bash call.
 
 </details>
 
-<details><summary><strong>B12 — <code>ensure-bridge.sh</code> does not lie.</strong></summary>
+<details><summary><strong>B12 — <code>ensure</code> does not lie.</strong></summary>
+
+*TESTED · platform: posix*
 
 *Expected behaviour:* given port 8791 held by a non-bridge,
-`ensure-bridge.sh` ends with a live answering bridge or a non-zero
-exit — never exit 0 while `/ping` is empty. Stale pidfile is removed.
+`python -m html_annotator ensure` ends with a live answering bridge or a
+non-zero exit — never exit 0 while `/ping` is empty. A stale pid file is
+removed. A second `ensure` says "already running" and starts nothing;
+`stop` takes down what `ensure` started.
 
 *Evidence:* `tests/case-03-ensure-bridge-eerlijk.sh`.
 
@@ -144,45 +188,23 @@ exit — never exit 0 while `/ping` is empty. Stale pidfile is removed.
 
 </details>
 
-<details><summary><strong>B13 — A draft edit lands as <code>type: edit</code>.</strong></summary>
-
-*Expected behaviour:* click-edit in a draft card stores `type: edit`
-with original, new (both as plain-text projection), `origineelHtml` /
-`nieuwHtml`, and a diff that points at the changed span, and survives
-reload. No badge, no orphan list.
-
-*Evidence:* `tests/case-05` (draft edit).
-
-*Gap:* no contract mutation.
-
-</details>
-
 <details><summary><strong>B14 — Hunks are independently applicable.</strong></summary>
+
+*TESTED · platform: posix*
 
 *Expected behaviour:* each contiguous edit is its own hunk with
 surrounding text as the anchor. Hunks apply and resolve independently.
 The edit is done only when no hunk is open.
 
-*Evidence:* `tests/case-06-hunks.mjs` · `bin/pas-hunk-toe.py`.
-
-*Gap:* no contract mutation.
-
-</details>
-
-<details><summary><strong>B15 — <code>la-sub*</code> +30px, hook without page CSS.</strong></summary>
-
-*Expected behaviour:* each nest level steps 30px further in, at least
-four deep. A child draws a hook on any block element, including a bare
-`<li>`. Line colour follows `--line` when set, and stays visible
-without it. `--la-stap` moves indent and hook together.
-
-*Evidence:* `tests/case-07`.
+*Evidence:* `tests/case-06-hunks.mjs` · `html_annotator/hunks.py`.
 
 *Gap:* no contract mutation.
 
 </details>
 
 <details><summary><strong>B16 — Locator survives a row insert; orphan only when the text is gone; repeated cell text stays on the labeled row.</strong></summary>
+
+*TESTED · platform: posix*
 
 *Expected behaviour:* inserting a row above does not move the mark;
 deleting the text orphans it; two identical cells keep the mark on the
@@ -196,6 +218,8 @@ row the locator named.
 
 <details><summary><strong>B17 — Sideviewer origin.</strong></summary>
 
+*UNTESTED · platform: posix (manual, 2026-08-18)*
+
 *Expected behaviour:* opening a file in the sideviewer is a `data:`
 snapshot and cannot reach the bridge. The same page via `/p/` works,
 including self-heal.
@@ -205,6 +229,8 @@ including self-heal.
 </details>
 
 <details><summary><strong>B18 — A fresh agent pastes the snippet.</strong></summary>
+
+*UNTESTED · platform: posix (BLOCKED)*
 
 *Expected behaviour:* a fresh agent asked to ship HTML via Bash starts
 the bridge (new pid) and includes the `LUC-ANNOTATOR` marker. All runs
@@ -229,6 +255,8 @@ default `tests/run.sh`.
 
 <details><summary><strong>B21 — A dump error removes the <code>.tmp</code>.</strong></summary>
 
+*TESTED · platform: all*
+
 *Expected behaviour:* after a failed dump the leftover tmp file is gone.
 
 *Evidence:* `tests/test_bridge_contract.py` · mutate (`os.remove`).
@@ -237,41 +265,19 @@ default `tests/run.sh`.
 
 <details><summary><strong>B22 — A page under <code>/p/</code> on a non-default port talks to that port.</strong></summary>
 
+*TESTED · platform: posix*
+
 *Expected behaviour:* when the bridge is not on 8791, the snippet still
 posts to the port that served `/p/`.
 
-*Evidence:* `tests/case-08-locator-tabel.mjs` (requires `LUC_ANNOTATOR_PORT`)
+*Evidence:* `tests/case-08-locator-tabel.mjs` (requires `HTML_ANNOTATOR_PORT`)
 · `tests/mutate-contract.sh`.
 
 </details>
 
-<details><summary><strong>B24 — A draft card renders as the mail: lists, bold and links.</strong></summary>
-
-*Expected behaviour:* `.la-draft-txt` shows real `<ul>`/`<ol>` items,
-bold, italic and links, and the reviewer applies them from the card's own
-toolbar (⌘B/⌘I/⌘K too). The stored `nieuwHtml` uses only
-`p, ul, ol, li, b, i, a, br`, so it can go into a mail body as-is. A card
-the agent wrote as plain text stays plain until a format button is used.
-
-*Evidence:* `tests/case-13-rijke-concepten.mjs`.
-
-</details>
-
-<details><summary><strong>B25 — Formatting is its own hunk kind, and the text diff stays plain.</strong></summary>
-
-*Expected behaviour:* turning a line into a bullet or a word bold leaves
-the plain-text projection untouched and produces a hunk with
-`soort: "opmaak"` naming what changed and on which block. Text hunks keep
-plain-text anchors clamped to their own block, so `pas-hunk-toe.py` still
-places them in the HTML source; it refuses formatting hunks out loud
-instead of guessing. Both kinds come back on their anchor after a reload.
-
-*Evidence:* `tests/case-13-rijke-concepten.mjs`; decision in
-`docs/DECISIONS.md` (2026-08-28).
-
-</details>
-
 <details><summary><strong>B26 — Checklist state persists per page, outside the rounds.</strong></summary>
+
+*TESTED · platform: all*
 
 *Expected behaviour:* `POST /state-save` with `{component, key, value}`
 merges the value over the existing entry, stamps `changedAt` on the entry
@@ -286,6 +292,8 @@ touch it. Snippet: `references/checklist-snippet.html` (LA-CHECKLIST).
 </details>
 
 <details><summary><strong>B27 — A LA-SUGGEST "change" is editable, and pending keeps the typed text.</strong></summary>
+
+*TESTED · platform: posix*
 
 *Expected behaviour:* opening the ✎ popup for a suggestion that already
 carries a `change` decision prefills the comment field with the stored
@@ -304,6 +312,8 @@ comment on an accepted key.
 
 <details><summary><strong>B28 — A suggestion that becomes visible later gets its pill on its own.</strong></summary>
 
+*TESTED · platform: posix*
+
 *Expected behaviour:* an element with `data-la-suggest` that is hidden at
 load (a collapsed table group, an inline `display:none`) or inserted into
 the DOM later shows its rects and pill as soon as it becomes visible — no
@@ -317,6 +327,8 @@ layer's own nodes never trigger another redraw.
 </details>
 
 <details><summary><strong>B29 — One suggest key is one suggestion with one pill.</strong></summary>
+
+*TESTED · platform: posix*
 
 *Expected behaviour:* elements sharing a `data-la-suggest` key are drawn as
 one visual group — every rect highlighted — with exactly one pill, because
@@ -332,6 +344,8 @@ pill and decide independently: accepting one leaves the other pending, and
 
 <details><summary><strong>B23 — Region and text boxes scroll with the HTML they mark, including inside an <code>overflow:auto</code> scroller.</strong></summary>
 
+*TESTED · platform: posix*
+
 *Expected behaviour:* after the marked row moves in a nested scroller, the
 box and badge sit on that row — not at the same viewport coordinates.
 Window-scroll still follows too.
@@ -344,10 +358,12 @@ Window-scroll still follows too.
 
 <details><summary><strong>A1 — Root holds only ports.</strong></summary>
 
+*TESTED · platform: all*
+
 *Expected behaviour:* root files are README, SKILL, INSTALL, CRITERIA,
-`install.sh`, `.gitignore`. Directories: `annotator/` `bin/`
-`references/` `tests/` `docs/`. Snippet lives in `references/`.
-Gitignored runtime does not count.
+`.gitignore`. Directories: `html_annotator/` `bin/` `references/`
+`tests/` `docs/` `extras/`. Snippet lives in `references/`. Gitignored
+runtime does not count, and `install-skill` does not copy it.
 
 *Evidence:* `tests/test_layout.py`.
 
@@ -355,17 +371,32 @@ Gitignored runtime does not count.
 
 <details><summary><strong>A2 — No <code>memories/</code>. Agent rules live in <code>references/</code>.</strong></summary>
 
+*TESTED · platform: all*
+
 *Evidence:* `tests/test_layout.py`.
 
 </details>
 
-<details><summary><strong>A3 — <code>extras/</code> gone; not installed.</strong></summary>
+<details><summary><strong>A3 — <code>extras/</code> is documented and never installed.</strong></summary>
 
-*Evidence:* `tests/test_layout.py` · `install.sh`.
+*TESTED · platform: all*
+
+*Expected behaviour:* `extras/README.md` says what is in there and that
+it is not part of the install; `docs/SCOPE.md` says why; `install-skill`
+leaves `extras/` out of the copy.
+
+*Evidence:* `tests/test_layout.py`.
 
 </details>
 
-<details><summary><strong>A4 — CLIs and hooks live in <code>bin/</code>; install/hooks point there; a <code>bin/&lt;name&gt;.(py|sh)</code> string in agent-facing docs names a file that exists.</strong></summary>
+<details><summary><strong>A4 — CLIs and hooks live in <code>bin/</code> as thin wrappers; <code>install-hooks</code> points there; a <code>bin/&lt;name&gt;.py</code> string in agent-facing docs names a file that exists.</strong></summary>
+
+*TESTED · platform: all*
+
+*Expected behaviour:* `install-hooks` registers exactly two entries
+(SessionStart + PostToolUse on `Edit|Write`), both calling
+`bin/hook-ensure-bridge.py` with an absolute Python path, both
+idempotent, `--print` writing nothing.
 
 *Evidence:* `tests/test_layout.py` · `tests/mutate-layout.sh` (invented name).
 
@@ -373,54 +404,124 @@ Gitignored runtime does not count.
 
 <details><summary><strong>A5 — Python modules: <code>snake_case</code>. Scripts in <code>bin/</code>: kebab-case.</strong></summary>
 
+*TESTED · platform: all*
+
 *Evidence:* `tests/test_layout.py`.
 
 </details>
 
 <details><summary><strong>A6 — Agent-facing text names no person.</strong></summary>
 
-*Expected behaviour:* allowlist (behaviour): `LucAnnotator`,
-`LucAnnotatorBridge`, `LUC-ANNOTATOR`, `luc-annotator`,
-`luc-annotaties`, `LUC_ANNOTATOR_*`. Exempt: `docs/DECISIONS.md`.
+*TESTED · platform: all*
 
-*Evidence:* `tests/test_layout.py`.
-
-</details>
-
-<details><summary><strong>A7 — B1–B15 plus B16/B21/B22/B23/B24/B25/B26/B27/B28/B29 stay green.</strong></summary>
-
-*Evidence:* `tests/run.sh` (default: 00 02–09 11–17). The suite header
-prints `git rev-parse --short HEAD` and a dirty-tree count. Captures
-live in `tests/red/ronde-NN-*.txt`; never overwrite an existing ronde.
-
-</details>
-
-<details><summary><strong>A8 — Root ports are English.</strong></summary>
-
-*Expected behaviour:* `SKILL.md`, `README.md`, `INSTALL.md`,
-`CRITERIA.md`, and `install.sh` have no Dutch function-word leftovers.
-The handbook and the CLI work-rule stay Dutch until a dedicated pass
-(`docs/DECISIONS.md`, 2026-08-23).
+*Expected behaviour:* the allowlist covers identifiers that carry
+behaviour: the deprecated page-global alias, `LUC-ANNOTATOR` markers,
+`luc-annotaties` and `LUC_ANNOTATOR_*`. Exempt: `docs/DECISIONS.md` and
+`extras/`.
 
 *Evidence:* `tests/test_layout.py` · `tests/mutate-layout.sh`.
 
 </details>
 
+<details><summary><strong>A7 — The functional criteria stay green.</strong></summary>
+
+*TESTED · platform: posix (full suite), all (Python cases)*
+
+*Evidence:* `tests/run.sh` (default: 00 02–04 06 08–09 11–12 14–17).
+`00 09 11` run without a browser and are the three-OS CI set. The suite
+header prints `git rev-parse --short HEAD` and a dirty-tree count.
+
+</details>
+
+<details><summary><strong>A8 — Root ports are English.</strong></summary>
+
+*TESTED · platform: all*
+
+*Expected behaviour:* `SKILL.md`, `README.md`, `INSTALL.md` and
+`CRITERIA.md` have no Dutch function-word leftovers. Since 1.0.0rc1 the
+snippet UI, the bridge log lines, the CLI output and the work-rule box
+printed by `show` are English too (`docs/DECISIONS.md`, 2026-09-17).
+`references/agent-handbook.md` is still Dutch and is the one remaining
+surface waiting for a dedicated translation pass.
+
+*Evidence:* `tests/test_layout.py` · `tests/mutate-layout.sh`.
+
+</details>
+
+<details><summary><strong>A9 — No bash in the core.</strong></summary>
+
+*TESTED · platform: all*
+
+*Expected behaviour:* install, hooks, bridge and CLIs are one Python
+entry point (`python -m html_annotator`). No `.sh` outside `tests/`
+(Playwright runner) and `extras/`. A Windows user needs neither Git Bash
+nor jq.
+
+*Evidence:* `tests/test_layout.py` (A9) · CI matrix on
+`windows-latest`.
+
+</details>
+
+<details><summary><strong>A10 — The package installs, reports its version, and carries the snippet.</strong></summary>
+
+*TESTED · platform: all*
+
+*Expected behaviour:* `pyproject.toml` builds the distribution
+`html-annotator` with the console script `html-annotator` and no runtime
+dependencies (`[crops]` adds Pillow). The version sits in exactly one
+place, `html_annotator/__init__.py`; `pyproject.toml` reads it
+dynamically, `html-annotator --version` and `python -m html_annotator
+--version` print it, and `/ping` returns it as `release`. `pip install
+-e .` into a fresh venv gives a working console script, and
+`install-skill` also works from an installed package instead of only
+from a checkout. `LICENSE` and `CHANGELOG.md` exist and the changelog
+names this version.
+
+*Evidence:* `tests/test_layout.py` (A10 checks, including the venv
+install; it prints SKIP instead of PASS when no venv or no network is
+available) · `tests/test_bridge_contract.py` (B1 `release`).
+
+*Gap:* a published wheel from PyPI is not exercised; the venv case
+installs from the working tree.
+
+</details>
+
+<details><summary><strong>A11 — One source for the snippets.</strong></summary>
+
+*TESTED · platform: all*
+
+*Expected behaviour:* `references/` is the only copy of
+`annotator-snippet.html`, `checklist-snippet.html` and
+`suggest-snippet.html` in the repo. The build maps that directory into
+the wheel as `html_annotator/snippets/`, so the snippet is importable at
+runtime (`html_annotator.config.snippet_path()`), and a second copy in
+the tree is only allowed when it is byte-identical — a drifting copy
+fails.
+
+*Evidence:* `tests/test_layout.py` (A11 checks).
+
+</details>
+
 ## Seams
 
-Tests only touch these edges: the bridge HTTP API, the
-`toon-annotaties.py` and `pas-hunk-toe.py` CLIs, `ensure-bridge.sh`
-exit codes, the snippet via Playwright (cases 02/05/06/07/08), and the
-public paths in `bin/` plus root contents.
+Tests only touch these edges: the bridge HTTP API, the CLI
+(`python -m html_annotator show / apply-hunk / ensure / install-*`), the
+snippet via Playwright (cases 02/06/08/12/14–17), and the repo layout
+(root contents, `bin/`, the two install commands).
 
 No tests against internal helpers, no snapshots of whole JSON dumps.
 
 ## Release gate
 
-1. `python3 -m compileall -q annotator bin`
-2. Hook files live in `bin/`; `install.sh` registers
-   `bin/hook-ensure-bridge.sh`.
-3. `install.sh` copies no memories; agent rules live in `references/`.
-4. Suite: `tests/run.sh` — red if a case fails or BLOCKED is treated as pass.
-5. No diff on snippet CSS or English UI strings, except paths into
-   `bin/` and comment headers.
+0. `html-annotator --version` matches `html_annotator/__init__.py`, and
+   `CHANGELOG.md` has an entry for it.
+1. `python -m compileall -q html_annotator bin`
+2. `python tests/test_record.py test_bridge_contract.py test_toon.py
+   test_layout.py` — all four green, on the three-OS matrix.
+3. `python -m html_annotator ensure` starts a detached bridge, a second
+   call says "already running", `stop` takes it down again.
+4. `install-hooks` registers `bin/hook-ensure-bridge.py` twice and no
+   more, whatever it is run against.
+5. Suite: `tests/run.sh` — red if a case fails or BLOCKED is treated as pass.
+6. No diff on snippet CSS or English UI strings, except paths, commands
+   and comment headers.

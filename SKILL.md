@@ -14,18 +14,20 @@ description: >
 
 **Read `references/agent-handbook.md` before you act.** It covers the
 bridge, rounds, processing (`.` / resolve / refs / locators / hunks),
-todo-list spawn, draft cards (`la-draft`) and `la-sub`. This file is
-only the port: embed, start the bridge, `/p/` URL, plus the short
-process trigger.
+the checklist component and the suggest layer. This file is only the
+port: embed, start the bridge, `/p/` URL, plus the short process
+trigger.
 
-Criteria (and what must stay green): `CRITERIA.md`. Dated choices: `docs/DECISIONS.md`. Install: `INSTALL.md`.
+Criteria (and what must stay green): `CRITERIA.md`. What is core and
+what is not: `docs/SCOPE.md`. Dated choices: `docs/DECISIONS.md`.
+Install: `INSTALL.md`.
 
 ## Part 1: embed (every HTML deliverable)
 
 Paste the full contents of `references/annotator-snippet.html` at the
 bottom of every HTML file, just before `</body>` or at the end of the
-file. The block runs from `<!-- LUC-ANNOTATOR v2 -->` to
-`<!-- /LUC-ANNOTATOR -->`.
+file. The block runs from `<!-- HTML-ANNOTATOR v3 -->` to
+`<!-- /HTML-ANNOTATOR -->`.
 
 **Anchor on the LAST `</body>`, never the first.** A page can contain
 `</body>` inside a JavaScript string long before the real one — bundled
@@ -42,18 +44,20 @@ html = html[:i] + snippet + "\n" + html[i:]
 `str.replace(..., 1)` and `sed` both hit the first match, so neither is
 safe here. No `</body>` at all: append at the end of the file.
 
-On 2026-08-28 this broke `jamezz-cs-flows/flows.html` (3.5 MB, three
-`</body>` occurrences — two of them inside DOMPurify and a `btoa()`
-call). The Mermaid diagrams vanished and a wall of minified JS appeared
+In one case this broke a 3.5 MB process-flow page (three `</body>`
+occurrences — two of them inside DOMPurify and a `btoa()` call). The Mermaid diagrams vanished and a wall of minified JS appeared
 under the tables. Verify after embedding: open the page and check that
 what it normally renders is still there.
 
 On an existing page:
-- `LUC-ANNOTATOR v2` already present: do nothing;
-- older block (`LUC-ANNOTATOR v1`, no end marker): replace everything
+- a block already present (`HTML-ANNOTATOR v3`, or the older
+  `LUC-ANNOTATOR v2` that is still supported): do nothing;
+- oldest block (`LUC-ANNOTATOR v1`, no end marker): replace everything
   from `<!-- LUC-ANNOTATOR` through the matching `</script>` with the
   new block;
 - nothing there: append at the bottom.
+
+Never leave two annotator blocks in one page.
 
 Self-contained: no libraries, no CDN, no external fonts. Works on
 `file://` and localhost.
@@ -63,25 +67,26 @@ call it blindly on every deliverable and every update of a page that
 already has the snippet:
 
 ```bash
-~/.claude/skills/html-annotator/bin/ensure-bridge.sh
+python -m html_annotator ensure     # or: html-annotator ensure
 ```
 
-If it is already running, the script does nothing. If not, it starts
-the bridge detached from your shell (nohup), writes the pid to
-`bridge.pid` and output to `bridge.log` in the skill directory, and
-waits until it answers (max 5 seconds). Never skip this: without the
-bridge, feedback lands in localStorage and nothing is on disk.
+If it is already running, the command does nothing. If not, it starts
+the bridge detached from your shell, writes pid and log to a per-user
+state directory, and waits until it answers (max 5 seconds). Never skip
+this: without the bridge, feedback lands in localStorage and nothing is
+on disk.
 
-**Safety net, two layers.** Both run `bin/hook-ensure-bridge.sh` from
-this skill (log: `bridge-hook.log`), registered in
-`~/.claude/settings.local.json`:
+**Safety net, two layers.** Both run `bin/hook-ensure-bridge.py` from
+this skill, registered in `~/.claude/settings.local.json` by
+`python -m html_annotator install-hooks`:
 
 - **SessionStart** — one call per session, regardless of how that
   session later writes HTML. This is the layer that counts: the
   PostToolUse layer misses an agent that writes the file via Bash, and
   in auto-mode Bash is the prescribed route.
 - **PostToolUse on `Edit|Write`** — if the written file is `.html`/`.htm`
-  with the `LUC-ANNOTATOR` marker, the bridge comes up.
+  with an annotator marker (`HTML-ANNOTATOR`, or `LUC-ANNOTATOR` on an
+  older page), the bridge comes up.
 
 The matcher is not widened to `Bash`, because that would fire on every
 Bash call in every project. What the chosen route does: the
@@ -110,7 +115,15 @@ preview pane.** The bridge serves local files on `GET /p/<path-from-home>`:
 ```
 
 Build: absolute path, strip the home directory, put the rest after
-`http://127.0.0.1:8791/p/`. Paths outside home → 403. A preview pane
+`http://127.0.0.1:8791/p/` with forward slashes, on every OS. Paths
+outside home → 403. `python -m html_annotator url <file>` does this for
+you.
+
+**Hand the URL to the reviewer as a clickable markdown link**
+(`[title](http://127.0.0.1:8791/p/…)`), never inside backticks or a code
+block: a code block forces copy-paste, a link opens with one click
+(decision 2026-09-15). `python -m html_annotator url <file>` prints the
+link. A preview pane
 as `data:` can never reach loopback (Private Network Access). Via
 `/p/` the page is same-origin with the bridge.
 
@@ -120,16 +133,18 @@ What the reviewer can do (behaviour unchanged; details in the handbook):
 - orphan list **"N likely processed"**;
 - no download button, no Remove-all in the UI.
 
-Test/debug API: `window.LucAnnotator.add({type:'region'|'text', rect,
+Test/debug API: `window.HtmlAnnotator.add({type:'region'|'text', rect,
 comment, selectedText})`, `.anns()`, `.bridge()`, `.session()`,
-`.resolve(annotation)`.
+`.resolve(annotation)`. Pages written before the rename reach the same
+object through the deprecated global alias the snippet still assigns; see
+the migration section in `CHANGELOG.md`.
 
 ### Checklist component (LA-CHECKLIST)
 
 Any HTML deliverable with checkable items or rows (todo lists,
 test-case tables, review queues) also gets the block from
 `references/checklist-snippet.html` (`<!-- LA-CHECKLIST v1` to
-`<!-- /LA-CHECKLIST -->`), pasted right before the LUC-ANNOTATOR
+`<!-- /LA-CHECKLIST -->`), pasted right before the HTML-ANNOTATOR
 block. Put `data-la-check="<unique-key>"` on each checkable element
 (optional `data-la-label` for an explicit label). The script injects a
 Notion-style checkbox, loads saved state on page load via `POST /state`
@@ -137,12 +152,12 @@ and saves each change via `POST /state-save`; a checked element gets
 the class `la-checked` (title struck through, dimmed).
 
 Reading the checkmarks as an agent: per-page state lives in
-`~/Desktop/annotaties/<slug>/state.json` (or `POST /state` on the
+`<annotation-root>/<slug>/state.json` (or `POST /state` on the
 bridge) — persistent status, separate from the annotation rounds.
 Format: `{"components": {"checklist": {"<key>": {"checked": true,
 "label": "...", "changedAt": "..."}}}, "updatedAt": ...}`. Use
 `changedAt` to see what changed since your last read, analogous to
-reading `annotations.json`. Details: handbook part 8.
+reading `annotations.json`. Details: handbook part 5.
 
 ### Suggested changes (LA-SUGGEST layer)
 
@@ -151,7 +166,7 @@ or undo each change individually, mark every changed element with
 `data-la-suggest="<unique-key>"` plus `data-la-suggest-desc`,
 `data-la-suggest-old` (original content) and optionally
 `data-la-suggest-kind` (`edit`/`add`/`del`). Nothing else is needed: the
-regular LUC-ANNOTATOR snippet detects these attributes and renders each
+regular HTML-ANNOTATOR snippet detects these attributes and renders each
 suggestion with the exact annotation mechanics — blue selection rects for
 text, one region frame for visuals, and the badge stretched into a white
 pill holding ✕ reject · ✓ accept · ✎ change; ✎ opens the normal annotator
@@ -159,7 +174,7 @@ popup (chips included) for "do it differently". Decisions land via
 `POST /state-save` (component `suggest`) in the page's `state.json`.
 Processing on `.`: accepted → keep and strip markers, rejected → restore the
 original, change → apply the comment; then mark the key `processed`.
-Full rules: handbook part 9.
+Full rules: handbook part 6.
 
 ## Processing (short port)
 
@@ -168,8 +183,13 @@ Triggers — do not ask for confirmation:
 - a bare **`.`** (period only, surrounding whitespace is fine);
 - "process my feedback" / a path to `annotations.json` or a round.
 
-On `.`, find the open round yourself (`bin/toon-annotaties.py --open`
-or the bridge). Understand first, then apply, then `POST /resolve`.
+On `.`, find the open round yourself
+(`python -m html_annotator show --open`, or the bridge). Without a page name that picks the most recently annotated
+page with open annotations, within a 7-day window, and names the others in
+one tail line. Older rounds stay on disk: `--list` shows every page with
+open annotations, `--search <term>` finds one by name, `--since N` widens the
+window. Never dump the full page list into context.
+Understand first, then apply, then `POST /resolve`.
 Read `references/agent-handbook.md` (part 4) for refs, locators, hunks,
-crops. `bin/toon-annotaties.py` reprints the work rule whenever
+crops. `python -m html_annotator show` reprints the work rule whenever
 something is still open.
