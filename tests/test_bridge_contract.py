@@ -57,6 +57,7 @@ def start_bridge(root, poort):
     env = os.environ.copy()
     env["HTML_ANNOTATOR_PORT"] = str(poort)
     env["HTML_ANNOTATOR_ROOT"] = root
+    env["PYTHONPATH"] = SKILL + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     log = open(os.path.join(root, "bridge-test.log"), "w+", encoding="utf-8")
     proc = subprocess.Popen(
         [sys.executable, "-m", "html_annotator", "serve"],

@@ -14,10 +14,13 @@
 
 import { chromium } from 'playwright-core';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+const TESTDIR = join(homedir(), 'html-annotator-tests');
+mkdirSync(TESTDIR, { recursive: true });
+const ROOT = process.env.HTML_ANNOTATOR_ROOT || process.env.LUC_ANNOTATOR_ROOT || join(homedir(), 'annotations');
 
 const SKILL = process.env.HTML_ANNOTATOR_SKILL_DIR || process.env.LUC_ANNOTATOR_SKILL_DIR
   || join(fileURLToPath(new URL('..', import.meta.url)));
@@ -48,7 +51,7 @@ const NIEUW = (ORIGINEEL.slice(0, laatste) + 'gereed.' + ORIGINEEL.slice(laatste
   .replace('donderdag', 'vrijdag');
 
 const slug = `zz-test-hunks-${Date.now()}`;
-const bestand = join(homedir(), 'Desktop', `${slug}.html`);
+const bestand = join(TESTDIR, `${slug}.html`);
 writeFileSync(bestand, `<!doctype html><meta charset="utf-8"><title>${slug}</title>
 <div class="la-draft">
   <div class="la-draft-hdr"><b>Aan:</b> Kim &nbsp;·&nbsp; <b>Onderwerp:</b> Coverage</div>
@@ -61,7 +64,7 @@ const zeg = (ok, tekst) => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  case-06: ${
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage();
-await page.goto(`http://127.0.0.1:${PORT}/p/Desktop/${slug}.html`, { waitUntil: 'load' });
+await page.goto(`http://127.0.0.1:${PORT}/p/html-annotator-tests/${slug}.html`, { waitUntil: 'load' });
 await page.waitForSelector('.la-draft-txt.la-bewerkbaar', { timeout: 5000 });
 
 await page.click('.la-draft-txt');
@@ -143,7 +146,7 @@ ${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`);
 
 const browser2 = await chromium.launch({ channel: 'chrome', headless: true });
 const page2 = await browser2.newPage();
-await page2.goto(`http://127.0.0.1:${PORT}/p/Desktop/${slug}.html`, { waitUntil: 'load' });
+await page2.goto(`http://127.0.0.1:${PORT}/p/html-annotator-tests/${slug}.html`, { waitUntil: 'load' });
 await sleep(2500);
 await page2.click('.la-draft-diff');
 await sleep(300);
@@ -169,5 +172,5 @@ zeg(!/gewijzigd sinds annotatie/.test(herstel.melding),
 if (process.env.CASE06_TOON) { console.log(uit.trim(), '\n', uit3.trim()); }
 
 rmSync(bestand, { force: true });
-rmSync(join(homedir(), 'Desktop', 'annotaties', slug), { recursive: true, force: true });
+rmSync(join(ROOT, slug), { recursive: true, force: true });
 process.exit(falen ? 1 : 0);

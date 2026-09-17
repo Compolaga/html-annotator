@@ -132,6 +132,7 @@ fi
 
 if wil 06; then
   echo "case-06: losse blokken binnen één bewerking"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-06-hunks.mjs
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
   echo
@@ -139,6 +140,7 @@ fi
 
 if wil 14; then
   echo "case-14: change-suggestie bewerken in plaats van overschrijven"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-14-suggest-change-bewerken.mjs
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
   echo
@@ -146,6 +148,7 @@ fi
 
 if wil 15; then
   echo "case-15: suggestie die pas later zichtbaar wordt"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-15-suggest-zichtbaar.mjs
   rc=$?
   [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
@@ -155,6 +158,7 @@ fi
 
 if wil 16; then
   echo "case-16: gedeelde suggest-key is één suggestie met één pill"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-16-suggest-gedeelde-key.mjs
   rc=$?
   [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
@@ -164,6 +168,7 @@ fi
 
 if wil 17; then
   echo "case-17: losse suggest-keys beslissen onafhankelijk"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-17-suggest-losse-keys.mjs
   rc=$?
   [ $rc -eq 2 ] && BLOKKED=$((BLOKKED + 1))
@@ -173,6 +178,7 @@ fi
 
 if wil 12; then
   echo "case-12: boxes scrollen mee met de HTML"
+  bridge_up >/dev/null 2>&1 || echo "  (bridge_up faalde; case rapporteert zelf)"
   node ./case-12-scroll-mee.mjs
   [ $? -ne 0 ] && FALEN=$((FALEN + 1))
   echo

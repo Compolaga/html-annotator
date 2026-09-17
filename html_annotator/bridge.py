@@ -766,14 +766,21 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    os.makedirs(ROOT, exist_ok=True)
-    srv = ThreadingHTTPServer((HOST, PORT), Handler)
+    try:
+        os.makedirs(ROOT, exist_ok=True)
+        srv = ThreadingHTTPServer((HOST, PORT), Handler)
+    except Exception:
+        import traceback
+        print("annotator bridge failed to start on http://%s:%d" % (HOST, PORT), flush=True)
+        traceback.print_exc()
+        sys.stderr.flush()
+        raise
     print("annotator bridge listening on http://%s:%d (root: %s, pillow: %s)"
-          % (HOST, PORT, ROOT, HEEFT_PILLOW))
+          % (HOST, PORT, ROOT, HEEFT_PILLOW), flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
-        print("\nstopped.")
+        print("\nstopped.", flush=True)
 
 
 if __name__ == "__main__":

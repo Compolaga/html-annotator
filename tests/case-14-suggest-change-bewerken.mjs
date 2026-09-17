@@ -12,10 +12,13 @@
    Draait in systeem-Chrome via de bridge (/p/), net als case-05 en case-13. */
 
 import { chromium } from 'playwright-core';
-import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+const TESTDIR = join(homedir(), 'html-annotator-tests');
+mkdirSync(TESTDIR, { recursive: true });
+const ROOT = process.env.HTML_ANNOTATOR_ROOT || process.env.LUC_ANNOTATOR_ROOT || join(homedir(), 'annotations');
 
 const SKILL = process.env.HTML_ANNOTATOR_SKILL_DIR || process.env.LUC_ANNOTATOR_SKILL_DIR
   || join(fileURLToPath(new URL('..', import.meta.url)));
@@ -23,8 +26,8 @@ const PORT = process.env.HTML_ANNOTATOR_PORT || process.env.LUC_ANNOTATOR_PORT |
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const slug = `zz-test-suggest-${Date.now()}`;
-const bestand = join(homedir(), 'Desktop', `${slug}.html`);
-const stateDir = join(homedir(), 'Desktop', 'annotaties', slug);
+const bestand = join(TESTDIR, `${slug}.html`);
+const stateDir = join(ROOT, slug);
 const statePad = join(stateDir, 'state.json');
 const TEKST = 'liever "vanaf 1 september" hier';
 
@@ -41,7 +44,7 @@ const zeg = (ok, tekst) => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  case-14: ${
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage();
-const url = `http://127.0.0.1:${PORT}/p/Desktop/${slug}.html`;
+const url = `http://127.0.0.1:${PORT}/p/html-annotator-tests/${slug}.html`;
 await page.goto(url, { waitUntil: 'load' });
 await page.waitForSelector('.la-badge.la-sug', { timeout: 5000 });
 

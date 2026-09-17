@@ -56,7 +56,7 @@ jobs:
             "page": "http://127.0.0.1:8791/p/ci-page.html",
             "pageFile": "~/ci-page.html",
             "doc": {"w": 800, "h": 600},
-            "annotation": {"id": "ci-1", "type": "text", "selectedText": "CI smoke", "comment": "ünïcode ok"}
+            "annotation": {"id": "ci-1", "type": "text", "selectedText": "CI smoke", "comment": "\u00fcn\u00efcode ok"}
           }' | tee save.json
           grep -q '"ok": true' save.json
           # region annotation: crop may fail (no display), the record must still land
@@ -69,7 +69,7 @@ jobs:
           # slug from title must be filesystem-safe on every OS
           curl -fsS -X POST http://127.0.0.1:8791/save -H 'Content-Type: application/json' -d '{
             "page": "http://127.0.0.1:8791/other",
-            "title": "CI: page?*<>|",
+            "title": "CI: other?*<>|",
             "annotation": {"id": "ci-3", "type": "text", "selectedText": "x", "comment": "slug"}
           }' | grep -q '"ok": true'
 

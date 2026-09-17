@@ -3,6 +3,7 @@
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$TESTS_DIR/.." && pwd)"
+export PYTHONPATH="$SKILL_DIR${PYTHONPATH:+:$PYTHONPATH}"
 PORT="${HTML_ANNOTATOR_PORT:-${LUC_ANNOTATOR_PORT:-8791}}"
 BRIDGE_URL="http://127.0.0.1:$PORT"
 
