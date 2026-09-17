@@ -1,0 +1,10 @@
+ROOD-bewijs: case-07 met de la-sub-CSS uit het snippet gehaald (2026-08-19 09:30)
+
+  FAIL  case-07: elk niveau springt 30px verder in (gemeten: 0, 0, 0, 0, 0)
+  FAIL  case-07: elk subpunt is relatief gepositioneerd en tekent een haakje — ook de <li> zonder pagina-CSS
+  PASS  case-07: een punt zonder subklasse krijgt geen haakje
+  FAIL  case-07: --line van de pagina wordt gevolgd (rgb(0, 0, 0))
+  FAIL  case-07: zonder --line valt de lijn terug op een zichtbaar grijs (rgb(0, 0, 0))
+  FAIL  case-07: het haakje ligt binnen de goot van 30px (left NaN, breedte NaN)
+  FAIL  case-07: --la-stap verstelt inspringing én haakje (ml 0, left NaN, breedte NaN)
+exit=1

@@ -1,0 +1,15 @@
+PASS  A1 root alleen poorten
+PASS  A2 geen memories/
+PASS  A2 agent-regels in references/
+PASS  A3 geen extras/
+PASS  A4 bin/ bestaat
+PASS  A4 annotator-pakket
+PASS  A4 bin/ensure-bridge.sh
+PASS  A4 bin/hook-ensure-bridge.sh
+PASS  A4 bin/annotator-bridge.py
+PASS  A4 bin/toon-annotaties.py
+PASS  A4 bin/pas-hunk-toe.py
+PASS  A4 bin/vind-todolijst.sh
+PASS  A5 geen hyphen-module in annotator/
+PASS  A5 bin kebab-case
+PASS  A6 geen persoonsnaam in agent-facing docs

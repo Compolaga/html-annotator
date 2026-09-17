@@ -244,12 +244,12 @@ fallback als dat niet zo is.
 <p class="lead">Nog niet verstuurd. Annoteer gerust in de tekst zelf, dan pas ik aan.</p>
 
 <div class="la-draft">
-  <div class="la-draft-hdr"><b>Aan:</b> Alex Jansen &nbsp;·&nbsp; <b>Cc:</b> Sam de Vries &nbsp;·&nbsp; <b>Onderwerp:</b> Even bijpraten over security</div>
+  <div class="la-draft-hdr"><b>Aan:</b> Anne Dijkstra &nbsp;·&nbsp; <b>Cc:</b> Marco Bonsink &nbsp;·&nbsp; <b>Onderwerp:</b> Even bijpraten over security</div>
   <div class="la-draft-txt">
-    <p>Hi Alex,</p>
+    <p>Hi Anne,</p>
     <p>Eerste alinea van het bericht.</p>
     <ul>
-      <li>Alex: schiet het issue in bij <a href="https://…/pbi/1234">PBI 1234</a></li>
+      <li>Anne: schiet het issue in bij <a href="https://…/pbi/1234">PBI 1234</a></li>
       <li>Ik: stuur de opzet door</li>
     </ul>
     <p>Groet,<br>de reviewer</p>
@@ -274,12 +274,9 @@ hoop gooien.
 **Tracked changes.** Elke `la-draft-txt` is direct bewerkbaar: de reviewer klikt in de tekst,
 de cursor staat waar hij klikte, en hij typt. Er is bewust geen knop om "de bewerkmodus
 aan te zetten" — dat was een drempel voor iets wat hij gewoon wil kunnen doen. Klikt hij
-eruit, dan gaat de bewerking als annotatie van `type: "edit"` naar de bridge; de kaart
-blijft de kale, herschreven tekst tonen. Het verschil met de oorspronkelijke tekst
-(doorhaling en onderstreping, in de opgemaakte kaart, dus een gewijzigde bullet blijft een
-bullet) verschijnt alleen op verzoek via de knop "Show changes" in de bar, en verdwijnt
-weer met "Hide changes" of door in de tekst te klikken. Bewust niet automatisch bij het
-eruit klikken: dat sprong in het gezicht van wie gewoon aan het herschrijven was. Dat is vaak sneller dan een
+eruit, dan verschijnt het verschil met de oorspronkelijke tekst als doorhaling en
+onderstreping — in de opgemaakte kaart, dus een gewijzigde bullet blijft een bullet — en
+gaat het als annotatie van `type: "edit"` naar de bridge. Dat is vaak sneller dan een
 comment: in plaats van uitleggen wat er anders moet, schrijft hij het gewoon anders op.
 "↺ Herstel origineel" zet de kaart terug en verwijdert de bewerking.
 
@@ -318,7 +315,7 @@ Regels bij het gebruik:
 - Schrijf de berichttekst in blokken: `<p>` per alinea, `<ul>`/`<ol>` met `<li>` voor
   opsommingen, `<br>` voor een harde regelovergang binnen een alinea. Alleen die tags,
   plus `<b>`, `<i>` en `<a href>`. Geen `style`, geen `<div>`, geen tabellen.
-- Streepjes-als-bullet (`- Alex: …` als gewone tekstregel) zijn geen opsomming meer.
+- Streepjes-als-bullet (`- Anne: …` als gewone tekstregel) zijn geen opsomming meer.
   Wil je een opsomming, schrijf er dan één.
 - Kortere kaarten mogen nog steeds platte tekst zijn: laat je de blokken weg, dan
   gedraagt de kaart zich als voorheen (echte regelafbrekingen, `white-space: pre-wrap`,

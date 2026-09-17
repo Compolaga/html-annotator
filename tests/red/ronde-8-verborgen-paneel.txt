@@ -1,0 +1,11 @@
+### verborgen paneel, ongemuteerd — de listener moet het oplossen
+  PASS  case-02[file]: pil herstelde zonder reload ("bridge uit - alleen localStorage" -> "round 1 - 0 annotaties opgeslagen")
+  PASS  case-02[file]: annotatie teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-selfheal-1787074208228/ronde-01/annotations.json
+exit=0
+
+### verborgen paneel, listeners eruit — moet betrapt worden
+  (mutatie actief: geen-listeners — herstel hoort uit te blijven)
+  FAIL  case-02[file]: herstelde ondanks "geen-listeners" — een ander mechanisme doet het werk dan bedoeld
+exit=0
+  (mutatie actief: geen-poller — herstel hoort uit te blijven)
+  PASS  case-02[file]: mutatie "geen-poller" gedroeg zich zoals voorspeld (herstel: false)

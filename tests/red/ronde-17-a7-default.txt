@@ -1,0 +1,173 @@
+=== annotator-bridge suite · 2026-08-23 17:16:19 ===
+snippet: d36179523050  hook: c3018173a5e0  ensure: cb86fe471c57
+
+case-00: annotation-record (geen browser)
+PASS  lege locator
+PASS  nth-only locator
+PASS  path getrimd
+PASS  label max 200
+PASS  nth niet negatief
+PASS  start node int
+PASS  lege end weg
+PASS  één geldige ref
+PASS  ref id getrimd
+PASS  ref locator
+PASS  lege refs-lijst
+PASS  all-invalid refs → []
+PASS  expand ontbreekt
+PASS  expand aanwezig
+PASS  missing r1
+PASS  geen unused
+PASS  zet refs
+PASS  zet expanded
+PASS  zet incomplete r2
+
+case-09: bridge-contract B1–B7
+PASS  B5 hash negeert annotator-blok
+PASS  B5 hash ziet echte wijziging
+PASS  B1 ping 200
+PASS  B1 ping identiteit
+PASS  B1 CORS *
+PASS  B1 OPTIONS 204
+PASS  B2 /p/ buiten home is 403
+PASS  B3 /session antwoordt
+PASS  B3 /save antwoordt
+PASS  B3 /delete antwoordt
+PASS  B3 /remove-all antwoordt
+PASS  B3 /resolve antwoordt
+PASS  B3 /sessie antwoordt
+PASS  B3 /sessie weigert file://
+PASS  B3 save ok
+PASS  B7 json bestaat
+PASS  B7 geen tmp-rest
+PASS  B7 dump-fout laat origineel staan
+PASS  B7 dump-fout laat geen tmp
+PASS  B3 text-save houdt locator
+PASS  B9 refs bewaard
+PASS  B6 crop-fout bewaart toch
+PASS  B6 imageError gezet
+PASS  B4 zelfde ronde
+PASS  B3 delete houdt de rest
+PASS  B4 nieuwe ronde na remove-all
+PASS  B4 ronde 1 blijft staan
+PASS  B3 resolve
+PASS  B3 resolve op schijf
+PASS  B3 resolve terug te draaien
+case-09b: toon-annotaties B8–B9
+PASS  B8 geen root → exit 1
+PASS  B8 --open slaagt
+PASS  B8 WERKREGEL
+PASS  B8 punt-trigger
+PASS  B8 locator-pad
+PASS  B8 locator nth
+PASS  B8 context-label
+PASS  B8 ref geëxpandeerd
+PASS  B9 ontbrekende r2
+PASS  B8 resolve-hint
+PASS  B8 resolved verborgen
+
+case-11: repo-layout A1–A6
+PASS  A1 root alleen poorten
+PASS  A1 .gitignore bestaat
+PASS  A1 gitignore-runtime is subset
+PASS  A1 runtime staat in gitignore
+PASS  A2 geen memories/
+PASS  A2 agent-regels in references/
+PASS  A3 geen extras/
+PASS  A4 bin/ bestaat
+PASS  A4 annotator-pakket
+PASS  A4 bin/ensure-bridge.sh
+PASS  A4 bin/hook-ensure-bridge.sh
+PASS  A4 bin/annotator-bridge.py
+PASS  A4 bin/toon-annotaties.py
+PASS  A4 bin/pas-hunk-toe.py
+PASS  A4 bin/vind-todolijst.sh
+PASS  A4 geen pre-bin paden
+PASS  A5 geen hyphen-module in annotator/
+PASS  A5 bin kebab-case
+PASS  A6 geen persoonsnaam in agent-facing docs
+PASS  A3 install zonder memories/
+PASS  A3 install zonder extras/
+PASS  A1 install zonder runtime
+PASS  A4 install-hook bestaat
+  PASS  mutate-layout: ongemutileerd A1–A6 groen
+  PASS  mutate-layout: A1 wordt rood door een los root-bestand
+  PASS  mutate-layout: A2 wordt rood als memories/ terugkomt
+  PASS  mutate-layout: A6 wordt rood door een persoonsnaam
+  PASS  mutate-layout: A1-install wordt rood als bridge.log meegekopieerd wordt
+  PASS  mutate-layout: A4 wordt rood als de geïnstalleerde hook niet bestaat
+  PASS  mutate-layout: A4 wordt rood door een pre-bin pad
+  PASS  mutate-layout: A1 wordt rood als runtime niet in .gitignore staat
+
+  PASS  case-02[file]: pil herstelde zonder reload ("bridge off - localStorage only" -> "0 saved")
+  PASS  case-02[file]: annotatie teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-selfheal-1787498181550/ronde-01/annotations.json
+        console: Failed to load resource: net::ERR_CONNECTION_REFUSED
+  PASS  case-02[data]: geblokkeerd om de verwachte reden (Private Network Access), zoals gedocumenteerd
+        console: Failed to load resource: net::ERR_CONNECTION_REFUSED | Access to fetch at 'http://127.0.0.1:8791/session' from origin 'null' has been blocked by CORS policy: The request client is not a secure context and the resource is in more-private address space `loopback`. | Failed to load resource: net::ERR_F
+  PASS  case-02[file,verborgen]: pil herstelde zonder reload ("bridge off - localStorage only" -> "0 saved")
+  PASS  case-02[file,verborgen]: annotatie teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-selfheal-1787498196798/ronde-01/annotations.json
+        console: Failed to load resource: net::ERR_CONNECTION_REFUSED
+
+case-03: ensure-bridge.sh liegt niet over een bezette poort
+  PASS  exit 1, bezetter leeft, ping is geen luc-annotator (lsof: 35761)
+
+case-04: bridge komt omhoog los van de schrijfroute
+  PASS  hook geregistreerd op SessionStart (bestand bestaat)
+  PASS  SessionStart-hook bracht de bridge omhoog (pid 35950)
+  PASS  PostToolUse-tak (Write) brengt de bridge nog steeds omhoog
+
+case-05: tracked changes op een conceptbericht
+  PASS  case-05: wijziging zichtbaar als tracked change (5 ins, 5 del)
+  PASS  case-05: geen badge en geen weeslijst voor een bewerking (badges: 0, wees: false)
+  PASS  case-05: bewerking teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-tracked-1787498212771/ronde-01/annotations.json
+  PASS  case-05: originele tekst bewaard
+  PASS  case-05: herschreven tekst bewaard
+  PASS  case-05: de diff wijst het gewijzigde deel aan, niet de hele tekst
+  PASS  case-05: aanhef en afsluiting staan als onveranderd in de diff, niet als vervangen
+  PASS  case-05: cursor landt waar geklikt is, ook met opmaak in beeld ("week de XXsecurity-a")
+  PASS  case-05: de bewerking staat er na een reload nog
+
+case-06: losse blokken binnen één bewerking
+  PASS  case-06: bewerking teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-hunks-1787498223353/ronde-01/annotations.json
+  PASS  case-06: drie losse wijzigingen worden drie blokken (3)
+  PASS  case-06: elk blok draagt context als anker, geen kale positie
+  PASS  case-06: elk blok weet in welke alinea het staat (1,2,3)
+  PASS  case-06: schermnummers komen overeen met de opslag (1,2,3 vs 1,2,3)
+  PASS  case-06: blok 2 is doorgevoerd in de pagina
+  PASS  case-06: blok 1 is ongemoeid gelaten — blokken zijn dus echt onafhankelijk
+  PASS  case-06: blok 3 is ongemoeid gelaten
+  PASS  case-06: alleen blok 2 staat afgevinkt, 1 en 3 blijven open (1,3)
+  PASS  case-06: de bewerking zelf geldt nog niet als verwerkt zolang er blokken openstaan
+  PASS  case-06: blok 3 landt op de juiste van twee gelijke zinnen, ook met tekst erboven erbij
+  PASS  case-06: de andere "klaar." is niet aangeraakt — het anker koos, niet de volgorde
+  PASS  case-06: beide open blokken staan er nog, ook nu blok 2 is doorgevoerd (doorgehaald: "Hoi|klaar.")
+  PASS  case-06: het al doorgevoerde blok wordt niet opnieuw getoond
+  PASS  case-06: geen "tekst is gewijzigd"-melding meer, de blokken zijn gewoon herplaatst ("saved as annotation 1")
+
+case-07: inspringing van geneste subpunten
+  PASS  case-07: elk niveau springt 30px verder in (gemeten: 0, 30, 60, 90, 120)
+  PASS  case-07: elk subpunt is relatief gepositioneerd en tekent een haakje — ook de <li> zonder pagina-CSS
+  PASS  case-07: een punt zonder subklasse krijgt geen haakje
+  PASS  case-07: --line van de pagina wordt gevolgd (rgb(227, 227, 222))
+  PASS  case-07: zonder --line valt de lijn terug op een zichtbaar grijs (rgb(216, 216, 210))
+  PASS  case-07: het haakje ligt binnen de goot van 30px (left -15.9, breedte 14.0938)
+  PASS  case-07: --la-stap verstelt inspringing én haakje (ml 12, left -6.36, breedte 5.625)
+
+case-08: locator blijft op de tabelrij na insert
+  PASS  case-08: label komt van de start-rij (2.2Beta Menno Backlog E mid / I hoog checken)
+  PASS  case-08: label bevat niet rij 1 (2.2Beta Menno Backlog E mid / I hoog checken)
+  PASS  case-08: herhaalde E/I-tekst blijft op Beta via het label (wees=false, opRij2=true, opRij1=false)
+  PASS  case-08: eerste match start op Backlog van rij 3 ("Backlog E laag / I mid checken")
+  PASS  case-08: na een rij erboven blijft de annotatie op Gamma staan (wees=false, opRij3=true)
+  PASS  case-08: als de geselecteerde tekst nergens meer staat, is het wél een wees
+  PASS  case-08: laTekstNogDaar accepteert Selection-spaties vs Range.toString()
+  PASS  case-08: eerste zoekAnker-tak dekt de ongewijzigde pagina
+  PASS  case-08: bridge-origin volgt /p/ (http://127.0.0.1:8791 vs poort 8791)
+
+NIET GEAUTOMATISEERD — de echte Claude Desktop sideviewer. Case-02 draait in
+systeem-Chrome; Electron heeft eigen CSP en flags. Handmatig gemeten 18-08-2026
+(criteria.md, AC-4): als BESTAND openen werkt daar niet en herstelt niet; via
+http://127.0.0.1:8791/p/<pad> werkt alles, inclusief zelfherstel.
+Opnieuw meten: tests/sideview-test.sh
+
+GROEN — alle gedraaide cases geslaagd
