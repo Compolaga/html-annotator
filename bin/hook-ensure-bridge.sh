@@ -10,22 +10,10 @@
 
 set -u
 
-# python3 uit PATH, anders python (Git Bash op Windows kent vaak alleen `python`).
-zoek_python() {
-  local c
-  for c in python3 python; do
-    if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)' >/dev/null 2>&1; then
-      echo "$c"; return 0
-    fi
-  done
-  return 1
-}
-
 BIN="$(cd "$(dirname "$0")" && pwd)"
 DIR="$(cd "$BIN/.." && pwd)"
 
-PY=$(zoek_python) || exit 0
-gelezen=$("$PY" -c '
+gelezen=$(/usr/bin/python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)

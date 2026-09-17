@@ -1,0 +1,55 @@
+=== annotator-bridge suite · 2026-08-19 08:39:09 ===
+snippet: 26d3b530641c  hook: ed2fd46ae9e2  ensure: 580bfd15e933
+
+  PASS  case-02[file]: pil herstelde zonder reload ("bridge uit - alleen localStorage" -> "round 1 - 0 annotaties opgeslagen")
+  PASS  case-02[file]: annotatie teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-selfheal-1787121550064/ronde-01/annotations.json
+        console: Failed to load resource: net::ERR_CONNECTION_REFUSED
+  PASS  case-02[data]: geblokkeerd om de verwachte reden (Private Network Access), zoals gedocumenteerd
+        console: Failed to load resource: net::ERR_CONNECTION_REFUSED | Access to fetch at 'http://127.0.0.1:8791/session' from origin 'null' has been blocked by CORS policy: The request client is not a secure context and the resource is in more-private address space `loopback`. | Failed to load resource: net::ERR_F
+  PASS  case-02[file,verborgen]: pil herstelde zonder reload ("bridge uit - alleen localStorage" -> "round 1 - 0 annotaties opgeslagen")
+  PASS  case-02[file,verborgen]: annotatie teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-selfheal-1787121612960/ronde-01/annotations.json
+        console: Failed to load resource: net::ERR_CONNECTION_REFUSED
+
+case-03: ensure-bridge.sh liegt niet over een bezette poort
+  PASS  exit 1 past bij de werkelijkheid (ping: leeg)
+
+case-04: bridge komt omhoog los van de schrijfroute
+  PASS  hook geregistreerd op SessionStart (onafhankelijk van de schrijfroute)
+  PASS  SessionStart-hook bracht de bridge omhoog (pid 53140)
+  PASS  PostToolUse-tak (Write) brengt de bridge nog steeds omhoog
+
+case-05: tracked changes op een conceptbericht
+  PASS  case-05: wijziging zichtbaar als tracked change (5 ins, 5 del)
+  PASS  case-05: geen badge en geen weeslijst voor een bewerking (badges: 0, wees: false)
+  PASS  case-05: bewerking teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-tracked-1787122202905/ronde-01/annotations.json
+  PASS  case-05: originele tekst bewaard
+  PASS  case-05: herschreven tekst bewaard
+  PASS  case-05: de diff wijst het gewijzigde deel aan, niet de hele tekst
+  PASS  case-05: aanhef en afsluiting staan als onveranderd in de diff, niet als vervangen
+  PASS  case-05: cursor landt waar geklikt is, ook met opmaak in beeld ("week de XXsecurity-a")
+  PASS  case-05: de bewerking staat er na een reload nog
+
+case-06: losse blokken binnen één bewerking
+  PASS  case-06: bewerking teruggelezen uit /Users/lucmahieu/Desktop/annotaties/zz-test-hunks-1787122213862/ronde-01/annotations.json
+  PASS  case-06: drie losse wijzigingen worden drie blokken (3)
+  PASS  case-06: elk blok draagt context als anker, geen kale positie
+  PASS  case-06: elk blok weet in welke alinea het staat (1,2,3)
+  PASS  case-06: schermnummers komen overeen met de opslag (1,2,3 vs 1,2,3)
+  PASS  case-06: blok 2 is doorgevoerd in de pagina
+  PASS  case-06: blok 1 is ongemoeid gelaten — blokken zijn dus echt onafhankelijk
+  PASS  case-06: blok 3 is ongemoeid gelaten
+  PASS  case-06: alleen blok 2 staat afgevinkt, 1 en 3 blijven open (1,3)
+  PASS  case-06: de bewerking zelf geldt nog niet als verwerkt zolang er blokken openstaan
+  PASS  case-06: blok 3 landt op de juiste van twee gelijke zinnen, ook met tekst erboven erbij
+  PASS  case-06: de andere "klaar." is niet aangeraakt — het anker koos, niet de volgorde
+  PASS  case-06: beide open blokken staan er nog, ook nu blok 2 is doorgevoerd (doorgehaald: "Hoi|klaar.")
+  PASS  case-06: het al doorgevoerde blok wordt niet opnieuw getoond
+  PASS  case-06: geen "tekst is gewijzigd"-melding meer, de blokken zijn gewoon herplaatst ("opgeslagen als annotatie 1")
+
+NIET GEAUTOMATISEERD — de echte Claude Desktop sideviewer. Case-02 draait in
+systeem-Chrome; Electron heeft eigen CSP en flags. Handmatig gemeten 18-08-2026
+(criteria.md, AC-4): als BESTAND openen werkt daar niet en herstelt niet; via
+http://127.0.0.1:8791/p/<pad> werkt alles, inclusief zelfherstel.
+Opnieuw meten: tests/sideview-test.sh
+
+GROEN — alle gedraaide cases geslaagd

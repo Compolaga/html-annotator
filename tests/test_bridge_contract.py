@@ -60,17 +60,15 @@ def start_bridge(root, poort):
     env = os.environ.copy()
     env["LUC_ANNOTATOR_PORT"] = str(poort)
     env["LUC_ANNOTATOR_ROOT"] = root
-    log = open(os.path.join(root, "bridge-test.log"), "w+", encoding="utf-8")
     proc = subprocess.Popen(
         [sys.executable, BRIDGE],
         cwd=SKILL,
         env=env,
-        stdout=log,
-        stderr=subprocess.STDOUT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     basis = "http://127.0.0.1:%d" % poort
-    # ruim: een koude CI-runner (macOS) heeft soms >5s nodig voor de eerste start
-    deadline = time.time() + 30
+    deadline = time.time() + 5
     while time.time() < deadline:
         try:
             code, _, _ = http("GET", basis + "/ping")
@@ -79,8 +77,7 @@ def start_bridge(root, poort):
         except OSError:
             time.sleep(0.05)
     proc.kill()
-    log.seek(0)
-    raise RuntimeError("bridge kwam niet omhoog op poort %s; log:\n%s" % (poort, log.read()))
+    raise RuntimeError("bridge kwam niet omhoog op poort %s" % poort)
 
 
 def main():

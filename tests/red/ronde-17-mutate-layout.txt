@@ -1,0 +1,10 @@
+=== mutate-layout 2026-08-23 17:12:44 ===
+snippet: d36179523050  hook: c3018173a5e0  ensure: cb86fe471c57
+  PASS  mutate-layout: ongemutileerd A1–A6 groen
+  PASS  mutate-layout: A1 wordt rood door een los root-bestand
+  PASS  mutate-layout: A2 wordt rood als memories/ terugkomt
+  PASS  mutate-layout: A6 wordt rood door een persoonsnaam
+  PASS  mutate-layout: A1-install wordt rood als bridge.log meegekopieerd wordt
+  PASS  mutate-layout: A4 wordt rood als de geïnstalleerde hook niet bestaat
+  PASS  mutate-layout: A4 wordt rood door een pre-bin pad
+  PASS  mutate-layout: A1 wordt rood als runtime niet in .gitignore staat

@@ -32,8 +32,8 @@ const bestand = join(homedir(), 'Desktop', `${slug}.html`);
 const pagina = `<!doctype html><meta charset="utf-8"><title>${slug}</title>
 <h2>Mail-concepten</h2>
 <div class="la-draft">
-  <div class="la-draft-hdr"><b>Aan:</b> Alex Jansen &nbsp;·&nbsp; <b>Onderwerp:</b> Security</div>
-  <div class="la-draft-txt"><p>Hi Alex,</p><p>Korte recap van ons gesprek net:</p><ul><li>Alex: schiet het <b>issue</b> in bij <a href="https://example.org/pbi/1234">PBI 1234</a></li><li>Luc: stuurt de opzet door</li></ul><p>Groet,<br>Luc</p></div>
+  <div class="la-draft-hdr"><b>Aan:</b> Anne Dijkstra &nbsp;·&nbsp; <b>Onderwerp:</b> Security</div>
+  <div class="la-draft-txt"><p>Hi Anne,</p><p>Korte recap van ons gesprek net:</p><ul><li>Anne: schiet het <b>issue</b> in bij <a href="https://example.org/pbi/1234">PBI 1234</a></li><li>Luc: stuurt de opzet door</li></ul><p>Groet,<br>Luc</p></div>
   <div class="la-draft-na">Nog niet verstuurd.</div>
 </div>
 ${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`;
@@ -64,7 +64,7 @@ zeg(vorm.li === 2 && vorm.vet === 1 && vorm.link === 1 && vorm.rijk && vorm.prew
 
 // 2. de projectie waarop gedift wordt is kale tekst — geen "- ", geen "**"
 const proj = await page.evaluate(() => window.LucAnnotator.drafts()[0].origineel);
-zeg(!/^\s*[-*]\s/m.test(proj) && !proj.includes('**') && proj.includes('Alex: schiet het issue in bij PBI 1234'),
+zeg(!/^\s*[-*]\s/m.test(proj) && !proj.includes('**') && proj.includes('Anne: schiet het issue in bij PBI 1234'),
   `projectie is kale tekst zonder opmaakmarkeringen (${JSON.stringify(proj.split('\n')[4] || '')})`);
 
 // 3. een tekstwijziging in een opgemaakte kaart -> gewoon tekst-hunk met platte anker
@@ -116,18 +116,18 @@ if (!bron.includes('stuurt de opzet vrijdag door')) console.log(uit);
 // --- tweede kaart: opmaak als eigen kanaal --------------------------------
 const slug2 = `zz-test-opmaak-${Date.now()}`;
 const bestand2 = join(homedir(), 'Desktop', `${slug2}.html`);
-const PLAT = `Hi Alex,
+const PLAT = `Hi Anne,
 
 Twee dingen:
 
-Alex: schiet het issue in
+Anne: schiet het issue in
 Luc: stuurt de opzet door
 
 Groet,
 Luc`;
 writeFileSync(bestand2, `<!doctype html><meta charset="utf-8"><title>${slug2}</title>
 <div class="la-draft">
-  <div class="la-draft-hdr"><b>Aan:</b> Alex &nbsp;·&nbsp; <b>Onderwerp:</b> Twee dingen</div>
+  <div class="la-draft-hdr"><b>Aan:</b> Anne &nbsp;·&nbsp; <b>Onderwerp:</b> Twee dingen</div>
   <div class="la-draft-txt">${PLAT}</div>
 </div>
 ${readFileSync(join(SKILL, 'references', 'annotator-snippet.html'), 'utf8')}`);
@@ -149,7 +149,7 @@ await page2.evaluate(() => {
   const box = document.querySelector('.la-draft-txt');
   box.focus();
   const t = box.firstChild;
-  const start = box.textContent.indexOf('Alex: schiet');
+  const start = box.textContent.indexOf('Anne: schiet');
   const eind = box.textContent.indexOf('door') + 4;
   const r = document.createRange();
   r.setStart(t, start); r.setEnd(t, eind);

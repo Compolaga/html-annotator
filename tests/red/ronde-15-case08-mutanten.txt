@@ -1,0 +1,23 @@
+=== mutant A: label van gemeenschappelijke voorouder ===
+  PASS  case-08: label komt van de start-rij (2.1Alpha Mark Backlog E mid / I hoog checken 2.2Beta Menno B)
+  FAIL  case-08: label bevat niet rij 1 (2.1Alpha Mark Backlog E mid / I hoog checken 2.2Beta Menno B)
+  PASS  case-08: herhaalde E/I-tekst blijft op Beta via het label (wees=false, opRij2=true, opRij1=false)
+  PASS  case-08: eerste match start op Backlog van rij 3 ("Backlog E laag / I mid checken")
+  PASS  case-08: na een rij erboven blijft de annotatie op Gamma staan (wees=false, opRij3=true)
+  PASS  case-08: als de geselecteerde tekst nergens meer staat, is het wél een wees
+
+=== mutant B: wees zodra start-range bestaat ===
+  PASS  case-08: label komt van de start-rij (2.2Beta Menno Backlog E mid / I hoog checken)
+  PASS  case-08: label bevat niet rij 1 (2.2Beta Menno Backlog E mid / I hoog checken)
+  FAIL  case-08: herhaalde E/I-tekst blijft op Beta via het label (wees=true, opRij2=false, opRij1=false)
+  PASS  case-08: eerste match start op Backlog van rij 3 ("Backlog E laag / I mid checken")
+  FAIL  case-08: na een rij erboven blijft de annotatie op Gamma staan (wees=true, opRij3=false)
+  PASS  case-08: als de geselecteerde tekst nergens meer staat, is het wél een wees
+
+=== mutant C: zoekHostViaLabel → null ===
+  PASS  case-08: label komt van de start-rij (2.2Beta Menno Backlog E mid / I hoog checken)
+  PASS  case-08: label bevat niet rij 1 (2.2Beta Menno Backlog E mid / I hoog checken)
+  FAIL  case-08: herhaalde E/I-tekst blijft op Beta via het label (wees=false, opRij2=false, opRij1=false)
+  PASS  case-08: eerste match start op Backlog van rij 3 ("Backlog E laag / I mid checken")
+  PASS  case-08: na een rij erboven blijft de annotatie op Gamma staan (wees=false, opRij3=true)
+  PASS  case-08: als de geselecteerde tekst nergens meer staat, is het wél een wees

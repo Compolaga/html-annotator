@@ -31,7 +31,7 @@ NAAM = re.compile(r"luc|luke", re.I)
 
 
 RUNTIME = {"bridge.log", "bridge.pid", "bridge-hook.log", "__pycache__"}
-DOT_OK = {".gitignore", ".git", ".github", ".claude"}
+DOT_OK = {".gitignore", ".git"}
 OUD_NAMEN = (
     "annotator_config.py", "annotator_record.py", "annotator_refs.py",
     "annotator-bridge.py", "ensure-bridge.sh", "hook-ensure-bridge.sh",
@@ -214,9 +214,6 @@ def main():
     )
     dest = os.path.join(home, ".claude", "skills", "html-annotator")
     n += check("A3 install zonder memories/", uit.returncode == 0 and not os.path.isdir(os.path.join(dest, "memories")))
-    if uit.returncode != 0:
-        import shutil
-        print("      install.sh rc=%s via bash=%s\n%s\n%s" % (uit.returncode, shutil.which("bash"), uit.stdout, uit.stderr))
     n += check("A3 install zonder extras/", not os.path.isdir(os.path.join(dest, "extras")))
     runtime_mee = [naam for naam in RUNTIME if os.path.exists(os.path.join(dest, naam))]
     n += check("A1 install zonder runtime", runtime_mee == [])

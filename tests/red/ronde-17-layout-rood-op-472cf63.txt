@@ -1,0 +1,30 @@
+=== layout-test van nu op boom 472cf63 ===
+basis: 472cf63
+FAIL  A1 root alleen poorten
+      nog in root: annotator-bridge.py, annotator_config.py, annotator_record.py, annotator_refs.py, ensure-bridge.sh, extras/, hook-ensure-bridge.sh, memories/, pas-hunk-toe.py, toon-annotaties.py, vind-todolijst.sh
+PASS  A1 .gitignore bestaat
+PASS  A1 gitignore-runtime is subset
+PASS  A1 runtime staat in gitignore
+FAIL  A2 geen memories/
+PASS  A2 agent-regels in references/
+PASS  A2 SKILL-punt-trigger
+FAIL  A3 geen extras/
+FAIL  A4 bin/ bestaat
+FAIL  A4 annotator-pakket
+FAIL  A4 bin/ensure-bridge.sh
+FAIL  A4 bin/hook-ensure-bridge.sh
+FAIL  A4 bin/annotator-bridge.py
+FAIL  A4 bin/toon-annotaties.py
+FAIL  A4 bin/pas-hunk-toe.py
+FAIL  A4 bin/vind-todolijst.sh
+FAIL  A4 geen pre-bin paden
+      oude paden in: SKILL.md, INSTALL.md, HANDOFF.md, install.sh, annotator-snippet.html, references/agent-handbook.md
+FAIL  A5 geen hyphen-module in annotator/
+FAIL  A5 bin kebab-case
+FAIL  A6 geen persoonsnaam in agent-facing docs
+      nog Luc/Luke in: SKILL.md, README.md, INSTALL.md, HANDOFF.md, install.sh, annotator-snippet.html, references/agent-handbook.md
+FAIL  A3 install zonder memories/
+FAIL  A3 install zonder extras/
+PASS  A1 install zonder runtime
+PASS  A4 install-hook bestaat
+FAIL  A4 --copy ververst stale doel

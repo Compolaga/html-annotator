@@ -16,17 +16,6 @@ BRIDGE="$BIN/annotator-bridge.py"
 LOG="$DIR/bridge.log"
 PIDFILE="$DIR/bridge.pid"
 
-# python3 uit PATH, anders python (Git Bash op Windows kent vaak alleen `python`).
-zoek_python() {
-  local c
-  for c in python3 python; do
-    if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)' >/dev/null 2>&1; then
-      echo "$c"; return 0
-    fi
-  done
-  return 1
-}
-
 ping_bridge() {
   curl -fsS --max-time 2 "http://127.0.0.1:$PORT/ping" 2>/dev/null
 }
@@ -45,8 +34,7 @@ if [ -f "$PIDFILE" ] && ! kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; t
   rm -f "$PIDFILE"
 fi
 
-PY=$(zoek_python) || { echo "FOUT: geen python3 of python in PATH" >&2; exit 1; }
-nohup "$PY" "$BRIDGE" >>"$LOG" 2>&1 &
+nohup python3 "$BRIDGE" >>"$LOG" 2>&1 &
 echo $! >"$PIDFILE"
 disown 2>/dev/null || true
 
