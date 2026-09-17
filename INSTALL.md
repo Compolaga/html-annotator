@@ -143,12 +143,40 @@ under `~/Desktop/annotaties/<slug>/ronde-01/`.
 ## Requirements
 
 - **python3** (stdlib is enough) — the bridge runs on it.
-- **Chrome** — for screenshot crops. Without Chrome, region annotations
-  store without a crop.
+- **Chrome or Edge** — for screenshot crops. Found via `ANNOTATOR_CHROME`,
+  then PATH, then the usual install paths. Without either, region
+  annotations store without a crop.
 - **Pillow** (optional) — faster crops.
 - **jq** (optional) — only for automatic hook registration.
 - **Node** (optional) — only for the test suite.
 - Port **8791** must be free. Chosen on purpose: 8080 is often Docker.
+
+## Windows
+
+The bridge itself is plain Python and runs natively on Windows: it
+finds Chrome or Edge in the usual places, opens `claude://` links via
+the shell, and serves `/p/<path-from-home>` with forward slashes in the
+URL and backslashes on disk. CI runs the Python tests and a real
+`/save` on `windows-latest`.
+
+What is not native:
+
+- `install.sh`, `bin/ensure-bridge.sh`, `bin/hook-ensure-bridge.sh` and
+  `bin/vind-todolijst.sh` are bash. Use **Git Bash** (comes with Git for
+  Windows) or **WSL**. The hooks in `settings.local.json` then need a
+  command Claude Code can start, for example
+  `bash "C:/Users/<you>/.claude/skills/html-annotator/bin/hook-ensure-bridge.sh"`.
+  Test that by hand first; hook behaviour on Windows has not been
+  verified by the maintainer.
+- The scripts look for `python3` first and fall back to `python`, which
+  is what Git Bash usually has. Disable the Microsoft Store
+  "python3" alias if it gets in the way.
+- Symlinks need Developer Mode or admin rights; use `./install.sh --copy`.
+- The Playwright suite (`tests/run.sh`) is only exercised on macOS and
+  Linux.
+
+Checklist: Python 3 in PATH, Chrome or Edge installed, port 8791 free,
+Git Bash or WSL for the shell scripts.
 
 ## What this repo deliberately does not ship
 

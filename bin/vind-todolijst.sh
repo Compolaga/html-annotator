@@ -26,6 +26,11 @@
 # Exit 1 als er geen kandidaat is. Dan niet zelf een lijst verzinnen: vraag het.
 
 set -uo pipefail
+
+# stat verschilt per platform: BSD (macOS) kent -f, GNU (Linux, Git Bash) kent -c.
+mtime_epoch() { stat -f '%m' "$1" 2>/dev/null || stat -c '%Y' "$1"; }
+mtime_fmt()   { stat -f '%Sm' -t "$1" "$2" 2>/dev/null || date -d "@$(stat -c '%Y' "$2")" "+$1"; }
+
 UITLEG=0
 [ "${1:-}" = "-v" ] && UITLEG=1
 
@@ -36,7 +41,7 @@ if [ -s "$POINTER" ]; then
     if [ "$UITLEG" -eq 1 ]; then
       echo "gekozen: $PAD"
       echo "bron: pointer $POINTER (niet gezocht)"
-      echo "gewijzigd: $(stat -f '%Sm' -t '%d-%m-%Y %H:%M' "$PAD")"
+      echo "gewijzigd: $(mtime_fmt '%d-%m-%Y %H:%M' "$PAD")"
       echo "punten: $(grep -cE 'class="uid"|<span class="num">' "$PAD")"
       echo "hoogste nummer: $(grep -oE 'class="uid">#[0-9]+|<span class="num">[0-9]+' "$PAD" | grep -oE '[0-9]+$' | sort -n | tail -1)"
     else
@@ -67,18 +72,18 @@ fi
 
 # Meest recent gewijzigde wint.
 BESTE=$(for f in "${KANDIDATEN[@]}"; do
-  printf '%s\t%s\n' "$(stat -f '%m' "$f")" "$f"
+  printf '%s\t%s\n' "$(mtime_epoch "$f")" "$f"
 done | sort -rn | head -1 | cut -f2-)
 
 if [ "$UITLEG" -eq 1 ]; then
   echo "gekozen: $BESTE"
-  echo "gewijzigd: $(stat -f '%Sm' -t '%d-%m-%Y %H:%M' "$BESTE")"
+  echo "gewijzigd: $(mtime_fmt '%d-%m-%Y %H:%M' "$BESTE")"
   echo "punten: $(grep -cE 'class="uid"|<span class="num">' "$BESTE")"
   echo "hoogste nummer: $(grep -oE 'class="uid">#[0-9]+|<span class="num">[0-9]+' "$BESTE" | grep -oE '[0-9]+$' | sort -n | tail -1)"
   if [ ${#KANDIDATEN[@]} -gt 1 ]; then
     echo "andere kandidaten:"
     for f in "${KANDIDATEN[@]}"; do
-      [ "$f" = "$BESTE" ] || echo "  $f ($(stat -f '%Sm' -t '%d-%m %H:%M' "$f"))"
+      [ "$f" = "$BESTE" ] || echo "  $f ($(mtime_fmt '%d-%m %H:%M' "$f"))"
     done
   fi
 else

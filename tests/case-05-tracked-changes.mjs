@@ -22,7 +22,7 @@ const PORT = process.env.LUC_ANNOTATOR_PORT || '8791';
 const sh = (c, a) => { try { return execFileSync(c, a, { encoding: 'utf8' }).trim(); } catch { return ''; } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const ORIGINEEL = `Hi Anne,
+const ORIGINEEL = `Hi Alex,
 
 Ik wil even bijpraten over de security-afscherming.
 
@@ -34,7 +34,7 @@ const bestand = join(homedir(), 'Desktop', `${slug}.html`);
 const pagina = `<!doctype html><meta charset="utf-8"><title>${slug}</title>
 <h2>Mail-concepten</h2>
 <div class="la-draft">
-  <div class="la-draft-hdr"><b>Aan:</b> Anne Dijkstra &nbsp;·&nbsp; <b>Onderwerp:</b> Security</div>
+  <div class="la-draft-hdr"><b>Aan:</b> Alex Jansen &nbsp;·&nbsp; <b>Onderwerp:</b> Security</div>
   <div class="la-draft-txt">${ORIGINEEL}</div>
   <div class="la-draft-na">Nog niet verstuurd.</div>
 </div>
@@ -61,7 +61,23 @@ await page.evaluate((t) => {
 await page.evaluate(() => document.querySelector('.la-draft-txt').blur());  // eruit klikken
 await sleep(1500);
 
-// 2. de markup moet ins én del tonen, niet alleen de nieuwe tekst
+// 1b. eruit klikken toont GEEN diff: de kaart blijft de kale herschreven tekst, met
+// alleen een knop "Show changes" in de bar. De automatische doorhaling sprong in het
+// gezicht van wie gewoon aan het herschrijven was.
+const naBlur = await page.evaluate(() => {
+  const box = document.querySelector('.la-draft-txt');
+  const knop = document.querySelector('.la-draft-diff');
+  return { ins: box.querySelectorAll('ins').length, del: box.querySelectorAll('del').length,
+           knop: !!knop && knop.style.display !== 'none', label: knop ? knop.textContent : '' };
+});
+zeg(naBlur.ins === 0 && naBlur.del === 0,
+  `na eruit klikken geen automatische diff (${naBlur.ins} ins, ${naBlur.del} del)`);
+zeg(naBlur.knop && /Show changes/.test(naBlur.label),
+  `knop "Show changes" staat klaar (${JSON.stringify(naBlur.label)})`);
+
+// 2. via de knop moet de markup ins én del tonen, niet alleen de nieuwe tekst
+await page.click('.la-draft-diff');
+await sleep(300);
 const markup = await page.evaluate(() => {
   const box = document.querySelector('.la-draft-txt');
   return { ins: box.querySelectorAll('ins').length, del: box.querySelectorAll('del').length };
@@ -100,7 +116,7 @@ if (opSchijf) {
   // Niet toetsen op een percentage — bij het herschrijven van een hele zin verandert
   // terecht veel — maar op tekst die aantoonbaar níet is aangeraakt: aanhef en afsluiting.
   const gelijk = (opSchijf.diff || []).filter((o) => o.op === '=').map((o) => o.t).join('');
-  zeg(/Hi Anne,/.test(gelijk) && /Groet,/.test(gelijk) && /Luc/.test(gelijk),
+  zeg(/Hi Alex,/.test(gelijk) && /Groet,/.test(gelijk) && /Luc/.test(gelijk),
     'aanhef en afsluiting staan als onveranderd in de diff, niet als vervangen');
 }
 
@@ -145,6 +161,8 @@ if (!punt) {
 // 4. overleeft het een reload? Anders is Lucs werk weg zodra hij ververst.
 await page.reload({ waitUntil: 'load' });
 await sleep(2500);
+await page.click('.la-draft-diff');
+await sleep(300);
 const naReload = await page.evaluate(() => {
   const box = document.querySelector('.la-draft-txt');
   return { ins: box.querySelectorAll('ins').length, del: box.querySelectorAll('del').length,

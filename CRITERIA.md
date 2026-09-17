@@ -391,7 +391,8 @@ Gitignored runtime does not count.
 
 *Evidence:* `tests/run.sh` (default: 00 02–09 11–17). The suite header
 prints `git rev-parse --short HEAD` and a dirty-tree count. Captures
-live in `tests/red/ronde-NN-*.txt`; never overwrite an existing ronde.
+live in `tests/red/ronde-NN-*.txt` (local only, git-ignored: they carry
+machine paths); never overwrite an existing ronde.
 
 </details>
 
