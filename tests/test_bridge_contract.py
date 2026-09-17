@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import socket
+import signal
 import subprocess
 import sys
 import tempfile
@@ -76,9 +77,17 @@ def start_bridge(root, poort):
                 return proc, basis
         except OSError:
             time.sleep(0.05)
-    proc.kill()
+    # Diagnose: waar hangt het kind? SIGINT geeft een KeyboardInterrupt-traceback in de log.
+    rc = proc.poll()
+    try:
+        if rc is None:
+            proc.send_signal(signal.SIGINT)
+            proc.wait(timeout=5)
+    except Exception:
+        proc.kill()
     log.seek(0)
-    raise RuntimeError("bridge kwam niet omhoog op poort %s; log:\n%s" % (poort, log.read()))
+    raise RuntimeError("bridge kwam niet omhoog op poort %s (rc=%s, exe=%s); log:\n%s"
+                       % (poort, rc, sys.executable, log.read()))
 
 
 def main():

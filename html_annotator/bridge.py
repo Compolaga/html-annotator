@@ -73,6 +73,26 @@ def vind_chrome():
 
 
 CHROME = vind_chrome()
+
+
+def chrome_vlaggen():
+    """Headless flags for a screenshot run. Running as root (typical on a server or in a
+    container) Chrome refuses to start its sandbox; --no-sandbox is the documented way out."""
+    vlaggen = ["--headless=new", "--disable-gpu", "--hide-scrollbars",
+               "--no-first-run", "--no-default-browser-check",
+               "--allow-file-access-from-files", "--disable-dev-shm-usage"]
+    if os.name != "nt" and hasattr(os, "geteuid") and os.geteuid() == 0:
+        vlaggen.append("--no-sandbox")
+    return vlaggen
+
+
+def run_chrome(args, timeout=90):
+    """subprocess.run with the Chrome stderr tail in the error, so a failed crop says why."""
+    try:
+        subprocess.run([CHROME] + chrome_vlaggen() + args, check=True, capture_output=True, timeout=timeout)
+    except subprocess.CalledProcessError as e:
+        staart = (e.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-3:]
+        raise RuntimeError("chrome exit %d: %s" % (e.returncode, " | ".join(staart)[:400]))
 CACHE = os.path.join(tempfile.gettempdir(), "luc-annotator-shots")
 MARGE = 12
 LOCK = threading.Lock()
@@ -232,12 +252,7 @@ def volledige_shot(bestand, page_url, dw, dh):
     if bestand:
         url = "file://" + urllib.parse.quote(bestand)
     eis_chrome()
-    subprocess.run(
-        [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-         "--no-first-run", "--no-default-browser-check",
-         "--allow-file-access-from-files",
-         "--screenshot=" + uit, "--window-size=%d,%d" % (dw, dh), url],
-        check=True, capture_output=True, timeout=90)
+    run_chrome(["--screenshot=" + uit, "--window-size=%d,%d" % (dw, dh), url])
     return uit
 
 
@@ -257,14 +272,9 @@ def crop_via_chrome(bestand, page_url, dw, dh, box, uit):
     with open(wrapper, "w", encoding="utf-8") as f:
         f.write(html)
     try:
-        subprocess.run(
-            [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-             "--no-first-run", "--no-default-browser-check",
-             "--allow-file-access-from-files",
-             "--screenshot=" + uit,
-             "--window-size=%d,%d" % (max(1, x1 - x0), max(1, y1 - y0)),
-             "file://" + urllib.parse.quote(wrapper)],
-            check=True, capture_output=True, timeout=90)
+        run_chrome(["--screenshot=" + uit,
+                    "--window-size=%d,%d" % (max(1, x1 - x0), max(1, y1 - y0)),
+                    "file://" + urllib.parse.quote(wrapper)])
     finally:
         try:
             os.remove(wrapper)
