@@ -26,6 +26,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
+import socketserver
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -775,10 +776,21 @@ class Handler(BaseHTTPRequestHandler):
             self._json(500, {"ok": False, "error": str(e)[:300]})
 
 
+class BridgeServer(ThreadingHTTPServer):
+    """HTTPServer.server_bind calls socket.getfqdn(), a reverse-DNS lookup that can hang
+    for half a minute on hosts without working reverse DNS (seen on macOS CI runners).
+    The bridge only ever listens on a loopback IP, so the name is known up front."""
+
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name = self.server_address[0]
+        self.server_port = self.server_address[1]
+
+
 def main():
     try:
         os.makedirs(ROOT, exist_ok=True)
-        srv = ThreadingHTTPServer((HOST, PORT), Handler)
+        srv = BridgeServer((HOST, PORT), Handler)
     except Exception:
         import traceback
         print("annotator bridge failed to start on http://%s:%d" % (HOST, PORT), flush=True)
