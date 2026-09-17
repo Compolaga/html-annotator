@@ -77,6 +77,13 @@ if [ -z "$COMMANDO" ]; then
   exit $((RC == 0 ? 1 : RC))
 fi
 
+# De geregistreerde hook hoort bij déze checkout; wijst hij naar een andere installatie
+# (dev-machine met een live skill elders), dan toetst deze case niet deze code: BLOKKED.
+case "$COMMANDO" in
+  "$SKILL_DIR"/*) ;;
+  *) echo "BLOKKED case-04: geregistreerde hook hoort bij een andere installatie ($COMMANDO)"; exit 2 ;;
+esac
+
 if ! bridge_down; then
   fail "kon de bridge niet omlaag krijgen; gedragsdeel zegt niets"
   exit 2

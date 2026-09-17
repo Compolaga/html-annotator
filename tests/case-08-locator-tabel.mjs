@@ -16,13 +16,13 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SKILL = process.env.LUC_ANNOTATOR_SKILL_DIR
+const SKILL = process.env.HTML_ANNOTATOR_SKILL_DIR || process.env.LUC_ANNOTATOR_SKILL_DIR
   || join(fileURLToPath(new URL('..', import.meta.url)));
-if (!process.env.LUC_ANNOTATOR_PORT) {
-  console.log('  BLOKKED  case-08: LUC_ANNOTATOR_PORT verplicht (anders is de origin-assert tandeloos op 8791)');
+if (!(process.env.HTML_ANNOTATOR_PORT || process.env.LUC_ANNOTATOR_PORT)) {
+  console.log('  BLOKKED  case-08: HTML_ANNOTATOR_PORT verplicht (anders is de origin-assert tandeloos op 8791)');
   process.exit(2);
 }
-const PORT = process.env.LUC_ANNOTATOR_PORT;
+const PORT = process.env.HTML_ANNOTATOR_PORT || process.env.LUC_ANNOTATOR_PORT;
 
 const slug = `zz-test-locator-${Date.now()}`;
 const bestand = join(homedir(), 'Desktop', `${slug}.html`);
